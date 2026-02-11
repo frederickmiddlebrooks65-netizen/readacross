@@ -1,0 +1,2 @@
+                            {/* Floating action buttons on hover */}
+                            <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1 bg-background border rounded shadow-lg p-1 z-50 min-w-max">

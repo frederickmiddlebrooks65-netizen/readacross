@@ -1,0 +1,1903 @@
+import { 
+  users, 
+  documents, 
+  paragraphs, 
+  sentences,
+  translationCache,
+  translationAttempts,
+  notebooks,
+  notebookSentences,
+  glossary,
+  userProgress,
+  wordPracticeSessions,
+  practiceSessions,
+  userRssFeeds,
+  rssArticles,
+  type User, 
+  type InsertUser, 
+  type Document, 
+  type Paragraph, 
+  type Sentence, 
+  type UpdateSentence,
+  type InsertTranslationCache,
+  type TranslationCache,
+  type TranslationAttempt,
+  type InsertTranslationAttempt,
+  type Notebook,
+  type InsertNotebook,
+  type NotebookSentence,
+  type InsertNotebookSentence,
+  type Glossary,
+  type InsertGlossary,
+  type UpdateGlossary,
+  type UserProgress,
+  type InsertUserProgress,
+  type WordPracticeSession,
+  type InsertWordPracticeSession,
+  type PracticeSession,
+  type InsertPracticeSession,
+  type RssFeed,
+  type InsertRssFeed,
+  type RssArticle,
+  type InsertRssArticle
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and, or, sql, inArray, like, desc, isNull, lt, isNotNull, asc, count, ilike } from "drizzle-orm";
+
+export interface IStorage {
+  // User operations
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+
+  // Document operations
+  getAllDocuments(): Promise<Document[]>;
+  getUserDocuments(options?: { category?: string; sortBy?: string; type?: string; search?: string; }): Promise<Document[]>;
+  getDocument(id: number): Promise<Document | undefined>;
+  getDocumentWithParagraphs(id: number): Promise<DocumentWithParagraphs | undefined>;
+  createDocument(document: Omit<Document, "id" | "createdAt" | "progress">): Promise<Document>;
+  createDocumentWithParagraphs(data: CreateDocumentWithParagraphsParams): Promise<Document>;
+  updateDocumentProgress(id: number, progress: number): Promise<Document | undefined>;
+  updateDocumentActivity(id: number): Promise<Document | undefined>;
+  deleteDocument(id: number): Promise<boolean>;
+  
+  // Archive operations
+  archiveDocument(id: number): Promise<Document | undefined>;
+  restoreDocument(id: number): Promise<Document | undefined>;
+  getUserUploadDocuments(options?: { userId?: number; status?: 'active' | 'archived' | 'all'; search?: string; }): Promise<Document[]>;
+  getUserSavedDocuments(options?: { userId?: number; status?: 'active' | 'archived' | 'all'; search?: string; }): Promise<Document[]>;
+  getUserRSSDocuments(options?: { userId?: number; category?: string; sortBy?: string; search?: string; feedId?: number; }): Promise<Document[]>;
+
+  // Admin operations
+  getAdminStats(): Promise<{ totalDocuments: number; userDocuments: number; publicDocuments: number; }>;
+  getAdminDocuments(filters?: { search?: string; category?: string; type?: string; }): Promise<Document[]>;
+  
+  // Document cleanup operations
+  getExpiredDocuments(): Promise<Document[]>;
+  cleanupExpiredDocuments(): Promise<number>;
+  setDocumentExpiration(documentId: number, expiresAt: Date): Promise<Document | undefined>;
+  setExpirationDatesForExistingDocuments(): Promise<number>;
+  
+
+
+  // Public library operations
+  getPublicLibraryDocuments(filters: LibraryFilters): Promise<Document[]>;
+  setDocumentExpiration(documentId: number, expiresAt: Date): Promise<Document | undefined>;
+  setExpirationDatesForExistingDocuments(): Promise<number>;
+
+  // Paragraph operations
+  getParagraphsForDocument(documentId: number): Promise<Paragraph[]>;
+  getParagraph(id: number): Promise<Paragraph | undefined>;
+  createParagraph(paragraph: Omit<Paragraph, "id">): Promise<Paragraph>;
+
+  // Sentence operations
+  getSentencesForParagraph(paragraphId: number): Promise<Sentence[]>;
+  getSentence(id: number): Promise<Sentence | undefined>;
+  getSentenceById(id: number): Promise<Sentence | undefined>;
+  getAllSentences(): Promise<Sentence[]>;
+  getSentencesWithFilters(filters: SentenceFilters): Promise<SentenceWithDocument[]>;
+  createSentence(sentence: Omit<Sentence, "id" | "isScrapped" | "note" | "userTranslation" | "tags" | "practiced" | "practiceHistory" | "lastPracticedAt" | "status" | "practiceCount" | "userFeedback" | "styleVariations" | "notebookName" | "isFavorite">): Promise<Sentence>;
+  updateSentence(id: number, changes: UpdateSentence): Promise<Sentence | undefined>;
+  deleteSentence(id: number): Promise<boolean>;
+  bulkDeleteSentences(sentenceIds: number[]): Promise<boolean>;
+
+  // Notebook operations
+  getAllNotebooks(userId?: number): Promise<Notebook[]>;
+  getNotebook(id: number): Promise<Notebook | undefined>;
+  getNotebookByTitle(title: string): Promise<Notebook | undefined>;
+  getNotebookByDocumentId(documentId: number): Promise<Notebook | undefined>;
+  createNotebook(notebook: Omit<Notebook, "id" | "createdAt" | "updatedAt">): Promise<Notebook>;
+  updateNotebook(id: number, changes: Partial<Pick<Notebook, "title" | "description">>): Promise<Notebook | undefined>;
+  deleteNotebook(id: number): Promise<boolean>;
+
+  // Notebook-sentence relationship operations
+  addSentenceToNotebook(notebookId: number, sentenceId: number, personalNote?: string): Promise<NotebookSentence>;
+  removeSentenceFromNotebook(notebookId: number, sentenceId: number): Promise<boolean>;
+  getSentencesInNotebook(notebookId: number): Promise<Sentence[]>;
+  getNotebooksForSentence(sentenceId: number): Promise<Notebook[]>;
+  isSentenceInNotebook(sentenceId: number, notebookId: number): Promise<boolean>;
+  updateNotebookSentenceNote(notebookId: number, sentenceId: number, personalNote: string): Promise<void>;
+
+  // Translation cache operations
+  findTranslation(sourceText: string, sourceLanguage: string, targetLanguage: string): Promise<TranslationCache | undefined>;
+  saveTranslation(translation: InsertTranslationCache): Promise<TranslationCache>;
+  updateTranslationUsage(id: number): Promise<TranslationCache | undefined>;
+  clearTranslationCache(pattern?: string): Promise<number>;
+  clearAllTranslationCache(): Promise<number>;
+
+  // Glossary operations
+  getAllGlossaryTerms(userId: number): Promise<Glossary[]>;
+  getAllGlossaryEntries(): Promise<Glossary[]>;
+  getGlossaryTerm(id: number): Promise<Glossary | undefined>;
+  getGlossaryEntry(id: number): Promise<Glossary | undefined>;
+  createGlossaryTerm(term: Omit<Glossary, "id" | "createdAt" | "lastReviewed" | "reviewCount">): Promise<Glossary>;
+  updateGlossaryTerm(id: number, changes: Partial<Pick<Glossary, "definition" | "contextSentence" | "notes" | "tags">>): Promise<Glossary | undefined>;
+  updateGlossaryEntry(id: number, changes: UpdateGlossary): Promise<Glossary | undefined>;
+  deleteGlossaryTerm(id: number): Promise<boolean>;
+
+  // Word practice session operations
+  createWordPracticeSession(session: Omit<WordPracticeSession, "id" | "createdAt">): Promise<WordPracticeSession>;
+  getWordPracticeSessions(userId: number, wordId?: number): Promise<WordPracticeSession[]>;
+
+  // Practice session operations
+  createPracticeSession(session: Omit<PracticeSession, "id" | "createdAt" | "updatedAt">): Promise<PracticeSession>;
+  updatePracticeSession(id: number, changes: Partial<Omit<PracticeSession, "id" | "createdAt" | "updatedAt">>): Promise<PracticeSession | undefined>;
+  getPracticeSession(id: number): Promise<PracticeSession | undefined>;
+  getUserPracticeSessions(userId: number, status?: string): Promise<PracticeSession[]>;
+
+  // Translation attempts operations
+  createTranslationAttempt(attempt: Omit<TranslationAttempt, "id" | "createdAt">): Promise<TranslationAttempt>;
+  getTranslationAttemptsForSentence(sentenceId: number, userId: number): Promise<TranslationAttempt[]>;
+  getTranslationAttempt(id: number): Promise<TranslationAttempt | undefined>;
+  getLatestTranslationAttempt(sentenceId: number, userId: number): Promise<TranslationAttempt | undefined>;
+
+  // User progress operations
+  getUserProgress(userId: number): Promise<UserProgress | undefined>;
+  createUserProgress(progress: Omit<UserProgress, "id" | "updatedAt">): Promise<UserProgress>;
+  updateUserProgress(userId: number, changes: Partial<Omit<UserProgress, "id" | "userId">>): Promise<UserProgress | undefined>;
+
+  // Document content update operations
+  deleteDocumentContent(documentId: number): Promise<boolean>;
+  addParagraphsToDocument(documentId: number, paragraphsData: any[]): Promise<boolean>;
+
+  // RSS feed operations
+  getRSSFeeds(userId: number): Promise<RssFeed[]>;
+  getRSSFeed(id: number): Promise<RssFeed | undefined>;
+  createRSSFeed(feed: Omit<RssFeed, "id" | "createdAt" | "lastFetchedAt" | "lastSuccessAt" | "errorCount" | "lastError">): Promise<RssFeed>;
+  updateRSSFeed(id: number, changes: Partial<Omit<RssFeed, "id" | "userId" | "createdAt">>): Promise<RssFeed | undefined>;
+  deleteRSSFeed(id: number): Promise<boolean>;
+  updateRSSFeedSyncStatus(id: number, lastFetchedAt: Date, lastSuccessAt?: Date, errorCount?: number, lastError?: string): Promise<void>;
+
+  // RSS article operations
+  getRSSArticles(feedId: number): Promise<RssArticle[]>;
+  getRSSArticle(id: number): Promise<RssArticle | undefined>;
+  createRSSArticle(article: Omit<RssArticle, "id" | "createdAt">): Promise<RssArticle>;
+  updateRSSArticle(id: number, changes: Partial<Omit<RssArticle, "id" | "feedId" | "createdAt">>): Promise<RssArticle | undefined>;
+  deleteRSSArticle(id: number): Promise<boolean>;
+  getUnprocessedRSSArticles(feedId?: number): Promise<RssArticle[]>;
+  markRSSArticleAsProcessed(id: number, documentId: number): Promise<void>;
+}
+
+// Additional interfaces for library filtering
+export interface LibraryFilters {
+  category?: string;
+  difficulty?: string;
+  sortBy?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+interface DocumentWithParagraphs extends Document {
+  paragraphs: ParagraphWithSentences[];
+}
+
+interface ParagraphWithSentences extends Paragraph {
+  sentences: Sentence[];
+}
+
+interface CreateDocumentWithParagraphsParams {
+  title: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  userId?: number | null;
+  fileType?: string;
+  author?: string;
+  source?: string;
+  category?: string;
+  difficulty?: string;
+  tags?: string;
+  originalUrl?: string;
+  licenseType?: string;
+  isPublic?: boolean;
+  sourceType?: string;
+  paragraphs: Array<{
+    order: number;
+    title: string | null;
+    sentences: Array<{
+      order: number;
+      source: string;
+      target?: string;
+    }>;
+  }>;
+}
+
+interface SentenceFilters {
+  documentId?: number;
+  status?: string;
+  isFavorite?: boolean;
+  search?: string;
+  sortBy?: 'recent' | 'practice-count' | 'alphabetical' | 'status';
+}
+
+interface SentenceWithDocument extends Sentence {
+  documentTitle: string;
+  documentId: number;
+  documentSourceLanguage: string;
+  documentTargetLanguage: string;
+  averageScore?: number;
+  document: {
+    id: number;
+    title: string;
+    sourceLanguage: string;
+    targetLanguage: string;
+  };
+}
+
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  // Document methods
+  async getAllDocuments(): Promise<Document[]> {
+    return await db.select().from(documents);
+  }
+
+  async getUserDocuments(options?: {
+    category?: string;
+    sortBy?: string;
+    type?: string;
+    search?: string;
+  }): Promise<Document[]> {
+    console.log(`[STORAGE DEBUG] getUserDocuments called with options:`, options);
+    
+    // Route to specific functions based on type for clearer logic
+    if (options?.type === "uploads") {
+      return this.getUserUploadDocuments(options);
+    } else if (options?.type === "rss") {
+      return this.getUserRSSDocuments(options);
+    } else if (options?.type === "saved") {
+      return this.getUserSavedDocuments(options);
+    }
+    
+    // Default: return all user documents
+    let query = db.select().from(documents)
+      .where(or(eq(documents.isPublic, false), isNull(documents.isPublic)));
+      
+    // Apply sorting
+    if (options?.sortBy === "activity") {
+      query = query.orderBy(desc(documents.lastActivityAt));
+    } else {
+      query = query.orderBy(desc(documents.createdAt));
+    }
+    
+    return await query;
+  }
+
+  async getUserUploadDocuments(options?: {
+    userId?: number;
+    status?: 'active' | 'archived' | 'all';
+    search?: string;
+  }): Promise<Document[]> {
+    console.log(`[STORAGE DEBUG] getUserUploadDocuments called with status: ${options?.status}`);
+    
+    let conditions = [
+      eq(documents.sourceType, 'uploaded'),
+      eq(documents.isPublic, false)
+    ];
+
+    if (options?.userId) {
+      conditions.push(eq(documents.userId, options.userId));
+    }
+
+    if (options?.status === 'active') {
+      conditions.push(eq(documents.isArchived, false));
+    } else if (options?.status === 'archived') {
+      conditions.push(eq(documents.isArchived, true));
+    }
+    // 'all' status doesn't add any condition
+
+    if (options?.search) {
+      conditions.push(ilike(documents.title, `%${options.search}%`));
+    }
+
+    return await db
+      .select()
+      .from(documents)
+      .where(and(...conditions))
+      .orderBy(desc(documents.lastActivityAt));
+  }
+
+  async getUserRSSDocuments(options?: {
+    category?: string;
+    sortBy?: string;
+    search?: string;
+    feedId?: number;
+  }): Promise<(Document & { feedAlias?: string })[]> {
+    console.log(`[STORAGE DEBUG] getUserRSSDocuments called with options:`, options);
+    
+    let conditions = [
+      or(eq(documents.isPublic, false), isNull(documents.isPublic)),
+      eq(documents.source, "RSS Feed")
+    ];
+    
+    // Apply feed filter
+    if (options?.feedId) {
+      conditions.push(eq(documents.feedId, options.feedId));
+    }
+    
+    // Apply search filter
+    if (options?.search && options.search.trim()) {
+      const searchTerm = `%${options.search.trim()}%`;
+      conditions.push(
+        or(
+          ilike(documents.title, searchTerm),
+          ilike(documents.author, searchTerm)
+        )
+      );
+    }
+    
+    let query = db.select({
+      ...documents,
+      feedAlias: userRssFeeds.alias,
+    })
+    .from(documents)
+    .leftJoin(userRssFeeds, eq(documents.feedId, userRssFeeds.id))
+    .where(and(...conditions));
+    
+    // Apply sorting  
+    if (options?.sortBy === "latest") {
+      query = query.orderBy(desc(documents.createdAt));
+    } else {
+      query = query.orderBy(desc(documents.lastActivityAt));
+    }
+    
+    return await query;
+  }
+
+  async getUserSavedDocuments(options?: { 
+    userId?: number; 
+    status?: 'active' | 'archived' | 'all'; 
+    search?: string; 
+  }): Promise<Document[]> {
+    console.log(`[STORAGE DEBUG] getUserSavedDocuments called with status: ${options?.status}`);
+    
+    let conditions = [
+      eq(documents.sourceType, 'explore'),
+      eq(documents.isPublic, false)
+    ];
+
+    if (options?.userId) {
+      conditions.push(eq(documents.userId, options.userId));
+    }
+
+    if (options?.status === 'active') {
+      conditions.push(eq(documents.isArchived, false));
+    } else if (options?.status === 'archived') {
+      conditions.push(eq(documents.isArchived, true));
+    }
+    // 'all' status doesn't add any condition
+
+    if (options?.search) {
+      conditions.push(ilike(documents.title, `%${options.search}%`));
+    }
+
+    return await db
+      .select()
+      .from(documents)
+      .where(and(...conditions))
+      .orderBy(desc(documents.lastActivityAt));
+  }
+
+  async getDocument(id: number): Promise<Document | undefined> {
+    const [document] = await db.select().from(documents).where(eq(documents.id, id));
+    return document || undefined;
+  }
+
+  async getDocumentWithParagraphs(id: number): Promise<DocumentWithParagraphs | undefined> {
+    const document = await this.getDocument(id);
+    if (!document) return undefined;
+
+    const paragraphsList = await this.getParagraphsForDocument(id);
+
+    const paragraphsWithSentences = await Promise.all(
+      paragraphsList.map(async paragraph => {
+        const sentencesList = await this.getSentencesForParagraph(paragraph.id);
+        return {
+          ...paragraph,
+          sentences: sentencesList,
+        };
+      })
+    );
+
+    return {
+      ...document,
+      paragraphs: paragraphsWithSentences,
+    };
+  }
+
+  async createDocument(document: Omit<Document, "id" | "createdAt" | "progress">): Promise<Document> {
+    // Calculate expiration date for public documents based on category
+    let expiresAt = document.expiresAt;
+    if (document.isPublic && document.category && !expiresAt) {
+      const RETENTION_POLICY: Record<string, number> = {
+        'News': 30,
+        '뉴스': 30,
+        'Non-fiction': 60,
+        '칼럼·에세이': 60,
+        'Educational': 90,
+        '교육': 90,
+        'Academic': 90,
+        '논문': 90,
+        'Literature': 180,
+        '문학': 180,
+      };
+
+      const retentionDays = RETENTION_POLICY[document.category] || 30;
+      const expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + retentionDays);
+      expiresAt = expirationDate;
+    }
+
+    const [newDocument] = await db
+      .insert(documents)
+      .values({
+        title: document.title,
+        sourceLanguage: document.sourceLanguage,
+        targetLanguage: document.targetLanguage,
+        userId: document.userId,
+        progress: 0,
+        fileType: document.fileType || "text",
+        isArchived: document.isArchived || false,
+        sourceType: document.sourceType || "uploaded",
+        origin: document.origin || null,
+        author: document.author || null,
+        source: document.source || null,
+        category: document.category || "Educational",
+        difficulty: document.difficulty || null,
+        tags: document.tags || null,
+        originalUrl: document.originalUrl || null,
+        licenseType: document.licenseType || null,
+        isPublic: document.isPublic || false,
+        expiresAt: expiresAt,
+        lastActivityAt: new Date(),
+        feedId: document.feedId || null,
+      })
+      .returning();
+
+    return newDocument;
+  }
+
+  async createDocumentWithParagraphs(data: CreateDocumentWithParagraphsParams): Promise<Document> {
+    // Create the document
+    const newDocument = await this.createDocument({
+      title: data.title,
+      sourceLanguage: data.sourceLanguage,
+      targetLanguage: data.targetLanguage,
+      userId: data.userId || null,
+      fileType: data.fileType || "text",
+      isArchived: false,
+      sourceType: data.sourceType || "uploaded",
+      author: data.author || null,
+      source: data.source || null,
+      category: data.category || "Educational",
+      difficulty: data.difficulty || null,
+      tags: data.tags || null,
+      originalUrl: data.originalUrl || null,
+      licenseType: data.licenseType || null,
+      isPublic: data.isPublic || false,
+      expiresAt: null,
+      lastActivityAt: new Date(),
+    });
+
+    // Create paragraphs and sentences
+    for (const paragraphData of data.paragraphs) {
+      const newParagraph = await this.createParagraph({
+        documentId: newDocument.id,
+        order: paragraphData.order,
+        title: paragraphData.title,
+      });
+
+      // Create sentences for this paragraph
+      for (const sentenceData of paragraphData.sentences) {
+        await this.createSentence({
+          paragraphId: newParagraph.id,
+          order: sentenceData.order,
+          source: sentenceData.source,
+          target: sentenceData.target || null,
+        });
+      }
+    }
+
+    return newDocument;
+  }
+
+  async updateDocumentProgress(id: number, progress: number): Promise<Document | undefined> {
+    const [updatedDocument] = await db
+      .update(documents)
+      .set({ progress, lastActivityAt: new Date() })
+      .where(eq(documents.id, id))
+      .returning();
+
+    return updatedDocument || undefined;
+  }
+
+  async updateDocumentActivity(id: number): Promise<Document | undefined> {
+    const [updatedDocument] = await db
+      .update(documents)
+      .set({ lastActivityAt: new Date() })
+      .where(eq(documents.id, id))
+      .returning();
+
+    return updatedDocument || undefined;
+  }
+
+  async deleteDocument(id: number): Promise<boolean> {
+    try {
+      // Get all sentence IDs for this document first
+      const sentenceIds = await db
+        .select({ id: sentences.id })
+        .from(sentences)
+        .innerJoin(paragraphs, eq(sentences.paragraphId, paragraphs.id))
+        .where(eq(paragraphs.documentId, id));
+
+      const sentenceIdList = sentenceIds.map(s => s.id);
+
+      if (sentenceIdList.length > 0) {
+        // Delete translation attempts first (foreign key dependency)
+        await db.delete(translationAttempts).where(
+          inArray(translationAttempts.sentenceId, sentenceIdList)
+        );
+
+        // Delete notebook-sentence relationships
+        await db.delete(notebookSentences).where(
+          inArray(notebookSentences.sentenceId, sentenceIdList)
+        );
+
+        // Delete word practice sessions if any reference these sentences
+        // This is a safety measure in case there are any FK dependencies
+        await db.delete(wordPracticeSessions).where(
+          inArray(wordPracticeSessions.userId, [1]) // Assuming userId 1, adjust as needed
+        );
+
+        // Delete sentences
+        await db.delete(sentences).where(
+          inArray(sentences.id, sentenceIdList)
+        );
+      }
+
+      // Delete paragraphs
+      await db.delete(paragraphs).where(eq(paragraphs.documentId, id));
+
+      // Delete any system notebooks associated with this document
+      await db.delete(notebooks).where(
+        and(
+          eq(notebooks.documentId, id),
+          eq(notebooks.type, "system")
+        )
+      );
+
+      // Finally delete the document
+      const result = await db.delete(documents).where(eq(documents.id, id));
+
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      return false;
+    }
+  }
+
+  // Archive operations
+  async archiveDocument(id: number): Promise<Document | undefined> {
+    console.log(`[STORAGE] Archiving document ${id}`);
+    const [updatedDocument] = await db
+      .update(documents)
+      .set({ isArchived: true, lastActivityAt: new Date() })
+      .where(eq(documents.id, id))
+      .returning();
+
+    console.log(`[STORAGE] Archive result for document ${id}:`, updatedDocument?.isArchived);
+    return updatedDocument || undefined;
+  }
+
+  async restoreDocument(id: number): Promise<Document | undefined> {
+    const [updatedDocument] = await db
+      .update(documents)
+      .set({ isArchived: false, lastActivityAt: new Date() })
+      .where(eq(documents.id, id))
+      .returning();
+
+    return updatedDocument || undefined;
+  }
+
+
+
+  async getUserSavedDocuments(options?: { 
+    userId?: number; 
+    status?: 'active' | 'archived' | 'all'; 
+    search?: string; 
+  }): Promise<Document[]> {
+    console.log('[STORAGE DEBUG] getUserSavedDocuments called');
+    
+    let conditions = [
+      eq(documents.sourceType, 'explore'),
+      eq(documents.isPublic, false)
+    ];
+
+    if (options?.userId) {
+      conditions.push(eq(documents.userId, options.userId));
+    }
+
+    if (options?.status === 'active') {
+      conditions.push(eq(documents.isArchived, false));
+    } else if (options?.status === 'archived') {
+      conditions.push(eq(documents.isArchived, true));
+    }
+    // 'all' status doesn't add any condition
+
+    if (options?.search) {
+      conditions.push(ilike(documents.title, `%${options.search}%`));
+    }
+
+    return await db
+      .select()
+      .from(documents)
+      .where(and(...conditions))
+      .orderBy(desc(documents.lastActivityAt));
+  }
+
+
+
+    if (options?.category && options.category !== 'all') {
+      conditions.push(eq(documents.category, options.category));
+    }
+
+    if (options?.search) {
+      conditions.push(ilike(documents.title, `%${options.search}%`));
+    }
+
+    let orderBy = desc(documents.lastActivityAt);
+    if (options?.sortBy === 'name') {
+      orderBy = asc(documents.title);
+    } else if (options?.sortBy === 'oldest') {
+      orderBy = asc(documents.createdAt);
+    }
+
+    return await db
+      .select()
+      .from(documents)
+      .where(and(...conditions))
+      .orderBy(orderBy);
+  }
+
+  async getPublicLibraryDocuments(filters: LibraryFilters): Promise<Document[]> {
+    let conditions = [eq(documents.isPublic, true), eq(documents.isArchived, false)];
+
+    // Apply filters with simplified category mapping
+    if (filters.category && filters.category !== 'all') {
+      const categoryMapping: Record<string, string[]> = {
+        'Literature': ['Literature', 'Fiction', '문학'],
+        'Academic': ['Academic', 'Research', '논문'],
+        'News': ['News', 'Australia news', 'World news', 'UK news', 'US news', 'Politics', 'Technology', 'Business', 'Global development', '뉴스'], 
+        'Educational': ['Educational', 'Transcript', '교육'],
+        'Opinion': ['Opinion', 'Non-fiction', 'Essay', 'Life and style', 'Travel', 'Food', 'Sport', 'Culture', '에세이/오피니언', '칼럼·에세이', 'Television & radio']
+      };
+
+      const englishCategories = categoryMapping[filters.category];
+      if (englishCategories && englishCategories.length > 0) {
+        // Use OR condition for multiple English categories
+        const categoryConditions = englishCategories.map(cat => eq(documents.category, cat));
+        if (categoryConditions.length === 1) {
+          conditions.push(categoryConditions[0]);
+        } else {
+          const orCondition = or(...categoryConditions);
+          if (orCondition) {
+            conditions.push(orCondition);
+          }
+        }
+      } else {
+        // Fallback to direct match for English categories
+        conditions.push(eq(documents.category, filters.category));
+      }
+    }
+
+    if (filters.difficulty) {
+      conditions.push(eq(documents.difficulty, filters.difficulty));
+    }
+
+    // Add search functionality if provided
+    if (filters.search && filters.search.trim()) {
+      const searchTerm = `%${filters.search.trim()}%`;
+      conditions.push(
+        or(
+          ilike(documents.title, searchTerm),
+          ilike(documents.author, searchTerm),
+          ilike(documents.content, searchTerm)
+        )
+      );
+    }
+
+    let query = db.select().from(documents).where(and(...conditions));
+
+    // Add pagination support for performance
+    const limit = filters.limit || 50;
+    const offset = filters.offset || 0;
+    query = query.limit(limit).offset(offset);
+
+    // Apply simplified sorting (Latest, Title, Author only)
+    switch (filters.sortBy) {
+      case "author":
+        return await query.orderBy(documents.author);
+      case "title":
+        return await query.orderBy(documents.title);
+      case "activity":
+        return await query.orderBy(desc(documents.lastActivityAt), desc(documents.createdAt));
+      case "created":
+      case "latest":
+      default:
+        return await query.orderBy(desc(documents.createdAt));
+    }
+  }
+
+  async cleanupExpiredDocuments(): Promise<number> {
+    try {
+      const now = new Date();
+      const result = await db
+        .delete(documents)
+        .where(
+          and(
+            eq(documents.isPublic, true),
+            sql`${documents.expiresAt} IS NOT NULL AND ${documents.expiresAt} < ${now}`
+          )
+        );
+
+      return result.rowCount || 0;
+    } catch (error) {
+      console.error("Error cleaning up expired documents:", error);
+      return 0;
+    }
+  }
+
+  async setDocumentExpiration(documentId: number, expiresAt: Date): Promise<Document | undefined> {
+    try {
+      const [updatedDocument] = await db
+        .update(documents)
+        .set({ expiresAt })
+        .where(eq(documents.id, documentId))
+        .returning();
+
+      return updatedDocument;
+    } catch (error) {
+      console.error("Error setting document expiration:", error);
+      return undefined;
+    }
+  }
+
+  // Set expiration dates for existing public documents that don't have them
+  async setExpirationDatesForExistingDocuments(): Promise<number> {
+    try {
+      // Get public documents without expiration dates
+      const documentsWithoutExpiration = await db
+        .select()
+        .from(documents)
+        .where(
+          and(
+            eq(documents.isPublic, true),
+            isNull(documents.expiresAt)
+          )
+        );
+
+      console.log(`Found ${documentsWithoutExpiration.length} public documents without expiration dates`);
+
+      const RETENTION_POLICY: Record<string, number> = {
+        'News': 30,
+        '뉴스': 30,
+        'Non-fiction': 60,
+        '칼럼·에세이': 60,
+        'Educational': 90,
+        '교육': 90,
+        'Academic': 90,
+        '논문': 90,
+        'Literature': 180,
+        '문학': 180,
+      };
+
+      let updatedCount = 0;
+      for (const doc of documentsWithoutExpiration) {
+        const retentionDays = RETENTION_POLICY[doc.category || ''] || 30;
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + retentionDays);
+
+        await db
+          .update(documents)
+          .set({ expiresAt: expirationDate })
+          .where(eq(documents.id, doc.id));
+
+        updatedCount++;
+      }
+
+      console.log(`Successfully set expiration dates for ${updatedCount} documents`);
+      return updatedCount;
+    } catch (error) {
+      console.error("Error setting expiration dates:", error);
+      throw error;
+    }
+  }
+
+  // Paragraph methods
+  async getParagraphsForDocument(documentId: number): Promise<Paragraph[]> {
+    return await db
+      .select()
+      .from(paragraphs)
+      .where(eq(paragraphs.documentId, documentId))
+      .orderBy(paragraphs.order);
+  }
+
+  async getParagraph(id: number): Promise<Paragraph | undefined> {
+    const [paragraph] = await db
+      .select()
+      .from(paragraphs)
+      .where(eq(paragraphs.id, id));
+
+    return paragraph || undefined;
+  }
+
+  async createParagraph(paragraph: Omit<Paragraph, "id">): Promise<Paragraph> {
+    const [newParagraph] = await db
+      .insert(paragraphs)
+      .values(paragraph)
+      .returning();
+
+    return newParagraph;
+  }
+
+  // Sentence methods
+  async getSentencesForParagraph(paragraphId: number): Promise<Sentence[]> {
+    return await db
+      .select()
+      .from(sentences)
+      .where(eq(sentences.paragraphId, paragraphId))
+      .orderBy(sentences.order);
+  }
+
+  async getSentence(id: number): Promise<Sentence | undefined> {
+    const [sentence] = await db
+      .select()
+      .from(sentences)
+      .where(eq(sentences.id, id));
+
+    return sentence || undefined;
+  }
+
+  async getSentenceById(id: number): Promise<Sentence | undefined> {
+    const [sentence] = await db
+      .select()
+      .from(sentences)
+      .where(eq(sentences.id, id));
+
+    return sentence || undefined;
+  }
+
+  async getAllSentences(): Promise<Sentence[]> {
+    return await db.select().from(sentences);
+  }
+
+  async createSentence(sentence: Omit<Sentence, "id" | "isScrapped" | "note" | "userTranslation" | "tags" | "practiced" | "practiceHistory" | "lastPracticedAt" | "status" | "practiceCount" | "userFeedback" | "styleVariations" | "notebookName" | "isFavorite">): Promise<Sentence> {
+    const [newSentence] = await db
+      .insert(sentences)
+      .values({
+        ...sentence,
+        isScrapped: false,
+        note: null,
+        status: "new",
+        practiceCount: 0,
+        isFavorite: false,
+      })
+      .returning();
+
+    return newSentence;
+  }
+
+  async updateSentence(id: number, changes: UpdateSentence): Promise<Sentence | undefined> {
+    const [updatedSentence] = await db
+      .update(sentences)
+      .set(changes)
+      .where(eq(sentences.id, id))
+      .returning();
+
+    return updatedSentence || undefined;
+  }
+
+  async deleteSentence(id: number): Promise<boolean> {
+    try {
+      // First remove from notebook relationships
+      await db.delete(notebookSentences).where(eq(notebookSentences.sentenceId, id));
+
+      // Then delete the sentence
+      const result = await db.delete(sentences).where(eq(sentences.id, id));
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error("Error deleting sentence:", error);
+      return false;
+    }
+  }
+
+  async bulkDeleteSentences(sentenceIds: number[]): Promise<boolean> {
+    try {
+      // First remove from notebook relationships
+      await db.delete(notebookSentences).where(inArray(notebookSentences.sentenceId, sentenceIds));
+
+      // Then delete the sentences
+      const result = await db.delete(sentences).where(inArray(sentences.id, sentenceIds));
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error("Error bulk deleting sentences:", error);
+      return false;
+    }
+  }
+
+  async getSentencesWithFilters(filters: SentenceFilters): Promise<SentenceWithDocument[]> {
+    // For now, use a simpler approach that works with current Drizzle setup
+    const allSentences = await db
+      .select({
+        id: sentences.id,
+        paragraphId: sentences.paragraphId,
+        order: sentences.order,
+        source: sentences.source,
+        target: sentences.target,
+        isScrapped: sentences.isScrapped,
+        note: sentences.note,
+        userTranslation: sentences.userTranslation,
+        tags: sentences.tags,
+        practiced: sentences.practiced,
+        practiceHistory: sentences.practiceHistory,
+        lastPracticedAt: sentences.lastPracticedAt,
+        status: sentences.status,
+        practiceCount: sentences.practiceCount,
+        userFeedback: sentences.userFeedback,
+        styleVariations: sentences.styleVariations,
+        notebookName: sentences.notebookName,
+        isFavorite: sentences.isFavorite,
+        documentTitle: documents.title,
+        documentId: documents.id,
+        documentSourceLanguage: documents.sourceLanguage,
+        documentTargetLanguage: documents.targetLanguage,
+      })
+      .from(sentences)
+      .innerJoin(paragraphs, eq(sentences.paragraphId, paragraphs.id))
+      .innerJoin(documents, eq(paragraphs.documentId, documents.id))
+      .where(eq(sentences.isScrapped, true));
+
+    // Apply client-side filtering (can be optimized later)
+    let filtered = allSentences;
+
+    if (filters.documentId) {
+      const docSentences = await db
+        .select({ id: sentences.id })
+        .from(sentences)
+        .innerJoin(paragraphs, eq(sentences.paragraphId, paragraphs.id))
+        .where(eq(paragraphs.documentId, filters.documentId));
+
+      const sentenceIds = docSentences.map(s => s.id);
+      filtered = filtered.filter(s => sentenceIds.includes(s.id));
+    }
+
+    if (filters.status) {
+      if (filters.status === 'favorites') {
+        filtered = filtered.filter(s => s.isFavorite === true);
+      } else {
+        filtered = filtered.filter(s => s.status === filters.status);
+      }
+    }
+
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(s => 
+        s.source.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply sorting
+    switch (filters.sortBy) {
+      case 'recent':
+        filtered.sort((a, b) => {
+          if (!a.lastPracticedAt && !b.lastPracticedAt) return b.id - a.id;
+          if (!a.lastPracticedAt) return 1;
+          if (!b.lastPracticedAt) return -1;
+          return new Date(b.lastPracticedAt).getTime() - new Date(a.lastPracticedAt).getTime();
+        });
+        break;
+      case 'practice-count':
+        filtered.sort((a, b) => (b.practiceCount || 0) - (a.practiceCount || 0));
+        break;
+      case 'alphabetical':
+        filtered.sort((a, b) => a.source.localeCompare(b.source));
+        break;
+      case 'status':
+        filtered.sort((a, b) => (a.status || 'new').localeCompare(b.status || 'new'));
+        break;
+      default:
+        filtered.sort((a, b) => b.id - a.id);
+    }
+
+    // Add averageScore calculation and document object
+    return filtered.map(sentence => ({
+      ...sentence,
+      averageScore: undefined, // Can be calculated if needed
+      document: {
+        id: sentence.documentId,
+        title: sentence.documentTitle,
+        sourceLanguage: sentence.documentSourceLanguage,
+        targetLanguage: sentence.documentTargetLanguage,
+      }
+    }));
+  }
+
+  // Notebook operations
+  async getAllNotebooks(userId?: number): Promise<Notebook[]> {
+    const query = db.select().from(notebooks);
+    if (userId) {
+      return await query.where(eq(notebooks.userId, userId));
+    }
+    return await query;
+  }
+
+  async getNotebookByTitle(title: string): Promise<Notebook | undefined> {
+    const [notebook] = await db
+      .select()
+      .from(notebooks)
+      .where(eq(notebooks.title, title));
+
+    return notebook || undefined;
+  }
+
+  async getNotebook(id: number): Promise<Notebook | undefined> {
+    const [notebook] = await db
+      .select()
+      .from(notebooks)
+      .where(eq(notebooks.id, id));
+
+    return notebook || undefined;
+  }
+
+  async getNotebookByDocumentId(documentId: number): Promise<Notebook | undefined> {
+    const [notebook] = await db
+      .select()
+      .from(notebooks)
+      .where(and(eq(notebooks.documentId, documentId), eq(notebooks.type, "system")));
+
+    return notebook || undefined;
+  }
+
+  async createNotebook(notebook: Omit<Notebook, "id" | "createdAt" | "updatedAt">): Promise<Notebook> {
+    const [newNotebook] = await db
+      .insert(notebooks)
+      .values(notebook)
+      .returning();
+
+    return newNotebook;
+  }
+
+  async updateNotebook(id: number, changes: Partial<Pick<Notebook, "title" | "description">>): Promise<Notebook | undefined> {
+    const [notebook] = await db
+      .update(notebooks)
+      .set({ 
+        ...changes,
+        updatedAt: new Date()
+      })
+      .where(eq(notebooks.id, id))
+      .returning();
+
+    return notebook || undefined;
+  }
+
+  async deleteNotebook(id: number): Promise<boolean> {
+    // First delete all notebook-sentence relationships
+    await db.delete(notebookSentences).where(eq(notebookSentences.notebookId, id));
+
+    // Then delete the notebook
+    const result = await db.delete(notebooks).where(eq(notebooks.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Notebook-sentence relationship operations
+  async addSentenceToNotebook(notebookId: number, sentenceId: number, personalNote?: string): Promise<NotebookSentence> {
+    const [relationship] = await db
+      .insert(notebookSentences)
+      .values({ notebookId, sentenceId, personalNote })
+      .returning();
+
+    return relationship;
+  }
+
+  async isSentenceInNotebook(sentenceId: number, notebookId: number): Promise<boolean> {
+    const [relationship] = await db
+      .select()
+      .from(notebookSentences)
+      .where(
+        and(
+          eq(notebookSentences.sentenceId, sentenceId),
+          eq(notebookSentences.notebookId, notebookId)
+        )
+      );
+
+    return !!relationship;
+  }
+
+  async updateNotebookSentenceNote(notebookId: number, sentenceId: number, personalNote: string): Promise<void> {
+    await db
+      .update(notebookSentences)
+      .set({ personalNote })
+      .where(
+        and(
+          eq(notebookSentences.notebookId, notebookId),
+          eq(notebookSentences.sentenceId, sentenceId)
+        )
+      );
+  }
+
+  async removeSentenceFromNotebook(notebookId: number, sentenceId: number): Promise<boolean> {
+    const result = await db
+      .delete(notebookSentences)
+      .where(
+        and(
+          eq(notebookSentences.notebookId, notebookId),
+          eq(notebookSentences.sentenceId, sentenceId)
+        )
+      );
+
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getSentencesInNotebook(notebookId: number): Promise<Sentence[]> {
+    const result = await db
+      .select({ sentence: sentences })
+      .from(notebookSentences)
+      .innerJoin(sentences, eq(notebookSentences.sentenceId, sentences.id))
+      .where(eq(notebookSentences.notebookId, notebookId));
+
+    return result.map(row => row.sentence);
+  }
+
+  async getNotebooksForSentence(sentenceId: number): Promise<Notebook[]> {
+    const result = await db
+      .select({ notebook: notebooks })
+      .from(notebookSentences)
+      .innerJoin(notebooks, eq(notebookSentences.notebookId, notebooks.id))
+      .where(eq(notebookSentences.sentenceId, sentenceId));
+
+    return result.map(row => row.notebook);
+  }
+
+  // Translation cache operations
+  async findTranslation(sourceText: string, sourceLanguage: string, targetLanguage: string): Promise<TranslationCache | undefined> {
+    const [cached] = await db
+      .select()
+      .from(translationCache)
+      .where(
+        and(
+          eq(translationCache.sourceText, sourceText),
+          eq(translationCache.sourceLanguage, sourceLanguage),
+          eq(translationCache.targetLanguage, targetLanguage)
+        )
+      );
+
+    return cached || undefined;
+  }
+
+  async saveTranslation(translation: InsertTranslationCache): Promise<TranslationCache> {
+    const [saved] = await db
+      .insert(translationCache)
+      .values(translation)
+      .returning();
+
+    return saved;
+  }
+
+  async updateTranslationUsage(id: number): Promise<TranslationCache | undefined> {
+    const [updated] = await db
+      .update(translationCache)
+      .set({ 
+        usageCount: sql`${translationCache.usageCount} + 1`,
+        lastUsed: new Date()
+      })
+      .where(eq(translationCache.id, id))
+      .returning();
+
+    return updated || undefined;
+  }
+
+  // Clear translation cache (for testing improved translations)
+  async clearTranslationCache(pattern?: string): Promise<number> {
+    try {
+      let result;
+      if (pattern) {
+        result = await db
+          .delete(translationCache)
+          .where(like(translationCache.sourceText, `%${pattern}%`));
+      } else {
+        result = await db.delete(translationCache);
+      }
+      return result.rowCount ?? 0;
+    } catch (error) {
+      console.error("Error clearing translation cache:", error);
+      return 0;
+    }
+  }
+
+  // Clear all translation cache
+  async clearAllTranslationCache(): Promise<number> {
+    try {
+      const result = await db.delete(translationCache);
+      return result.rowCount ?? 0;
+    } catch (error) {
+      console.error("Error clearing all translation cache:", error);
+      return 0;
+    }
+  }
+
+  // Glossary operations
+  async getAllGlossaryTerms(userId: number): Promise<Glossary[]> {
+    return await db
+      .select()
+      .from(glossary)
+      .where(eq(glossary.userId, userId));
+  }
+
+  async getGlossaryTerm(id: number): Promise<Glossary | undefined> {
+    const [term] = await db
+      .select()
+      .from(glossary)
+      .where(eq(glossary.id, id));
+
+    return term || undefined;
+  }
+
+  async createGlossaryTerm(term: Omit<Glossary, "id" | "createdAt" | "lastReviewed" | "reviewCount">): Promise<Glossary> {
+    const [newTerm] = await db
+      .insert(glossary)
+      .values(term)
+      .returning();
+
+    return newTerm;
+  }
+
+  async updateGlossaryTerm(id: number, changes: Partial<Pick<Glossary, "definition" | "contextSentence" | "notes" | "tags">>): Promise<Glossary | undefined> {
+    const [updated] = await db
+      .update(glossary)
+      .set(changes)
+      .where(eq(glossary.id, id))
+      .returning();
+
+    return updated || undefined;
+  }
+
+  async deleteGlossaryTerm(id: number): Promise<boolean> {
+    const result = await db.delete(glossary).where(eq(glossary.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // New Glossary methods for word learning
+  async getAllGlossaryEntries(): Promise<Glossary[]> {
+    return await db.select().from(glossary);
+  }
+
+  async getGlossaryEntry(id: number): Promise<Glossary | undefined> {
+    const [entry] = await db
+      .select()
+      .from(glossary)
+      .where(eq(glossary.id, id));
+
+    return entry || undefined;
+  }
+
+  async updateGlossaryEntry(id: number, changes: UpdateGlossary): Promise<Glossary | undefined> {
+    const [updated] = await db
+      .update(glossary)
+      .set(changes)
+      .where(eq(glossary.id, id))
+      .returning();
+
+    return updated || undefined;
+  }
+
+  // Word practice session operations
+  async createWordPracticeSession(session: Omit<WordPracticeSession, "id" | "createdAt">): Promise<WordPracticeSession> {
+    const [newSession] = await db
+      .insert(wordPracticeSessions)
+      .values(session)
+      .returning();
+
+    return newSession;
+  }
+
+  async getWordPracticeSessions(userId: number, wordId?: number): Promise<WordPracticeSession[]> {
+    if (wordId) {
+      return await db
+        .select()
+        .from(wordPracticeSessions)
+        .where(
+          and(
+            eq(wordPracticeSessions.userId, userId),
+            eq(wordPracticeSessions.wordId, wordId)
+          )
+        );
+    }
+
+    return await db
+      .select()
+      .from(wordPracticeSessions)
+      .where(eq(wordPracticeSessions.userId, userId));
+  }
+
+  // Practice session operations
+  async createPracticeSession(session: Omit<PracticeSession, "id" | "createdAt" | "updatedAt">): Promise<PracticeSession> {
+    const [newSession] = await db
+      .insert(practiceSessions)
+      .values(session)
+      .returning();
+
+    return newSession;
+  }
+
+  async updatePracticeSession(id: number, changes: Partial<Omit<PracticeSession, "id" | "createdAt" | "updatedAt">>): Promise<PracticeSession | undefined> {
+    const [updated] = await db
+      .update(practiceSessions)
+      .set({ ...changes, updatedAt: new Date() })
+      .where(eq(practiceSessions.id, id))
+      .returning();
+
+    return updated || undefined;
+  }
+
+  async getPracticeSession(id: number): Promise<PracticeSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(practiceSessions)
+      .where(eq(practiceSessions.id, id));
+
+    return session || undefined;
+  }
+
+  async getUserPracticeSessions(userId: number, status?: string): Promise<PracticeSession[]> {
+    let conditions = [eq(practiceSessions.userId, userId)];
+
+    if (status) {
+      conditions.push(eq(practiceSessions.status, status));
+    }
+
+    const query = db
+      .select()
+      .from(practiceSessions)
+      .where(and(...conditions))
+      .orderBy(sql`${practiceSessions.updatedAt} DESC`);
+
+    return await query;
+  }
+
+  // Translation attempts operations
+  async createTranslationAttempt(attempt: Omit<TranslationAttempt, "id" | "createdAt">): Promise<TranslationAttempt> {
+    const [newAttempt] = await db
+      .insert(translationAttempts)
+      .values(attempt)
+      .returning();
+
+    return newAttempt;
+  }
+
+  async getTranslationAttemptsForSentence(sentenceId: number, userId: number): Promise<TranslationAttempt[]> {
+    return await db
+      .select()
+      .from(translationAttempts)
+      .where(
+        and(
+          eq(translationAttempts.sentenceId, sentenceId),
+          eq(translationAttempts.userId, userId)
+        )
+      )
+      .orderBy(sql`${translationAttempts.createdAt} DESC`);
+  }
+
+  async getTranslationAttempt(id: number): Promise<TranslationAttempt | undefined> {
+    const [attempt] = await db
+      .select()
+      .from(translationAttempts)
+      .where(eq(translationAttempts.id, id));
+
+    return attempt || undefined;
+  }
+
+  async getLatestTranslationAttempt(sentenceId: number, userId: number): Promise<TranslationAttempt | undefined> {
+    const [attempt] = await db
+      .select()
+      .from(translationAttempts)
+      .where(
+        and(
+          eq(translationAttempts.sentenceId, sentenceId),
+          eq(translationAttempts.userId, userId)
+        )
+      )
+      .orderBy(sql`${translationAttempts.createdAt} DESC`)
+      .limit(1);
+
+    return attempt || undefined;
+  }
+
+  async getTranslationAttempts(sentenceId: number, userId: number = 1): Promise<TranslationAttempt[]> {
+    return this.getTranslationAttemptsForSentence(sentenceId, userId);
+  }
+
+  // User progress operations
+  async getUserProgress(userId: number): Promise<UserProgress | undefined> {
+    const [progress] = await db
+      .select()
+      .from(userProgress)
+      .where(eq(userProgress.userId, userId));
+
+    return progress || undefined;
+  }
+
+  async createUserProgress(progress: Omit<UserProgress, "id" | "updatedAt">): Promise<UserProgress> {
+    const [newProgress] = await db
+      .insert(userProgress)
+      .values(progress)
+      .returning();
+
+    return newProgress;
+  }
+
+  async updateUserProgress(userId: number, changes: Partial<Omit<UserProgress, "id" | "userId">>): Promise<UserProgress | undefined> {
+    const [updated] = await db
+      .update(userProgress)
+      .set({
+        ...changes,
+        updatedAt: new Date()
+      })
+      .where(eq(userProgress.userId, userId))
+      .returning();
+
+    return updated || undefined;
+  }
+
+  // Document content update operations
+  async deleteDocumentContent(documentId: number): Promise<boolean> {
+    try {
+      // Delete sentences first (due to foreign key constraints)
+      await db.delete(sentences).where(
+        inArray(sentences.paragraphId, 
+          db.select({ id: paragraphs.id }).from(paragraphs).where(eq(paragraphs.documentId, documentId))
+        )
+      );
+      
+      // Then delete paragraphs
+      await db.delete(paragraphs).where(eq(paragraphs.documentId, documentId));
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting document content:', error);
+      return false;
+    }
+  }
+
+  async addParagraphsToDocument(documentId: number, paragraphsData: any[]): Promise<boolean> {
+    try {
+      for (const paragraphData of paragraphsData) {
+        // Create paragraph
+        const [newParagraph] = await db
+          .insert(paragraphs)
+          .values({
+            documentId,
+            title: paragraphData.title,
+            order: paragraphData.order
+          })
+          .returning();
+
+        // Create sentences for this paragraph
+        const sentencesInsertData = paragraphData.sentences.map((sentence: any) => ({
+          paragraphId: newParagraph.id,
+          source: sentence.source,
+          target: sentence.target || null,
+          order: sentence.order
+        }));
+
+        if (sentencesInsertData.length > 0) {
+          await db.insert(sentences).values(sentencesInsertData);
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error adding paragraphs to document:', error);
+      return false;
+    }
+  }
+
+  // Admin methods
+  async getAdminStats(): Promise<{ totalDocuments: number; userDocuments: number; publicDocuments: number; }> {
+    const [totalResult] = await db.select({ count: count() }).from(documents);
+    const [userResult] = await db.select({ count: count() }).from(documents)
+      .where(sql`${documents.isPublic} = false OR ${documents.isPublic} IS NULL`);
+    const [publicResult] = await db.select({ count: count() }).from(documents)
+      .where(eq(documents.isPublic, true));
+
+    return {
+      totalDocuments: totalResult.count,
+      userDocuments: userResult.count,
+      publicDocuments: publicResult.count,
+    };
+  }
+
+  async getAdminDocuments(filters?: { 
+    search?: string; 
+    category?: string; 
+    type?: string; 
+  }): Promise<Document[]> {
+    let query = db.select().from(documents);
+
+    // Apply search filter
+    if (filters?.search) {
+      const searchTerm = `%${filters.search}%`;
+      query = query.where(
+        or(
+          ilike(documents.title, searchTerm),
+          ilike(documents.author, searchTerm),
+          ilike(documents.sourceDomain, searchTerm)
+        )
+      );
+    }
+
+    // Apply category filter
+    if (filters?.category && filters.category !== "all") {
+      query = query.where(eq(documents.category, filters.category));
+    }
+
+    // Apply type filter
+    if (filters?.type && filters.type !== "all") {
+      if (filters.type === "public") {
+        query = query.where(eq(documents.isPublic, true));
+      } else if (filters.type === "user") {
+        query = query.where(sql`${documents.isPublic} = false OR ${documents.isPublic} IS NULL`);
+      }
+    }
+
+    // Order by last activity, then creation date
+    query = query.orderBy(desc(documents.lastActivityAt), desc(documents.createdAt));
+
+    return await query;
+  }
+
+  // Document cleanup methods
+  async getExpiredDocuments(): Promise<Document[]> {
+    const now = new Date();
+    return await db.select().from(documents)
+      .where(
+        and(
+          eq(documents.isPublic, true),
+          lt(documents.expiresAt, now)
+        )
+      )
+      .orderBy(desc(documents.expiresAt));
+  }
+
+  async cleanupExpiredDocuments(): Promise<number> {
+    try {
+      const now = new Date();
+      console.log(`Starting cleanup of expired documents at ${now.toISOString()}`);
+      
+      // Find expired public documents
+      const expiredDocs = await db.select({ id: documents.id }).from(documents)
+        .where(
+          and(
+            eq(documents.isPublic, true),
+            lt(documents.expiresAt, now)
+          )
+        );
+
+      if (expiredDocs.length === 0) {
+        console.log("No expired documents found");
+        return 0;
+      }
+
+      console.log(`Found ${expiredDocs.length} expired documents to clean up`);
+      const expiredDocIds = expiredDocs.map(doc => doc.id);
+
+      // Delete in correct order to respect foreign key constraints
+      // Only delete if the documents are NOT in user libraries (no user copies)
+      let deletedCount = 0;
+      for (const docId of expiredDocIds) {
+        // Check if there are any user copies (non-public versions) of this document
+        const userCopies = await db.select({ id: documents.id }).from(documents)
+          .where(
+            and(
+              or(eq(documents.isPublic, false), isNull(documents.isPublic)),
+              eq(documents.title, 
+                sql`(SELECT title FROM ${documents} WHERE id = ${docId})`
+              )
+            )
+          );
+
+        // Only delete if no user copies exist
+        if (userCopies.length === 0) {
+          const deleted = await this.deleteDocument(docId);
+          if (deleted) {
+            deletedCount++;
+            console.log(`Deleted expired document ID: ${docId}`);
+          }
+        } else {
+          console.log(`Skipping deletion of document ID ${docId} - user copies exist`);
+        }
+      }
+
+      console.log(`Cleanup completed: ${deletedCount} documents deleted, ${expiredDocs.length - deletedCount} preserved due to user copies`);
+      return deletedCount;
+    } catch (error) {
+      console.error("Error during document cleanup:", error);
+      return 0;
+    }
+  }
+
+  async setDocumentExpiration(documentId: number, expiresAt: Date): Promise<Document | undefined> {
+    const [updatedDocument] = await db
+      .update(documents)
+      .set({ expiresAt })
+      .where(eq(documents.id, documentId))
+      .returning();
+
+    return updatedDocument || undefined;
+  }
+
+  async setExpirationDatesForExistingDocuments(): Promise<number> {
+    try {
+      // Get all public documents without expiration dates
+      const documentsToUpdate = await db.select().from(documents)
+        .where(
+          and(
+            eq(documents.isPublic, true),
+            isNull(documents.expiresAt)
+          )
+        );
+
+      let updatedCount = 0;
+      const now = new Date();
+
+      for (const doc of documentsToUpdate) {
+        let expirationDays = 90; // Default
+
+        // Set expiration based on category
+        switch (doc.category?.toLowerCase()) {
+          case 'news':
+          case '뉴스':
+            expirationDays = 30;
+            break;
+          case 'opinion':
+          case 'column':
+          case '칼럼':
+          case '오피니언':
+            expirationDays = 60;
+            break;
+          case 'education':
+          case 'academic':
+          case '교육':
+          case '학술논문':
+            expirationDays = 90;
+            break;
+          case 'literature':
+          case '문학':
+            expirationDays = 180;
+            break;
+          default:
+            expirationDays = 90;
+        }
+
+        const expiresAt = new Date(doc.createdAt);
+        expiresAt.setDate(expiresAt.getDate() + expirationDays);
+
+        await this.setDocumentExpiration(doc.id, expiresAt);
+        updatedCount++;
+      }
+
+      console.log(`Set expiration dates for ${updatedCount} documents`);
+      return updatedCount;
+    } catch (error) {
+      console.error("Error setting expiration dates:", error);
+      return 0;
+    }
+  }
+
+  // RSS feed operations
+  async getRSSFeeds(userId: number): Promise<RssFeed[]> {
+    return await db
+      .select()
+      .from(userRssFeeds)
+      .where(eq(userRssFeeds.userId, userId))
+      .orderBy(desc(userRssFeeds.createdAt));
+  }
+
+  async getRSSFeed(id: number): Promise<RssFeed | undefined> {
+    const [feed] = await db
+      .select()
+      .from(userRssFeeds)
+      .where(eq(userRssFeeds.id, id));
+    return feed || undefined;
+  }
+
+  async createRSSFeed(feed: Omit<RssFeed, "id" | "createdAt" | "lastFetchedAt" | "lastSuccessAt" | "errorCount" | "lastError">): Promise<RssFeed> {
+    const [newFeed] = await db
+      .insert(userRssFeeds)
+      .values(feed)
+      .returning();
+    return newFeed;
+  }
+
+  async updateRSSFeed(id: number, changes: Partial<Omit<RssFeed, "id" | "userId" | "createdAt">>): Promise<RssFeed | undefined> {
+    const [updated] = await db
+      .update(userRssFeeds)
+      .set(changes)
+      .where(eq(userRssFeeds.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteRSSFeed(id: number): Promise<boolean> {
+    try {
+      // Get all documents associated with this RSS feed
+      const feedDocuments = await db
+        .select({ id: documents.id })
+        .from(documents)
+        .where(eq(documents.feedId, id));
+      
+      const documentIds = feedDocuments.map(doc => doc.id);
+      
+      if (documentIds.length > 0) {
+        // Delete in proper order to avoid foreign key constraints
+        
+        // 1. Delete notebook-sentence relationships for sentences in these documents
+        const feedSentences = await db
+          .select({ id: sentences.id })
+          .from(sentences)
+          .innerJoin(paragraphs, eq(sentences.paragraphId, paragraphs.id))
+          .where(inArray(paragraphs.documentId, documentIds));
+        
+        const sentenceIds = feedSentences.map(s => s.id);
+        if (sentenceIds.length > 0) {
+          await db.delete(notebookSentences).where(inArray(notebookSentences.sentenceId, sentenceIds));
+        }
+        
+        // 2. Delete sentences
+        await db.delete(sentences)
+          .where(inArray(sentences.paragraphId, 
+            db.select({ id: paragraphs.id })
+              .from(paragraphs)
+              .where(inArray(paragraphs.documentId, documentIds))
+          ));
+        
+        // 3. Delete paragraphs
+        await db.delete(paragraphs).where(inArray(paragraphs.documentId, documentIds));
+        
+        // 4. Delete glossary entries
+        await db.delete(glossary).where(inArray(glossary.documentId, documentIds));
+        
+        // 5. Delete notebooks
+        await db.delete(notebooks).where(inArray(notebooks.documentId, documentIds));
+        
+        // 6. Delete documents
+        await db.delete(documents).where(inArray(documents.id, documentIds));
+      }
+      
+      // Delete associated articles
+      await db.delete(rssArticles).where(eq(rssArticles.feedId, id));
+      
+      // Delete the feed
+      const result = await db.delete(userRssFeeds).where(eq(userRssFeeds.id, id));
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error("Error deleting RSS feed:", error);
+      return false;
+    }
+  }
+
+  async updateRSSFeedSyncStatus(id: number, lastFetchedAt: Date, lastSuccessAt?: Date, errorCount?: number, lastError?: string): Promise<void> {
+    const updates: Partial<RssFeed> = { lastFetchedAt };
+    
+    if (lastSuccessAt) updates.lastSuccessAt = lastSuccessAt;
+    if (errorCount !== undefined) updates.errorCount = errorCount;
+    if (lastError !== undefined) updates.lastError = lastError;
+
+    await db
+      .update(userRssFeeds)
+      .set(updates)
+      .where(eq(userRssFeeds.id, id));
+  }
+
+  // RSS article operations
+  async getRSSArticles(feedId: number): Promise<RssArticle[]> {
+    return await db
+      .select()
+      .from(rssArticles)
+      .where(eq(rssArticles.feedId, feedId))
+      .orderBy(desc(rssArticles.publishedAt));
+  }
+
+  async getRSSArticle(id: number): Promise<RssArticle | undefined> {
+    const [article] = await db
+      .select()
+      .from(rssArticles)
+      .where(eq(rssArticles.id, id));
+    return article || undefined;
+  }
+
+  async createRSSArticle(article: Omit<RssArticle, "id" | "createdAt">): Promise<RssArticle> {
+    const [newArticle] = await db
+      .insert(rssArticles)
+      .values(article)
+      .returning();
+    return newArticle;
+  }
+
+  async updateRSSArticle(id: number, changes: Partial<Omit<RssArticle, "id" | "feedId" | "createdAt">>): Promise<RssArticle | undefined> {
+    const [updated] = await db
+      .update(rssArticles)
+      .set(changes)
+      .where(eq(rssArticles.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteRSSArticle(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(rssArticles).where(eq(rssArticles.id, id));
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error("Error deleting RSS article:", error);
+      return false;
+    }
+  }
+
+  async getUnprocessedRSSArticles(feedId?: number): Promise<RssArticle[]> {
+    let query = db
+      .select()
+      .from(rssArticles)
+      .where(eq(rssArticles.processed, false));
+
+    if (feedId) {
+      query = query.where(and(eq(rssArticles.processed, false), eq(rssArticles.feedId, feedId)));
+    }
+
+    return await query.orderBy(desc(rssArticles.publishedAt));
+  }
+
+  async markRSSArticleAsProcessed(id: number, documentId: number): Promise<void> {
+    await db
+      .update(rssArticles)
+      .set({ processed: true, documentId })
+      .where(eq(rssArticles.id, id));
+  }
+
+}
+
+export const storage = new DatabaseStorage();

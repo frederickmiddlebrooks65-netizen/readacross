@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.next/
+.cache/
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Replit
+.replit
+.local
+.pythonlibs/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+
+# Database backups
+*.sql
+
+# Uploaded / large assets
+attached_assets/
+
+# Temporary
+*.tar.gz

@@ -1,0 +1,1381 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =================================================================
+   Global Typography Unification - Modern Zen Aesthetic
+   San-serif: Pretendard/Inter for ALL UI elements
+   Serif: Libre Baskerville for inspirational quotes ONLY
+   ================================================================= */
+
+/* Unified Page Title Typography - Modern Sans-serif for All Languages */
+.page-title {
+  font-family: "Pretendard Variable", "Pretendard", "Inter", "Noto Sans KR", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #000000;
+}
+
+/* Dark mode support for page titles */
+.dark .page-title {
+  color: #f1f5f9; /* slate-100 */
+}
+
+/* Hero Quote Typography - Literary Serif for Inspirational Quotes ONLY */
+.hero-quote {
+  font-family: "Libre Baskerville", Georgia, serif;
+  font-weight: 400;
+  line-height: 1.6;
+  color: #334155; /* slate-700 */
+}
+
+.dark .hero-quote {
+  color: #cbd5e1; /* slate-300 */
+}
+
+/* Card Typography - Modern Sans-serif */
+.card-title {
+  font-family: "Pretendard Variable", "Pretendard", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.card-body {
+  font-family: "Pretendard Variable", "Pretendard", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* Legacy support - redirect to new unified class */
+.page-title-ko {
+  font-family: "Pretendard Variable", "Pretendard", "Inter", "Noto Sans KR", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Prevent layout shift when scrollbar appears/disappears */
+html {
+  scrollbar-gutter: stable both-edges;
+}
+
+:root {
+  /* =================================================================
+     Cool Forest × Mineral Ink Design System
+     Modern Zen Research Tool Aesthetic
+     ================================================================= */
+
+  /* Foundation Colors */
+  --background: 210 17% 98%;      /* #F8F9FA - Cool white global bg */
+  --foreground: 210 24% 16%;      /* #1F2933 - Ink Black primary text */
+  --muted: 210 14% 95%;           /* Cool-toned muted */
+  --muted-foreground: 220 9% 46%; /* #6B7280 - Cool Gray secondary text */
+  --popover: 0 0% 100%;
+  --popover-foreground: 210 24% 16%;
+  --card: 0 0% 100%;              /* Pure white for cards */
+  --card-foreground: 210 24% 16%;
+  --border: 210 14% 89%;          /* Cool gray border */
+  --input: 210 14% 92%;           /* Cool gray input */
+  
+  /* Primary = Deep Forest for CTAs and active states */
+  --primary: 162 33% 28%;         /* #2F5D50 - Deep Forest */
+  --primary-foreground: 0 0% 100%; /* White text on primary */
+  
+  /* Secondary = Soft Sage for navigation, icons, inactive UI */
+  --secondary: 154 14% 49%;       /* #6B8E7E - Soft Sage */
+  --secondary-foreground: 0 0% 100%;
+  
+  --accent: 154 14% 94%;          /* Sage tinted accent */
+  --accent-foreground: 210 24% 16%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 162 33% 28%;            /* Deep Forest ring */
+  --radius: 0.625rem;             /* 10px - Modern Zen radius */
+  
+  /* Chart colors - Cool Forest variants */
+  --chart-1: 162 33% 28%;         /* Deep Forest */
+  --chart-2: 154 14% 49%;         /* Soft Sage */
+  --chart-3: 166 25% 63%;         /* Mist Teal */
+  --chart-4: 168 14% 50%;
+  --chart-5: 154 18% 55%;
+
+  /* Font System - Modern Zen Typography */
+  --font-sans: "Pretendard Variable", "Pretendard", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Libre Baskerville", Georgia, serif;
+  --font-korean: "Pretendard Variable", "Pretendard", "Noto Sans KR", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  
+  /* Cool Forest × Mineral Ink Brand Colors */
+  --brand-ink: 210 24% 16%;       /* #1F2933 - Ink Black */
+  --brand-paper: 210 17% 98%;     /* #F8F9FA - Cool white */
+  --brand-surface: 0 0% 100%;     /* Pure white */
+
+  /* Monotone Design System - Cool Forest */
+  --bg: 210 17% 98%;
+  --fg: 210 24% 16%;
+  --muted: 210 14% 95%;
+  --border: 210 14% 89%;
+  
+  /* Deep Forest - Primary CTAs and Active States */
+  --forest: 162 33% 28%;          /* #2F5D50 - Deep Forest */
+  --forest-hover: 162 35% 23%;    /* Darker hover state */
+  --forest-active: 162 37% 20%;   /* Active/pressed state */
+  
+  /* Soft Sage - Navigation, Icons, Tags, Inactive UI */
+  --sage: 154 14% 49%;            /* #6B8E7E - Soft Sage */
+  --sage-hover: 154 16% 42%;      /* Darker hover state */
+  --sage-subtle: 154 20% 96%;     /* Subtle sage tint */
+  --sage-soft: 154 12% 88%;       /* Softer tint */
+  
+  /* Mist Teal - AI States ONLY (not for primary actions) */
+  --mist: 166 25% 63%;            /* #8FB8AD - Mist Teal */
+  --mist-subtle: 166 25% 95%;     /* 5-8% opacity equivalent */
+  --mist-ring: 166 25% 63%;       /* AI focus rings */
+  
+  /* Brand tokens mapped to new system */
+  --brand: 162 33% 28%;           /* Deep Forest for CTAs */
+  --brand-hover: 162 35% 23%;
+  --brand-active: 162 37% 20%;
+  --brand-subtle: 154 20% 96%;    /* Sage tint for highlights */
+  --brand-outline: 154 14% 55%;   /* Sage outline */
+  --brand-soft: 154 12% 88%;      /* Soft sage */
+  --brand-text: 162 33% 28%;      /* Deep Forest for text links */
+  --brand-underline: 162 33% 28%;
+  --brand-dot: 154 14% 49%;       /* Sage dot markers */
+  --brand-foreground: 0 0% 100%;  /* White text on brand surfaces */
+
+  /* Legacy tokens for backward compatibility */
+  --base-bg: 210 17% 98%;
+  --base-fg: 210 24% 16%;
+  --base-muted: 210 14% 95%;
+  --base-border: 210 14% 89%;
+
+  /* Unified Dot Markers - Sage */
+  --dot-marker: 154 14% 49%;      /* Sage markers */
+  --dot-marker-subtle: 154 12% 65%; /* Muted version */
+
+  /* Layout Design Tokens - Increased Spacing for Calm Layout */
+  --page-max-width: 1200px;
+  --sidebar-width: 400px;
+  --header-height: 64px;
+  --page-gap: 2rem;               /* 32px - more breathing room */
+  --section-gap: 1.5rem;          /* 24px */
+  --card-radius: 0.75rem;         /* 12px - Modern Zen cards */
+
+  /* Immersive Reader Core Tokens */
+  --immersive-bg: var(--bg);
+  --immersive-text: var(--fg);
+  --immersive-muted: var(--muted);
+
+  /* Mobile Safe Area Support */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  --immersive-border: var(--border);
+  --immersive-link: var(--brand-text);
+}
+
+.dark {
+  /* =================================================================
+     Cool Forest × Mineral Ink - Dark Mode
+     ================================================================= */
+  --background: 210 14% 6%;
+  --foreground: 0 0% 98%;
+  --muted: 210 10% 12%;
+  --muted-foreground: 210 8% 75%;
+  --popover: 210 14% 8%;
+  --popover-foreground: 0 0% 98%;
+  --card: 210 14% 8%;
+  --card-foreground: 0 0% 98%;
+  --border: 210 10% 20%;
+  --input: 210 10% 15%;
+  
+  /* Primary = Deep Forest (lightened for dark mode) */
+  --primary: 162 28% 45%;         /* Lightened Deep Forest */
+  --primary-foreground: 210 14% 6%;
+  
+  /* Secondary = Soft Sage (lightened) */
+  --secondary: 154 20% 60%;
+  --secondary-foreground: 210 14% 6%;
+  
+  --accent: 154 15% 18%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 45%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 162 28% 45%;
+  --radius: 0.625rem;
+
+  /* Monotone Design System - Dark Mode */
+  --bg: 210 14% 6%;
+  --fg: 0 0% 98%;
+  --muted: 210 10% 12%;
+  --border: 210 10% 20%;
+  
+  /* Deep Forest - Dark Mode */
+  --forest: 162 28% 45%;
+  --forest-hover: 162 30% 52%;
+  --forest-active: 162 25% 40%;
+  
+  /* Soft Sage - Dark Mode */
+  --sage: 154 20% 60%;
+  --sage-hover: 154 22% 68%;
+  --sage-subtle: 154 15% 15%;
+  --sage-soft: 154 12% 22%;
+  
+  /* Mist Teal - Dark Mode */
+  --mist: 166 28% 55%;
+  --mist-subtle: 166 20% 15%;
+  --mist-ring: 166 28% 55%;
+  
+  /* Brand tokens - Dark Mode */
+  --brand: 162 28% 45%;
+  --brand-hover: 162 30% 52%;
+  --brand-active: 162 25% 40%;
+  --brand-subtle: 154 15% 15%;
+  --brand-outline: 154 20% 60%;
+  --brand-soft: 154 12% 22%;
+  --brand-text: 162 30% 55%;
+  --brand-underline: 162 30% 55%;
+  --brand-dot: 154 20% 60%;
+  --brand-foreground: 210 14% 6%;
+
+  /* Legacy tokens for backward compatibility */
+  --base-bg: 210 14% 6%;
+  --base-fg: 0 0% 98%;
+  --base-muted: 210 10% 12%;
+  --base-border: 210 10% 20%;
+
+  /* Unified Dot Markers - Dark Mode */
+  --dot-marker: 154 20% 60%;
+  --dot-marker-subtle: 154 15% 55%;
+  
+  /* Brand Colors - Dark Mode */
+  --brand-ink: 210 8% 78%;
+  --brand-paper: 210 14% 8%;
+  --brand-surface: 210 14% 10%;
+  
+  /* Card radius for dark mode */
+  --card-radius: 0.75rem;
+}
+
+@layer base {
+  /* ChatGPT의 박스모델 해결책 - 모든 요소를 border-box로 */
+  *, *::before, *::after { 
+    box-sizing: border-box !important; 
+  }
+
+  /* Remove any default borders and decorations from labels and all pseudo-states */
+  label,
+  label:hover,
+  label:focus,
+  label:active,
+  label:focus-within,
+  label::before,
+  label::after {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    text-decoration: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Prevent focus-within from adding borders to form container divs only */
+  /* Exclude all Radix UI components (dropdowns, dialogs, popovers, etc.) */
+  div:focus-within:not([data-radix-popper-content-wrapper] *):not([data-radix-popper-content-wrapper]):not([role="dialog"]):not([role="dialog"] *):not([data-state]):not([data-state] *),
+  div:has(input:focus):not([data-radix-popper-content-wrapper] *):not([data-radix-popper-content-wrapper]):not([role="dialog"]):not([role="dialog"] *):not([data-state]):not([data-state] *),
+  div:has(input:focus-visible):not([data-radix-popper-content-wrapper] *):not([data-radix-popper-content-wrapper]):not([role="dialog"]):not([role="dialog"] *):not([data-state]):not([data-state] *) {
+    border-top: none !important;
+    border-bottom: none !important;
+  }
+  
+  /* Specifically target card and form elements */
+  .space-y-2:focus-within,
+  .space-y-4:focus-within,
+  .space-y-1:focus-within,
+  .space-y-1\.5:focus-within {
+    border: none !important;
+    outline: none !important;
+  }
+
+  /* Respect theme colors in autofill */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px hsl(var(--background)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    caret-color: hsl(var(--foreground)) !important;
+  }
+
+  body {
+    @apply font-sans antialiased bg-brand-paper text-foreground transition-colors duration-300;
+  }
+
+  .bg-paper {
+    @apply bg-brand-paper;
+  }
+
+  .reader-container,
+  .reader-container-scrollable {
+    @apply bg-background;
+  }
+
+  /* Smart hover menu positioning */
+  .hover-menu {
+    pointer-events: none;
+    transition: all 0.2s ease-in-out;
+    user-select: none;
+  }
+
+  .hover-menu.show {
+    pointer-events: auto;
+  }
+
+  /* Improved hover menu interaction - DISABLED for click-only behavior */
+  /*
+  .sentence-segment:hover > div[class*="absolute top-full"],
+  .sentence-segment > div[class*="absolute top-full"]:hover,
+  .sentence-hover-menu:hover {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  */
+
+  /* Ensure menu stays visible when moving mouse from sentence to menu - DISABLED */
+  /*
+  .sentence-segment:hover .sentence-hover-menu {
+    transition-delay: 0ms;
+  }
+  */
+
+  .sentence-hover-menu {
+    transition-delay: 150ms;
+  }
+
+  /* Create invisible bridge between sentence and menu - DISABLED for click-only behavior */
+  /*
+  .sentence-segment::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: -10px;
+    right: -10px;
+    height: 15px;
+    z-index: 48;
+    pointer-events: none;
+    background: transparent;
+  }
+
+  .sentence-segment:hover::after {
+    pointer-events: auto;
+  }
+  */
+
+  /* Extended hover area for menu */
+  .sentence-segment > div[class*="absolute top-full"]::before {
+    content: '';
+    position: absolute;
+    top: -15px;
+    left: -10px;
+    right: -10px;
+    height: 15px;
+    z-index: 47;
+    pointer-events: auto;
+    background: transparent;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -10px);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+  }
+
+  /* Responsive positioning for screen edges */
+  .hover-menu-responsive {
+    /* Default: centered below */
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  /* When near right edge, align to right */
+  .hover-menu-responsive.align-right {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+
+  /* When near left edge, align to left */
+  .hover-menu-responsive.align-left {
+    left: 0;
+    right: auto;
+    transform: none;
+  }
+
+}
+
+/* Read Across specific styles - Enhanced Typography */
+.reader-content {
+  font-family: var(--font-sans) !important;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+}
+
+.reader-content.serif {
+  --font-sans: var(--font-serif);
+  font-family: var(--font-serif) !important;
+  line-height: 1.8;
+}
+
+.reader-content.serif * {
+  font-family: inherit !important;
+}
+
+/* Enhanced Typography Scale */
+.heading-xl { font-size: 2.25rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+.heading-lg { font-size: 1.875rem; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
+.heading-md { font-size: 1.5rem; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
+.heading-sm { font-size: 1.25rem; font-weight: 600; line-height: 1.4; }
+.body-lg { font-size: 1.125rem; line-height: 1.6; }
+.body-md { font-size: 1rem; line-height: 1.6; }
+.body-sm { font-size: 0.875rem; line-height: 1.5; }
+.caption { font-size: 0.75rem; line-height: 1.4; color: hsl(var(--muted-foreground)); }
+
+/* Enhanced Table Styles */
+.table-enhanced {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  overflow: hidden;
+}
+
+.table-enhanced th {
+  background-color: hsl(var(--muted));
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.table-enhanced td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.table-enhanced tbody tr:hover {
+  background-color: hsl(var(--brand-subtle));
+  transition: background-color 150ms ease;
+}
+
+.table-enhanced tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Admin Dashboard Card Improvements */
+.admin-card-header {
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
+}
+
+.admin-card-body {
+  padding: 1.5rem;
+}
+
+/* Status Badge Improvements */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.status-badge.active {
+  background-color: hsl(var(--brand-subtle));
+  color: hsl(var(--brand));
+  border: 1px solid hsl(var(--brand-outline));
+}
+
+.status-badge.expired {
+  background-color: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+  border: 1px solid hsl(var(--destructive) / 0.3);
+}
+
+.status-badge.pending {
+  background-color: hsl(45 100% 95%);
+  color: hsl(45 100% 35%);
+  border: 1px solid hsl(45 100% 70%);
+}
+
+.reader-container {
+  min-height: calc(100vh - 96px);
+  width: 100%;
+  background-color: hsl(var(--background));
+  display: flex;
+  justify-content: center;
+}
+
+.reader-container-scrollable {
+  width: 100%;
+  height: calc(100vh - 160px);
+  overflow-y: auto;
+  background-color: hsl(var(--background));
+  padding-right: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.reader-content {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 8px;
+}
+
+@media (min-width: 1024px) {
+  .reader-content {
+    padding: 0 16px;
+  }
+}
+
+.reader-container-scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.reader-container-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.reader-container-scrollable::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+.reader-container-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.sentence:hover {
+  background-color: hsl(var(--brand-subtle));
+}
+
+.scrapped {
+  background-color: hsl(var(--brand-soft));
+}
+
+.with-note {
+  border-left: 3px solid var(--primary);
+}
+
+.progress-bar {
+  height: 4px;
+  background: linear-gradient(to right, hsl(var(--primary)) var(--progress), #E5E7EB var(--progress));
+}
+
+.progress-bar-complete {
+  background: linear-gradient(to right, hsl(var(--brand)) var(--progress), #E5E7EB var(--progress));
+}
+
+.max-w-reader {
+  max-width: 42rem;
+  /* 672px */
+}
+
+/* Book cover effects */
+.book-cover {
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.book-cover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(to right, rgba(0,0,0,0.1), rgba(0,0,0,0.3));
+  transform: rotateY(-90deg);
+  transform-origin: right;
+}
+
+/* Text clamp utilities */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .show-mobile {
+    display: none !important;
+  }
+}
+
+/* Highlight flash animation for side panel navigation */
+.highlight-flash {
+  background-color: hsl(var(--brand-subtle)) !important;
+  transition: background-color 0.3s ease-in-out;
+}
+
+/* Side panel is now integrated, no fixed positioning needed */
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Highlight flash animation */
+@keyframes highlight-flash {
+  0% { background-color: hsl(var(--brand-subtle)); }
+  100% { background-color: transparent; }
+}
+
+.highlight-flash {
+  animation: highlight-flash 2s ease-out;
+}
+
+/* =================================================================
+   Modern Zen Search Highlight System
+   Word-level Sage Green highlight + temporary sentence flash
+   No layout shifts - text alignment stays rock-solid
+   ================================================================= */
+
+/* Temporary sentence block flash (landing cue) - 1.5s duration */
+@keyframes sentence-landing-flash {
+  0% {
+    background-color: hsla(154, 14%, 49%, 0.06); /* 6% Sage Green */
+  }
+  70% {
+    background-color: hsla(154, 14%, 49%, 0.03); /* Fade to 3% */
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.search-sentence-flash {
+  animation: sentence-landing-flash 1.5s ease-out forwards;
+  border-radius: 2px;
+}
+
+/* Persistent word-level search highlight - Sage Green */
+.search-word-highlight {
+  background-color: hsla(154, 20%, 75%, 0.5); /* Soft Sage Green - clearly distinct from yellow notes */
+  border-radius: 2px;
+  padding: 0 1px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Dark mode - slightly adjusted for visibility */
+.dark .search-word-highlight {
+  background-color: hsla(154, 25%, 40%, 0.4);
+}
+
+/* Fade out animation for word highlight removal */
+@keyframes word-highlight-fade {
+  0% {
+    background-color: hsla(154, 20%, 75%, 0.5);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.search-word-highlight-fade {
+  animation: word-highlight-fade 0.3s ease-out forwards;
+}
+
+/* Monotone Design System Utilities */
+.bg-surface { background-color: hsl(var(--base-bg)); }
+.text-base-fg { color: hsl(var(--base-fg)); }
+.border-base { border-color: hsl(var(--base-border)); }
+
+/* Brand Blue Utility Classes */
+.btn-primary { background: hsl(var(--brand)); color: white; }
+.btn-primary:hover { background: hsl(var(--brand-hover)); }
+.btn-primary:active { background: hsl(var(--brand-active)); }
+.btn-secondary { border: 1px solid hsl(var(--brand-outline)); color: hsl(var(--brand-text)); background: transparent; }
+.btn-secondary:hover { background: hsl(var(--brand-subtle)); }
+.link { color: hsl(var(--brand-text)); }
+.link:hover { text-decoration: underline; color: hsl(var(--brand-hover)); }
+.brand-underline { border-bottom: 2px solid hsl(var(--brand-underline)); }
+.brand-dot::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--brand-dot)); margin-right: 8px; }
+.bg-brand-subtle { background-color: hsl(var(--brand-subtle)); }
+.bg-brand-soft { background-color: hsl(var(--brand-soft)); }
+.text-brand { color: hsl(var(--brand-text)); }
+.border-brand { border-color: hsl(var(--brand-outline)); }
+.border-l-brand { border-left-color: hsl(var(--brand)); }
+.border-t-brand { border-top-color: hsl(var(--brand)); }
+.border-r-brand { border-right-color: hsl(var(--brand)); }
+.border-b-brand { border-bottom-color: hsl(var(--brand)); }
+
+/* Unified Dot Marker Styles - Enhanced */
+.bg-dot-marker { background-color: hsl(var(--dot-marker)); }
+.bg-dot-marker-subtle { background-color: hsl(var(--dot-marker-subtle)); }
+.dot-marker::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--dot-marker)); margin-right: 8px; }
+.dot-marker-subtle::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--dot-marker-subtle)); margin-right: 8px; }
+
+/* =================================================================
+   Cool Forest × Mineral Ink - AI State Utilities
+   AI features distinguished by STATE, not by separate hue
+   ================================================================= */
+
+/* AI Processing State - Mist Teal indicators */
+.ai-processing {
+  position: relative;
+}
+
+.ai-processing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid hsl(var(--mist));
+  border-radius: inherit;
+  animation: ai-pulse 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes ai-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* AI Response State - Subtle Mist Teal background + left indicator */
+.ai-response {
+  background-color: hsl(var(--mist-subtle));
+  border-left: 2px solid hsl(var(--mist));
+  padding-left: 1rem;
+}
+
+/* AI Focus Ring - Mist Teal */
+.ai-focus:focus,
+.ai-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--mist-ring));
+}
+
+/* AI Loading Spinner */
+.ai-spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid hsl(var(--mist) / 0.3);
+  border-top-color: hsl(var(--mist));
+  border-radius: 50%;
+  animation: ai-spin 0.8s linear infinite;
+}
+
+@keyframes ai-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* AI Progress Bar */
+.ai-progress {
+  height: 3px;
+  background: hsl(var(--mist) / 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ai-progress-bar {
+  height: 100%;
+  background: hsl(var(--mist));
+  animation: ai-progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes ai-progress-indeterminate {
+  0% { transform: translateX(-100%); width: 40%; }
+  50% { width: 60%; }
+  100% { transform: translateX(250%); width: 40%; }
+}
+
+/* =================================================================
+   Navigation Clarity - Active/Inactive States
+   ================================================================= */
+
+/* Active Navigation Tab */
+.nav-tab-active {
+  color: hsl(var(--forest));
+  border-bottom: 2px solid hsl(var(--forest));
+  font-weight: 500;
+}
+
+/* Inactive Navigation Tab */
+.nav-tab-inactive {
+  color: hsl(var(--sage));
+  border-bottom: 2px solid transparent;
+}
+
+.nav-tab-inactive:hover {
+  color: hsl(var(--sage-hover));
+}
+
+/* =================================================================
+   Modern Zen Cards - Soft shadows, no borders
+   ================================================================= */
+
+.zen-card {
+  background: hsl(var(--card));
+  border: none;
+  border-radius: var(--card-radius, 0.75rem);
+  box-shadow: 0 1px 3px hsl(var(--foreground) / 0.04), 
+              0 4px 12px hsl(var(--foreground) / 0.03);
+  transition: box-shadow 0.2s ease;
+}
+
+.zen-card:hover {
+  box-shadow: 0 2px 6px hsl(var(--foreground) / 0.06), 
+              0 8px 24px hsl(var(--foreground) / 0.05);
+}
+
+/* Forest/Sage color utilities */
+.bg-forest { background-color: hsl(var(--forest)); }
+.bg-forest-hover:hover { background-color: hsl(var(--forest-hover)); }
+.text-forest { color: hsl(var(--forest)); }
+.border-forest { border-color: hsl(var(--forest)); }
+
+.bg-sage { background-color: hsl(var(--sage)); }
+.bg-sage-subtle { background-color: hsl(var(--sage-subtle)); }
+.bg-sage-soft { background-color: hsl(var(--sage-soft)); }
+.text-sage { color: hsl(var(--sage)); }
+.border-sage { border-color: hsl(var(--sage)); }
+
+.bg-mist { background-color: hsl(var(--mist)); }
+.bg-mist-subtle { background-color: hsl(var(--mist-subtle)); }
+.text-mist { color: hsl(var(--mist)); }
+.border-mist { border-color: hsl(var(--mist)); }
+
+/* Ink typography utilities */
+.text-ink { color: hsl(var(--brand-ink)); }
+.text-ink-muted { color: hsl(var(--muted-foreground)); }
+
+/* Metric Card Improvements */
+.metric-card {
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  transition: all 200ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, hsl(var(--brand)), hsl(var(--brand-hover)));
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.metric-card:hover {
+  border-color: hsl(var(--brand-outline));
+  box-shadow: 0 4px 12px hsl(var(--brand) / 0.1);
+}
+
+.metric-card:hover::before {
+  opacity: 1;
+}
+
+.metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: hsl(var(--brand));
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.25rem;
+}
+
+/* Targeted pseudo-element control - only disable quote/bracket additions */
+.prose blockquote::before,
+.prose blockquote::after,
+.prose q::before,
+.prose q::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Keep essential pseudo-elements active */
+.hover-menu::before,
+.sentence-segment > div[class*="absolute top-full"]::before,
+.brand-dot::before,
+.dot-marker::before,
+.dot-marker-subtle::before,
+.metric-card::before {
+  content: '' !important;
+  display: block !important;
+}
+
+/* Remove any browser default quotes/brackets for blockquotes */
+blockquote, q {
+  quotes: none !important;
+}
+
+/* Page width utility classes */
+.page-width-compact  { --page-max-width: 960px; }
+.page-width-standard { --page-max-width: 1200px; }
+.page-width-wide     { --page-max-width: 1440px; }
+.page-width-full     { --page-max-width: 100%; }
+
+/* Viewport utilities */
+.page-viewport {
+  height: 100dvh;
+  height: calc(100vh - 0px); /* 폴백 */
+}
+
+/* Reset base styles for layout control */
+html {
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  height: 100%;
+}
+
+/* Utility class for pages that need to lock body scroll */
+.app-lock-scroll {
+  overflow: hidden !important;
+  height: 100vh;
+}
+
+/* Scroll container utility classes */
+[data-scroll-container="true"] {
+  overscroll-behavior: contain;
+}
+
+/* Override any global min-height that might interfere */
+.reader-container-scrollable {
+  min-height: unset !important;
+}
+
+/* Ensure Layout maintains proper height */
+.layout-main {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Override prose typography to respect user font settings */
+.reader-content .prose {
+  font-size: var(--font-size, 16px) !important;
+  line-height: var(--line-height, 1.6) !important;
+}
+
+.reader-content .prose * {
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+/* Ensure paragraph text inherits the font settings */
+.reader-content .prose p,
+.reader-content .prose span,
+.reader-content .prose div {
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+/* =================================================================
+   Immersive Reader Theme System
+   - Scoped to .ImmersiveShell container only
+   - Does not affect global site theme
+   ================================================================= */
+
+/* Light Theme for Immersive Reader */
+.ImmersiveShell[data-theme="light"] {
+  --immersive-bg: 0 0% 100%;
+  --immersive-text: 220 13% 10%;
+  --immersive-muted: 210 20% 96%;
+  --immersive-border: 210 16% 87%;
+  --immersive-link: 212 60% 40%;
+  
+  /* Apply to common elements */
+  --bg: var(--immersive-bg);
+  --text: var(--immersive-text);
+  --muted: var(--immersive-muted);
+  --border: var(--immersive-border);
+  --link: var(--immersive-link);
+  
+  /* Override Tailwind CSS variables */
+  --background: var(--immersive-bg);
+  --foreground: var(--immersive-text);
+  --muted-foreground: 220 13% 40%;
+  --card: var(--immersive-bg);
+  --card-foreground: var(--immersive-text);
+  --popover: var(--immersive-bg);
+  --popover-foreground: var(--immersive-text);
+}
+
+.ImmersiveShell[data-theme="light"] :where(*) {
+  --immersive-bg: 0 0% 100%;
+  --immersive-text: 220 13% 10%;
+  --immersive-muted: 210 20% 96%;
+  --immersive-border: 210 16% 87%;
+  --immersive-link: 212 60% 40%;
+  
+  /* Apply to common elements */
+  --bg: var(--immersive-bg);
+  --text: var(--immersive-text);
+  --muted: var(--immersive-muted);
+  --border: var(--immersive-border);
+  --link: var(--immersive-link);
+  
+  /* Override Tailwind CSS variables */
+  --background: var(--immersive-bg);
+  --foreground: var(--immersive-text);
+  --muted-foreground: 220 13% 40%;
+  --card: var(--immersive-bg);
+  --card-foreground: var(--immersive-text);
+  --popover: var(--immersive-bg);
+  --popover-foreground: var(--immersive-text);
+}
+
+/* Dark Theme for Immersive Reader */
+.ImmersiveShell[data-theme="dark"] {
+  --immersive-bg: 220 15% 8%;
+  --immersive-text: 0 0% 95%;
+  --immersive-muted: 220 15% 12%;
+  --immersive-border: 220 13% 18%;
+  --immersive-link: 212 60% 60%;
+  
+  /* Apply to common elements */
+  --bg: var(--immersive-bg);
+  --text: var(--immersive-text);
+  --muted: var(--immersive-muted);
+  --border: var(--immersive-border);
+  --link: var(--immersive-link);
+  
+  /* Override Tailwind CSS variables */
+  --background: var(--immersive-bg);
+  --foreground: var(--immersive-text);
+  --muted-foreground: 220 13% 60%;
+  --card: var(--immersive-bg);
+  --card-foreground: var(--immersive-text);
+  --popover: var(--immersive-bg);
+  --popover-foreground: var(--immersive-text);
+}
+
+.ImmersiveShell[data-theme="dark"] :where(*) {
+  --immersive-bg: 220 15% 8%;
+  --immersive-text: 0 0% 95%;
+  --immersive-muted: 220 15% 12%;
+  --immersive-border: 220 13% 18%;
+  --immersive-link: 212 60% 60%;
+  
+  /* Apply to common elements */
+  --bg: var(--immersive-bg);
+  --text: var(--immersive-text);
+  --muted: var(--immersive-muted);
+  --border: var(--immersive-border);
+  --link: var(--immersive-link);
+  
+  /* Override Tailwind CSS variables */
+  --background: var(--immersive-bg);
+  --foreground: var(--immersive-text);
+  --muted-foreground: 220 13% 60%;
+  --card: var(--immersive-bg);
+  --card-foreground: var(--immersive-text);
+  --popover: var(--immersive-bg);
+  --popover-foreground: var(--immersive-text);
+}
+
+/* Sepia Theme for Immersive Reader - High contrast for readability */
+.ImmersiveShell[data-theme="sepia"] {
+  --immersive-bg: 45 30% 88%;    /* Warm sepia background */
+  --immersive-text: 30 20% 15%;  /* Dark brown text for 7:1+ contrast */
+  --immersive-muted: 45 25% 82%; /* Slightly darker sepia */
+  --immersive-border: 40 20% 70%; /* Subtle brown border */
+  --immersive-link: 25 60% 35%;  /* Dark amber link */
+  
+  /* Apply to common elements */
+  --bg: var(--immersive-bg);
+  --text: var(--immersive-text);
+  --muted: var(--immersive-muted);
+  --border: var(--immersive-border);
+  --link: var(--immersive-link);
+  
+  /* Override Tailwind CSS variables */
+  --background: var(--immersive-bg);
+  --foreground: var(--immersive-text);
+  --muted-foreground: 30 20% 35%;
+  --card: var(--immersive-bg);
+  --card-foreground: var(--immersive-text);
+  --popover: var(--immersive-bg);
+  --popover-foreground: var(--immersive-text);
+}
+
+.ImmersiveShell[data-theme="sepia"] :where(*) {
+  --immersive-bg: 45 30% 88%;    /* Warm sepia background */
+  --immersive-text: 30 20% 15%;  /* Dark brown text for 7:1+ contrast */
+  --immersive-muted: 45 25% 82%; /* Slightly darker sepia */
+  --immersive-border: 40 20% 70%; /* Subtle brown border */
+  --immersive-link: 25 60% 35%;  /* Dark amber link */
+  
+  /* Apply to common elements */
+  --bg: var(--immersive-bg);
+  --text: var(--immersive-text);
+  --muted: var(--immersive-muted);
+  --border: var(--immersive-border);
+  --link: var(--immersive-link);
+  
+  /* Override Tailwind CSS variables */
+  --background: var(--immersive-bg);
+  --foreground: var(--immersive-text);
+  --muted-foreground: 30 20% 35%;
+  --card: var(--immersive-bg);
+  --card-foreground: var(--immersive-text);
+  --popover: var(--immersive-bg);
+  --popover-foreground: var(--immersive-text);
+}
+
+/* Immersive Reader Typography System */
+.ImmersiveShell {
+  /* Smooth transitions for theme changes */
+  transition: background-color 200ms ease, color 200ms ease;
+  
+  /* Simple background for enhanced immersion - no gradient effect */
+  background: hsl(var(--background));
+  
+  /* Position context for child elements */
+  position: relative;
+}
+
+.ImmersiveShell * {
+  /* Smooth transitions for all child elements */
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .ImmersiveShell,
+  .ImmersiveShell * {
+    transition: none !important;
+  }
+}
+
+/* Font family overrides within Immersive Shell */
+.ImmersiveShell[data-serif="true"] {
+  font-family: var(--font-serif);
+}
+
+.ImmersiveShell[data-serif="true"] .prose,
+.ImmersiveShell[data-serif="true"] .prose * {
+  font-family: var(--font-serif) !important;
+}
+
+/* ================================================================
+   Phase 2: Responsive Styles (900px breakpoint)
+   - Container width reduction
+   - Touch-friendly spacing adjustments
+   ================================================================ */
+
+@media (max-width: 900px) {
+  /* Immersive Shell responsive adjustments */
+  .ImmersiveShell {
+    /* Reduce padding on smaller screens */
+    padding: 0.75rem;
+  }
+  
+  /* Main content area adjustments */
+  .ImmersiveShell .flex-1 {
+    /* Reduce horizontal padding */
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 1rem;
+  }
+  
+  /* Document width responsive constraints */
+  .ImmersiveShell [data-testid*="document"] {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+  
+  /* Typography adjustments for better mobile readability - using CSS variables to cooperate with !important rules */
+  .ImmersiveShell {
+    --font-size: 16px;
+    --line-height: 1.7;
+  }
+  
+  /* Header responsive adjustments */
+  .ImmersiveShell header {
+    padding: 0.75rem 1rem;
+    min-height: 48px; /* Touch-friendly height */
+  }
+  
+  /* Button touch targets */
+  .ImmersiveShell button {
+    min-height: 44px; /* iOS touch guidelines */
+    min-width: 44px;
+  }
+  
+  /* Progress bar adjustments */
+  .ImmersiveShell [role="progressbar"] {
+    height: 4px; /* Thicker on mobile */
+  }
+}
+
+@media (max-width: 640px) {
+  /* Extra small screens - further adjustments */
+  .ImmersiveShell {
+    padding: 0.5rem;
+  }
+  
+  .ImmersiveShell .flex-1 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
+  /* Typography for very small screens - using CSS variables */
+  .ImmersiveShell {
+    --font-size: 15px;
+    --line-height: 1.6;
+  }
+  
+  /* Additional progress bar selector in case .progress-bar is used */
+  .ImmersiveShell .progress-bar {
+    height: 4px;
+  }
+  
+  /* Compact header on very small screens */
+  .ImmersiveShell header {
+    padding: 0.5rem 0.75rem;
+    min-height: 44px;
+  }
+}
+
+/* Mobile Safe Area Utilities */
+@supports (bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    bottom: calc(1.5rem + var(--safe-area-inset-bottom));
+  }
+  
+  .safe-pb {
+    padding-bottom: calc(1rem + var(--safe-area-inset-bottom));
+  }
+}
+
+/* ChatGPT's 확정빵 해결책 - 최강 오버라이드 */
+@layer base {
+  /* 더 구체적인 선택자로 Radix 기본 스타일 덮기 */
+  [data-radix-tabs-trigger] {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    flex: 1 1 0% !important;
+    flex-basis: 0% !important;
+    flex-grow: 1 !important;
+    flex-shrink: 1 !important;
+  }
+  
+  /* DevTools에서 data-radix-tabs-trigger가 없을 경우 fallback */
+  [role="tab"] {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    flex: 1 1 0% !important;
+    flex-basis: 0% !important;
+    flex-grow: 1 !important;
+    flex-shrink: 1 !important;
+  }
+}
+
+/* 최강 오버라이드 - 모든 가능한 Radix 속성들 타겟팅 */
+[data-state="active"][role="tab"],
+[data-state="inactive"][role="tab"],
+button[role="tab"],
+.tabs-trigger,
+[data-radix-collection-item][role="tab"] {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  flex: 1 1 0% !important;
+  flex-basis: 0% !important;
+  flex-grow: 1 !important;
+  flex-shrink: 1 !important;
+  max-width: none !important;
+}
+
+/* 최후의 수단 - 더 구체적인 선택자 */
+div[class*="TabsList"] > div > button[role="tab"],
+div[class*="TabsList"] [data-radix-tabs-trigger] {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  flex: 1 1 0% !important;
+  flex-basis: 0% !important;
+  flex-grow: 1 !important;
+  flex-shrink: 1 !important;
+  max-width: none !important;
+}
+
+/* ChatGPT의 B) 진짜로 죽이기 - 마지막 보루 */
+@layer base {
+  /* Radix TabsTrigger 기본 inline-flex / min-content 폭을 전부 무력화 */
+  [data-radix-tabs-trigger],
+  [role="tab"],
+  [data-radix-collection-item][role="tab"] {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 0% !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important; /* 패딩/보더 포함 */
+  }
+}
