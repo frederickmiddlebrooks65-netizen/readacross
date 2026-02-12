@@ -81,7 +81,7 @@ export default function AISideDrawer({
   
   const userPlan = user?.plan as string | undefined;
   const isStarter = !userPlan || userPlan === "starter" || userPlan === "free";
-  const isPro = userPlan === "pro" || userPlan === "admin";
+  const isPro = userPlan === "pro" || userPlan === "admin" || userPlan === "beta_pro";
 
   const aiAssistMutation = useMutation({
     mutationFn: async (payload: {

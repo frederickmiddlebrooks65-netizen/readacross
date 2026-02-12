@@ -16,7 +16,7 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
   passwordVersion: integer("password_version").default(1).notNull(),
   // Subscription plan for monetization
-  plan: text("plan", { enum: ["starter", "pro", "admin"] }).default("starter").notNull(),
+  plan: text("plan", { enum: ["starter", "pro", "admin", "beta_pro"] }).default("starter").notNull(),
   // Specific plan type (e.g., 'pro_1month', 'pro_1year', 'starter')
   planType: text("plan_type").default("starter"),
   // Plan expiration date for non-auto-renewal subscriptions
@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   oauthProviderId: text("oauth_provider_id"), // Google's 'sub' claim or provider's user ID
   needsUsernameSetup: boolean("needs_username_setup").default(false), // Flag for first-time OAuth users
   // Language-agnostic learning settings (Phase 1)
+  betaExpiresAt: timestamp("beta_expires_at"),
   baseLanguage: text("base_language").default("ko").notNull(), // The language used for understanding explanations
   learningLanguage: text("learning_language").default("en").notNull(), // The language the user is actively learning
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1193,6 +1194,17 @@ export const PLAN_LIMITS = {
     priorityProcessing: false,
   },
   pro: {
+    monthlyTokenCap: 500_000,
+    premiumTokenCap: 200_000,
+    maxConcurrentDocuments: Infinity,
+    maxFullDocTranslations: Infinity,
+    maxOcr: Infinity,
+    canExport: true,
+    model: "gemini-2.0-flash-lite" as const,
+    premiumModel: "gemini-2.5-flash" as const,
+    priorityProcessing: true,
+  },
+  beta_pro: {
     monthlyTokenCap: 500_000,
     premiumTokenCap: 200_000,
     maxConcurrentDocuments: Infinity,

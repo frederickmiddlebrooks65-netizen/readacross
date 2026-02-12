@@ -138,8 +138,8 @@ router.post(
       }
 
       const validatedData = aiAssistRequestSchema.parse(req.body);
-      const userPlan = (user.plan || "starter") as "starter" | "pro" | "admin";
-      const isPro = userPlan === "pro" || userPlan === "admin";
+      const userPlan = (user.plan || "starter") as "starter" | "pro" | "admin" | "beta_pro";
+      const isPro = userPlan === "pro" || userPlan === "admin" || userPlan === "beta_pro";
 
       const sessionCheck = GeminiService.checkSessionLimit(
         validatedData.questionCount + 1,
@@ -290,16 +290,16 @@ router.get(
         return res.status(401).json({ error: "User not found" });
       }
 
-      const userPlan = (user.plan || "starter") as "starter" | "pro" | "admin";
+      const userPlan = (user.plan || "starter") as "starter" | "pro" | "admin" | "beta_pro";
       const snapshot = await TokenTrackingService.getUsageSnapshot(userId, userPlan);
       const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.starter;
       const nearingLimit = TokenTrackingService.isNearing80Percent(snapshot.totalTokensUsed, userPlan);
 
       return res.json({
-        plan: userPlan,
+        plan: userPlan === "beta_pro" ? "pro" : userPlan,
         remaining: snapshot.remainingTokens,
         limitReached: snapshot.remainingTokens === 0,
-        isFallback: userPlan === "pro" && snapshot.remainingPremiumTokens === 0,
+        isFallback: (userPlan === "pro" || userPlan === "beta_pro") && snapshot.remainingPremiumTokens === 0,
         nearingLimit,
         totalTokensUsed: snapshot.totalTokensUsed,
         monthlyTokenCap: limits.monthlyTokenCap,
@@ -326,7 +326,7 @@ router.post(
       }
 
       const user = await storage.getUser(userId);
-      if (!user || (user.plan !== "pro" && user.plan !== "admin")) {
+      if (!user || (user.plan !== "pro" && user.plan !== "admin" && user.plan !== "beta_pro")) {
         return res
           .status(403)
           .json({ error: "Pro plan required for document caching" });

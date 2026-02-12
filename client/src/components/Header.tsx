@@ -46,7 +46,7 @@ export default function Header({ className }: HeaderProps) {
     enabled: isAuthenticated,
   });
   
-  const isPro = user?.plan === "pro" || user?.plan === "admin";
+  const isPro = user?.plan === "pro" || user?.plan === "admin" || user?.plan === "beta_pro";
   
   const navItems = [
     { icon: Compass, text: t('navigation.explore'), path: "/explore" },

@@ -869,7 +869,7 @@ router.get('/me', authenticateJWT, async (req: AuthenticatedRequest, res) => {
         email: req.user.email,
         status: req.user.status,
         role: req.user.role,
-        plan: req.user.plan,
+        plan: req.user.plan === "beta_pro" ? "pro" : req.user.plan,
         planType: req.user.planType,
         planExpiresAt: req.user.planExpiresAt,
         emailVerifiedAt: req.user.emailVerifiedAt,

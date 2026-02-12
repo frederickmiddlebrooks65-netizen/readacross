@@ -202,7 +202,7 @@ export default function Pricing() {
     }
   };
 
-  const isPro = user?.plan === "pro" || user?.plan === "admin";
+  const isPro = user?.plan === "pro" || user?.plan === "admin" || user?.plan === "beta_pro";
 
   const starterFeatures = [
     { icon: FileText, text: t('pricing.starterFeature1') },

@@ -1,7 +1,7 @@
 import { GeminiService } from "./GeminiService.js";
 import { storage } from "../storage.js";
 
-export type UserPlan = "starter" | "pro" | "admin";
+export type UserPlan = "starter" | "pro" | "admin" | "beta_pro";
 
 export const MAX_CONVERSATION_MESSAGES = 5;
 export const MAX_SESSION_QUESTIONS = 15;

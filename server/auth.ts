@@ -124,9 +124,14 @@ export const authenticateJWT = async (req: AuthenticatedRequest, res: Response, 
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       
       // Fetch full user information from database
-      const user = await storage.getUser(decoded.id);
+      let user = await storage.getUser(decoded.id);
       if (!user) {
         return res.sendStatus(403);
+      }
+
+      if (user.plan === "beta_pro" && user.betaExpiresAt && new Date(user.betaExpiresAt) < new Date()) {
+        await storage.updateUser(user.id, { plan: "starter", betaExpiresAt: null });
+        user = (await storage.getUser(user.id))!;
       }
       
       req.user = user;
@@ -206,8 +211,12 @@ export const optionalAuthenticateJWT = async (req: AuthenticatedRequest, res: Re
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     
     // Fetch full user information from database
-    const user = await storage.getUser(decoded.id);
+    let user = await storage.getUser(decoded.id);
     if (user) {
+      if (user.plan === "beta_pro" && user.betaExpiresAt && new Date(user.betaExpiresAt) < new Date()) {
+        await storage.updateUser(user.id, { plan: "starter", betaExpiresAt: null });
+        user = (await storage.getUser(user.id))!;
+      }
       req.user = user;
       req.userId = user.id;
     } else {

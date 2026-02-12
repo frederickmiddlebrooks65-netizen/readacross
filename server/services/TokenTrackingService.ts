@@ -2,7 +2,7 @@ import { db } from "../db.js";
 import { tokenUsage, PLAN_LIMITS, type TokenUsage } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 
-export type PlanType = "starter" | "pro" | "admin";
+export type PlanType = "starter" | "pro" | "admin" | "beta_pro";
 
 function getCurrentMonth(): string {
   const now = new Date();
@@ -159,7 +159,7 @@ export class TokenTrackingService {
     }
 
     let shouldFallbackModel = false;
-    if (plan === "pro") {
+    if (plan === "pro" || plan === "beta_pro") {
       const remainingPremium = limits.premiumTokenCap - usage.premiumTokensUsed;
       if (remainingPremium <= this.PREMIUM_FALLBACK_BUFFER) {
         shouldFallbackModel = true;
@@ -178,7 +178,7 @@ export class TokenTrackingService {
     userId: number,
     plan: PlanType
   ): Promise<{ canProceed: boolean; errorCode?: string; message?: string; used: number; limit: number }> {
-    if (plan === "admin" || plan === "pro") {
+    if (plan === "admin" || plan === "pro" || plan === "beta_pro") {
       return { canProceed: true, used: 0, limit: Infinity };
     }
 
@@ -202,7 +202,7 @@ export class TokenTrackingService {
     userId: number,
     plan: PlanType
   ): Promise<{ canProceed: boolean; errorCode?: string; message?: string; used: number; limit: number }> {
-    if (plan === "admin" || plan === "pro") {
+    if (plan === "admin" || plan === "pro" || plan === "beta_pro") {
       return { canProceed: true, used: 0, limit: Infinity };
     }
 
@@ -235,7 +235,7 @@ export class TokenTrackingService {
       remainingTokens: Math.max(0, limits.monthlyTokenCap - usage.totalTokensUsed),
       premiumTokensUsed: usage.premiumTokensUsed,
       remainingPremiumTokens:
-        plan === "pro"
+        (plan === "pro" || plan === "beta_pro")
           ? Math.max(0, limits.premiumTokenCap - usage.premiumTokensUsed)
           : 0,
       fullDocTranslations: usage.fullDocTranslations,

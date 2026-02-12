@@ -447,7 +447,7 @@ router.get("/me/usage", authenticateJWT, async (req: AuthenticatedRequest, res) 
       return res.status(404).json({ error: "User not found" });
     }
 
-    const plan = (user.plan || "starter") as "starter" | "pro" | "admin";
+    const plan = (user.plan || "starter") as "starter" | "pro" | "admin" | "beta_pro";
     const snapshot = await TokenTrackingService.getUsageSnapshot(userId, plan);
     const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
     const nearingLimit = TokenTrackingService.isNearing80Percent(snapshot.totalTokensUsed, plan);

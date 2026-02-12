@@ -155,8 +155,8 @@ router.get("/payment/status", authenticateJWT, async (req: AuthenticatedRequest,
     }
 
     res.json({
-      plan: user.plan,
-      isPro: user.plan === "pro" || user.plan === "admin",
+      plan: user.plan === "beta_pro" ? "pro" : user.plan,
+      isPro: user.plan === "pro" || user.plan === "admin" || user.plan === "beta_pro",
     });
   } catch (error) {
     console.error("Payment status check error:", error);

@@ -7,7 +7,7 @@ import { storage } from "../storage.js";
 import { TokenTrackingService } from "./TokenTrackingService.js";
 import { PLAN_LIMITS } from "@shared/schema";
 
-export type UserPlan = "starter" | "pro" | "admin";
+export type UserPlan = "starter" | "pro" | "admin" | "beta_pro";
 
 export const MAX_CONVERSATION_MESSAGES = 5;
 export const MAX_SESSION_QUESTIONS = 15;

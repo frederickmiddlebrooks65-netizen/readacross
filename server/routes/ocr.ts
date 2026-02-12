@@ -15,7 +15,7 @@ router.post("/extract", authenticateJWT, async (req: AuthenticatedRequest, res: 
   try {
     const userId = req.userId!;
     const user = await storage.getUser(userId);
-    const userPlan = (user?.plan || "starter") as "starter" | "pro" | "admin";
+    const userPlan = (user?.plan || "starter") as "starter" | "pro" | "admin" | "beta_pro";
 
     const tokenCheck = await TokenTrackingService.checkTokenLimit(userId, userPlan);
     if (!tokenCheck.canProceed) {
