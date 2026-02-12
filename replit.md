@@ -41,6 +41,15 @@ The PDF processing pipeline prioritizes stable position anchoring with a 2-track
 
 ## Recent Changes
 
+### 2026-02-12: Beta Pro Plan for Private Beta
+- **New Plan**: `beta_pro` added to plan enum in `shared/schema.ts`
+- **Behavior**: Identical to `pro` plan (500K tokens, 200K premium cap, unlimited docs/OCR, export enabled, premium model)
+- **New Field**: `betaExpiresAt` (nullable timestamp) on `users` table
+- **Auto Downgrade**: In `authenticateJWT` and `optionalAuthenticateJWT` middleware (`server/auth.ts`), if `plan === "beta_pro"` and `betaExpiresAt < now`, silently downgrade to `starter` and clear `betaExpiresAt`
+- **UI Masking**: `/api/auth/me`, `/api/ai/usage-status`, and `/api/payment/status` return `"pro"` instead of `"beta_pro"` — UI never displays "Beta Pro"
+- **Type Updates**: `PlanType` and `UserPlan` types extended in `TokenTrackingService`, `GeminiService`, `TranslationService`
+- **No Admin UI**: Beta users managed via direct DB update (`UPDATE users SET plan='beta_pro', beta_expires_at='...' WHERE id=...`)
+
 ### 2026-02-12: Token-Based Freemium Plan Architecture
 - **Architecture**: Replaced daily AI call-count limits with monthly token-based tracking per instructions.md
 - **New Table**: `token_usage` (id, user_id, month, total_tokens_used, premium_tokens_used, full_doc_translations, ocr_count, updated_at) with unique constraint on (user_id, month)
