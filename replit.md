@@ -41,6 +41,25 @@ The PDF processing pipeline prioritizes stable position anchoring with a 2-track
 
 ## Recent Changes
 
+### 2026-02-12: Token-Based Freemium Plan Architecture
+- **Architecture**: Replaced daily AI call-count limits with monthly token-based tracking per instructions.md
+- **New Table**: `token_usage` (id, user_id, month, total_tokens_used, premium_tokens_used, full_doc_translations, ocr_count, updated_at) with unique constraint on (user_id, month)
+- **New Service**: `server/services/TokenTrackingService.ts` - handles token recording, limit checking, monthly reset, usage snapshots
+- **Plan Limits** (`PLAN_LIMITS` in `shared/schema.ts`):
+  - Starter: 50K tokens/month, 3 concurrent docs, 3 full-doc translations/month, 3 OCR/month, no export
+  - Pro: 500K tokens/month (200K premium cap), unlimited features, auto-fallback to lite model after premium cap
+  - Admin: unlimited
+- **GeminiService Changes**: `extractAndRecordTokens()` captures `usageMetadata` from every Gemini API response and records via TokenTrackingService
+- **Route Enforcement**:
+  - Upload: concurrent document count check (not cumulative counter)
+  - Full-doc translate: monthly limit check via `checkFullDocTranslationLimit()`
+  - OCR: monthly limit check via `checkOcrLimit()`
+  - Download: blocked for Starter (`canExport: false`)
+  - All routes: pre-flight token limit check
+- **Error Codes**: `CONCURRENT_DOC_LIMIT`, `MONTHLY_LIMIT_EXCEEDED`, `FULL_DOC_TRANSLATION_LIMIT`, `OCR_LIMIT_REACHED`, `EXPORT_NOT_AVAILABLE`
+- **New Endpoints**: `GET /account/me/usage` (user dashboard), `GET /admin/token-usage` (admin monitoring)
+- **Model Fallback**: Pro users auto-downgrade from gemini-2.5-flash to gemini-2.0-flash-lite when premium token cap exceeded
+
 ### 2026-02-04: Hard Block Boundary Rule for Headings
 - **Root Cause**: Headings were being merged with following prose at paragraph block construction stage
   - Block-level promotion cannot work if heading never exists as a separate block
