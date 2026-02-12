@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { authenticateJWT, AuthenticatedRequest } from "../auth.js";
 import { z } from "zod";
 import { GeminiService } from "../services/GeminiService.js";
+import { TokenTrackingService } from "../services/TokenTrackingService.js";
 import { storage } from "../storage.js";
 
 const router = Router();
@@ -14,11 +15,23 @@ router.post("/extract", authenticateJWT, async (req: AuthenticatedRequest, res: 
   try {
     const userId = req.userId!;
     const user = await storage.getUser(userId);
-    if (user && user.plan === "starter" && user.ocrUsed >= 1) {
+    const userPlan = (user?.plan || "starter") as "starter" | "pro" | "admin";
+
+    const tokenCheck = await TokenTrackingService.checkTokenLimit(userId, userPlan);
+    if (!tokenCheck.canProceed) {
+      return res.status(403).json({
+        error: "Token limit exceeded",
+        errorCode: tokenCheck.errorCode,
+        message: tokenCheck.message,
+      });
+    }
+
+    const ocrCheck = await TokenTrackingService.checkOcrLimit(userId, userPlan);
+    if (!ocrCheck.canProceed) {
       return res.status(403).json({
         error: "OCR limit reached",
-        errorCode: "OCR_LIMIT_REACHED",
-        message: "이미지 텍스트 인식은 1회 체험이 제공됩니다.",
+        errorCode: ocrCheck.errorCode,
+        message: ocrCheck.message,
       });
     }
 
@@ -30,16 +43,14 @@ router.post("/extract", authenticateJWT, async (req: AuthenticatedRequest, res: 
     const extractedTexts: string[] = [];
 
     for (const imageBase64 of images) {
-      const extractedText = await GeminiService.processImageOCR(imageBase64);
+      const extractedText = await GeminiService.processImageOCR(imageBase64, userId);
       extractedTexts.push(extractedText);
       console.log(`[OCR] Extracted ${extractedText.length} characters from image`);
     }
 
     const combinedText = extractedTexts.join("\n\n---\n\n");
 
-    if (user && user.plan === "starter") {
-      await storage.updateUser(userId, { ocrUsed: (user.ocrUsed || 0) + 1 });
-    }
+    await TokenTrackingService.incrementOcrCount(userId);
 
     res.json({
       success: true,

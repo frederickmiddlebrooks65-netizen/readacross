@@ -2,12 +2,14 @@ import express from "express";
 import multer from "multer";
 import { storage } from "../storage.js";
 import { ObjectStorageService } from "../objectStorage.js";
+import { TokenTrackingService } from "../services/TokenTrackingService.js";
 import {
   updateUserProfileSchema,
   updateUserPreferencesSchema,
   insertUserSourceSchema,
   updateUserSourceSchema,
   updateUserLanguageSchema,
+  PLAN_LIMITS,
   type UserProfile,
   type UserPreferences,
   type UserSource,
@@ -433,6 +435,38 @@ router.post("/profile/avatar", authenticateJWT, upload.single('avatar'), async (
   } catch (error) {
     console.error("Error uploading avatar:", error);
     res.status(500).json({ error: "Failed to upload avatar" });
+  }
+});
+
+// GET /me/usage - Get current user's token usage for the month
+router.get("/me/usage", authenticateJWT, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.userId!;
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const plan = (user.plan || "starter") as "starter" | "pro" | "admin";
+    const snapshot = await TokenTrackingService.getUsageSnapshot(userId, plan);
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
+    const nearingLimit = TokenTrackingService.isNearing80Percent(snapshot.totalTokensUsed, plan);
+
+    res.json({
+      ...snapshot,
+      limits: {
+        monthlyTokenCap: limits.monthlyTokenCap,
+        premiumTokenCap: limits.premiumTokenCap,
+        maxConcurrentDocuments: limits.maxConcurrentDocuments,
+        maxFullDocTranslations: limits.maxFullDocTranslations,
+        maxOcr: limits.maxOcr,
+        canExport: limits.canExport,
+      },
+      nearingLimit,
+    });
+  } catch (error) {
+    console.error("Error fetching usage:", error);
+    res.status(500).json({ error: "Failed to fetch usage data" });
   }
 });
 

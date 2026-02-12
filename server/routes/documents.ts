@@ -4,6 +4,8 @@ import { DocumentService } from "../services/DocumentService.js";
 import { TranslationService, type UserPlan } from "../services/TranslationService.js";
 import { GeminiService } from "../services/GeminiService.js";
 import { LanguageDetectionService } from "../services/LanguageDetectionService.js";
+import { TokenTrackingService } from "../services/TokenTrackingService.js";
+import { PLAN_LIMITS } from "@shared/schema";
 import multer from "multer";
 import * as mammoth from "mammoth";
 import { parsePDFWithArchetype, type Block, type PDFParseResult } from "../pdfUtils.js";
@@ -405,11 +407,26 @@ router.post("/upload", authenticateJWT, upload.single("file"),
 
     const userId = req.userId!;
     const user = await storage.getUser(userId);
-    if (user && user.plan === "starter" && user.documentsUploaded >= 3) {
+    const userPlan = (user?.plan || "starter") as UserPlan;
+    const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.starter;
+
+    if (userPlan === "starter") {
+      const userDocs = await storage.getUserDocuments({ userId, status: 'active' });
+      if (userDocs.length >= limits.maxConcurrentDocuments) {
+        return res.status(403).json({
+          error: "Upload limit reached",
+          errorCode: "CONCURRENT_DOC_LIMIT",
+          message: `Starter 플랜에서는 동시에 ${limits.maxConcurrentDocuments}개의 문서만 보관할 수 있습니다. 기존 문서를 삭제한 후 업로드해 주세요.`,
+        });
+      }
+    }
+
+    const tokenCheck = await TokenTrackingService.checkTokenLimit(userId, userPlan);
+    if (!tokenCheck.canProceed) {
       return res.status(403).json({
-        error: "Upload limit reached",
-        errorCode: "UPLOAD_LIMIT_REACHED",
-        message: "Starter 플랜에서는 문서를 최대 3회까지 체험할 수 있어요.",
+        error: "Token limit exceeded",
+        errorCode: tokenCheck.errorCode,
+        message: tokenCheck.message,
       });
     }
 
@@ -511,10 +528,6 @@ router.post("/upload", authenticateJWT, upload.single("file"),
         });
       }
 
-      if (user && user.plan === "starter") {
-        await storage.updateUser(userId, { documentsUploaded: (user.documentsUploaded || 0) + 1 });
-      }
-
       res.status(201).json({
         success: true,
         document: document,
@@ -534,10 +547,23 @@ router.post("/upload", authenticateJWT, upload.single("file"),
 // Documents are processed during creation only - no regeneration during retrieval
 
 // GET /:id/download - Download document as file
-router.get("/:id/download", async (req, res) => {
+router.get("/:id/download", authenticateJWT, async (req: AuthenticatedRequest, res) => {
   const documentId = parseInt(req.params.id);
+  const userId = req.userId!;
 
   try {
+    const user = await storage.getUser(userId);
+    const userPlan = (user?.plan || "starter") as UserPlan;
+    const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.starter;
+
+    if (!limits.canExport) {
+      return res.status(403).json({
+        error: "Export not available",
+        errorCode: "EXPORT_NOT_AVAILABLE",
+        message: "문서 다운로드는 Pro 플랜에서 이용하실 수 있습니다.",
+      });
+    }
+
     const document = await storage.getDocumentWithParagraphs(documentId);
     if (!document) {
       return res.status(404).json({ error: "Document not found" });
@@ -1033,22 +1059,38 @@ router.post("/:id/translate", authenticateJWT, async (req: AuthenticatedRequest,
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // Get user plan for model selection
     const user = await storage.getUser(userId);
     const userPlan: UserPlan = (user?.plan as UserPlan) || "starter";
 
-    // Mark document as translating with timestamp for stale detection
+    const tokenCheck = await TokenTrackingService.checkTokenLimit(userId, userPlan);
+    if (!tokenCheck.canProceed) {
+      return res.status(403).json({
+        error: "Token limit exceeded",
+        errorCode: tokenCheck.errorCode,
+        message: tokenCheck.message,
+      });
+    }
+
+    const docTransCheck = await TokenTrackingService.checkFullDocTranslationLimit(userId, userPlan);
+    if (!docTransCheck.canProceed) {
+      return res.status(403).json({
+        error: "Full document translation limit reached",
+        errorCode: docTransCheck.errorCode,
+        message: docTransCheck.message,
+      });
+    }
+
+    await TokenTrackingService.incrementFullDocTranslation(userId);
+
     await storage.updateDocument(documentId, { 
       translationStatus: "running",
       translationUpdatedAt: new Date(),
-      translationError: null, // Clear previous errors
+      translationError: null,
     });
 
-    // Return immediately and start translation in background
     res.json({ message: "Translation started", documentId });
 
-    // Background translation process
-    translateDocumentInBackground(documentId, document, userPlan, user?.email || undefined);
+    translateDocumentInBackground(documentId, document, userPlan, user?.email || undefined, userId);
   } catch (error) {
     console.error("Document translation request error:", error);
     res.status(500).json({ message: "Failed to start document translation" });
@@ -1116,7 +1158,8 @@ async function translateDocumentInBackground(
   documentId: number,
   document: any,
   userPlan: UserPlan,
-  userEmail?: string
+  userEmail?: string,
+  userId?: number
 ) {
   try {
     console.log(`[TRANSLATE] Starting batch translation for document ${documentId}`);
@@ -1161,6 +1204,7 @@ async function translateDocumentInBackground(
           {
             userEmail,
             userPlan,
+            userId,
             sourceLanguage: document.sourceLanguage || "en",
             targetLanguage: document.targetLanguage || "ko",
           },

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage.js";
 import { AdminService } from "../services/AdminService.js";
 import { DocumentService } from "../services/DocumentService.js";
+import { TokenTrackingService } from "../services/TokenTrackingService.js";
 import { authenticateJWT, requireRole, type AuthenticatedRequest } from "../auth.js";
 import type { Request, Response } from "express";
 
@@ -320,6 +321,18 @@ router.patch("/documents/:id/permanent", authenticateJWT, requireRole(['admin'])
   } catch (error) {
     console.error("Error updating document permanent status:", error);
     res.status(500).json({ message: "Failed to update document" });
+  }
+});
+
+// GET /token-usage - Admin token usage dashboard
+router.get("/token-usage", authenticateJWT, requireRole(['admin']), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const costPerMillion = parseFloat((req.query.costPerMillion as string) || "0.15");
+    const data = await TokenTrackingService.getGlobalTokenUsage(costPerMillion);
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching token usage:", error);
+    res.status(500).json({ error: "Failed to fetch token usage data" });
   }
 });
 
