@@ -298,7 +298,7 @@ export default function Pricing() {
               <ul className="space-y-4">
                 {starterFeatures.map((feature, index) => (
                   <li key={index} className="flex items-start gap-3">
-                    <feature.icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${feature.icon === X ? 'text-red-400' : 'text-muted-foreground'}`} />
+                    <feature.icon className="h-5 w-5 flex-shrink-0 mt-0.5 text-muted-foreground" />
                     <span className="text-sm font-medium text-foreground">{feature.text}</span>
                   </li>
                 ))}
