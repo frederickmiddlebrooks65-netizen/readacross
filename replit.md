@@ -59,6 +59,10 @@ The PDF processing pipeline prioritizes stable position anchoring with a 2-track
 - **Error Codes**: `CONCURRENT_DOC_LIMIT`, `MONTHLY_LIMIT_EXCEEDED`, `FULL_DOC_TRANSLATION_LIMIT`, `OCR_LIMIT_REACHED`, `EXPORT_NOT_AVAILABLE`
 - **New Endpoints**: `GET /account/me/usage` (user dashboard), `GET /admin/token-usage` (admin monitoring)
 - **Model Fallback**: Pro users auto-downgrade from gemini-2.5-flash to gemini-2.0-flash-lite when premium token cap exceeded
+- **Safety Buffers**: Pre-flight checks use safety buffers to prevent overshoot:
+  - `MONTHLY_CAP_BUFFER = 500`: Blocks when remaining tokens <= 500 (prevents calls that would exceed cap)
+  - `PREMIUM_FALLBACK_BUFFER = 2,000`: Triggers lite-model fallback when remaining premium tokens <= 2,000
+- **Legacy Cleanup**: Removed all daily-count infrastructure (`STARTER_DAILY_LIMIT`, `PRO_DAILY_THRESHOLD`, `incrementUsage`, `checkAndUpdateDailyUsage`). Frontend `AISideDrawer.tsx` updated to show token-based messaging.
 
 ### 2026-02-04: Hard Block Boundary Rule for Headings
 - **Root Cause**: Headings were being merged with following prose at paragraph block construction stage

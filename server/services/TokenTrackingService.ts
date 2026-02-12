@@ -127,6 +127,9 @@ export class TokenTrackingService {
       .where(and(eq(tokenUsage.userId, userId), eq(tokenUsage.month, month)));
   }
 
+  static readonly MONTHLY_CAP_BUFFER = 500;
+  static readonly PREMIUM_FALLBACK_BUFFER = 2_000;
+
   static async checkTokenLimit(
     userId: number,
     plan: PlanType
@@ -143,7 +146,8 @@ export class TokenTrackingService {
     const usage = await this.getOrCreateMonthlyUsage(userId);
     const limits = PLAN_LIMITS[plan];
 
-    if (usage.totalTokensUsed >= limits.monthlyTokenCap) {
+    const remainingTokens = limits.monthlyTokenCap - usage.totalTokensUsed;
+    if (remainingTokens <= this.MONTHLY_CAP_BUFFER) {
       return {
         canProceed: false,
         shouldFallbackModel: false,
@@ -155,8 +159,11 @@ export class TokenTrackingService {
     }
 
     let shouldFallbackModel = false;
-    if (plan === "pro" && usage.premiumTokensUsed >= limits.premiumTokenCap) {
-      shouldFallbackModel = true;
+    if (plan === "pro") {
+      const remainingPremium = limits.premiumTokenCap - usage.premiumTokensUsed;
+      if (remainingPremium <= this.PREMIUM_FALLBACK_BUFFER) {
+        shouldFallbackModel = true;
+      }
     }
 
     return {
