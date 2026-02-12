@@ -186,7 +186,7 @@ Check if the user's answer conveys the same meaning as the expected answer.`;
       const content = await GeminiService.generateText(
         `${systemPrompt}\n\n${userPrompt}`,
         undefined,
-        { maxTokens: 150, temperature: 0.1, plan: "starter", jsonMode: true }
+        { maxTokens: 150, temperature: 0.1, plan: "starter", jsonMode: true, userId }
       );
 
       const result = JSON.parse(content || '{"isCorrect": false, "feedback": "Unable to check answer"}');
@@ -615,7 +615,7 @@ Analyze the semantic accuracy and provide feedback.`;
       const content = await GeminiService.generateText(
         `${systemPrompt}\n\n${userPrompt}`,
         undefined,
-        { maxTokens: 300, temperature: 0.3, plan: "starter", jsonMode: true }
+        { maxTokens: 300, temperature: 0.3, plan: "starter", jsonMode: true, userId }
       );
 
       const result = JSON.parse(content || '{"isCorrect": false, "feedback": "분석 실패", "suggestions": []}');

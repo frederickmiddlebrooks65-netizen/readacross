@@ -9,8 +9,6 @@ import { PLAN_LIMITS } from "@shared/schema";
 
 export type UserPlan = "starter" | "pro" | "admin";
 
-export const STARTER_DAILY_LIMIT = 3;
-export const PRO_DAILY_THRESHOLD = 50;
 export const MAX_CONVERSATION_MESSAGES = 5;
 export const MAX_SESSION_QUESTIONS = 15;
 
@@ -182,10 +180,6 @@ export class GeminiService {
       remainingCalls: Math.max(0, tokenCheck.limit - tokenCheck.currentUsage),
       shouldFallback: tokenCheck.shouldFallbackModel,
     };
-  }
-
-  static async incrementUsage(userId: number): Promise<number> {
-    return await storage.incrementDailyAiCount(userId);
   }
 
   static extractAndRecordTokens(
@@ -534,8 +528,6 @@ export class GeminiService {
     try {
       const response = await executeChat();
 
-      await this.incrementUsage(userId);
-
       const usage = await TokenTrackingService.getOrCreateMonthlyUsage(userId);
       const limits = PLAN_LIMITS[context.userPlan] || PLAN_LIMITS.starter;
       const remainingCalls = Math.max(0, limits.monthlyTokenCap - usage.totalTokensUsed);
@@ -636,7 +628,6 @@ ${text}`;
       this.extractAndRecordTokens(result.response, userId, modelName);
 
       if (userId) {
-        await this.incrementUsage(userId);
         const usage = await TokenTrackingService.getOrCreateMonthlyUsage(userId);
         const limits = PLAN_LIMITS[context.userPlan] || PLAN_LIMITS.starter;
         remainingCalls = Math.max(0, limits.monthlyTokenCap - usage.totalTokensUsed);
@@ -721,6 +712,7 @@ ${text}`;
       temperature?: number;
       plan?: UserPlan;
       jsonMode?: boolean;
+      userId?: number;
     },
   ): Promise<string> {
     const plan = options?.plan || "starter";
@@ -739,41 +731,12 @@ ${text}`;
       });
 
       const result = await model.generateContent(prompt);
+      this.extractAndRecordTokens(result.response, options?.userId, modelName);
       return result.response.text();
     } catch (error) {
       console.error("Text generation error:", error);
       throw error;
     }
-  }
-
-  static async generateTextWithTracking(
-    prompt: string,
-    userId: number,
-    systemPrompt?: string,
-    options?: {
-      maxTokens?: number;
-      temperature?: number;
-      plan?: UserPlan;
-      jsonMode?: boolean;
-    },
-  ): Promise<string> {
-    const plan = options?.plan || "starter";
-    const modelName = this.getModelForPlan(plan, false);
-
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      systemInstruction: systemPrompt,
-      safetySettings: SAFETY_SETTINGS,
-      generationConfig: {
-        maxOutputTokens: options?.maxTokens || 1000,
-        temperature: options?.temperature || 0.7,
-        responseMimeType: options?.jsonMode ? "application/json" : undefined,
-      },
-    });
-
-    const result = await model.generateContent(prompt);
-    this.extractAndRecordTokens(result.response, userId, modelName);
-    return result.response.text();
   }
 
   static async processImageOCR(imageBase64: string, userId?: number): Promise<string> {
@@ -1312,8 +1275,6 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
 }
 
 export const AI_LIMITS = {
-  STARTER_DAILY_LIMIT,
-  PRO_DAILY_THRESHOLD,
   MAX_CONVERSATION_MESSAGES,
   MAX_SESSION_QUESTIONS,
 };

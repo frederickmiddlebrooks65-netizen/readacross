@@ -200,12 +200,14 @@ Guidelines:
 - Difficulty based on word complexity and usage frequency
 - Consider the context if provided`;
 
+    const userId = req.userId;
     const response = await GeminiService.generateText(prompt, 
       "You are a helpful language learning assistant. Provide educational glossary entries in valid JSON format only. Do not include markdown code blocks.",
       { 
         maxTokens: 500, 
         temperature: 0.3,
-        jsonMode: true 
+        jsonMode: true,
+        userId: userId || undefined,
       }
     );
 

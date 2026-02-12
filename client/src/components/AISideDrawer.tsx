@@ -35,7 +35,6 @@ interface ChatMessage {
 }
 
 const MAX_SESSION_QUESTIONS = 15;
-const STARTER_DAILY_LIMIT = 3;
 
 function formatMarkdown(text: string): string {
   return text
@@ -342,11 +341,11 @@ export default function AISideDrawer({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Crown className="h-5 w-5 text-forest dark:text-slate-400" />
-              오늘의 대화 횟수를 모두 사용했습니다
+              이번 달 토큰 사용량을 초과했습니다
             </DialogTitle>
             <DialogDescription>
-              Starter 플랜은 하루 {STARTER_DAILY_LIMIT}회의 AI 대화를 제공합니다. 
-              Pro로 업그레이드하여 무제한으로 AI 코칭을 받아보세요.
+              Starter 플랜의 월간 토큰 한도에 도달했습니다. 
+              Pro로 업그레이드하여 더 많은 AI 코칭을 받아보세요.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col gap-2 sm:flex-row">
@@ -522,11 +521,11 @@ export default function AISideDrawer({
                 <Crown className="h-5 w-5 text-forest dark:text-slate-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-forest dark:text-slate-300">
-                    오늘의 대화 횟수를 모두 사용했습니다
+                    이번 달 토큰 사용량을 초과했습니다
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Starter 플랜은 하루 {STARTER_DAILY_LIMIT}회의 AI 대화를 제공합니다. 
-                    Pro로 업그레이드하여 무제한으로 AI 코칭을 받아보세요.
+                    Starter 플랜의 월간 토큰 한도에 도달했습니다. 
+                    Pro로 업그레이드하여 더 많은 AI 코칭을 받아보세요.
                   </p>
                   <Button
                     size="sm"
@@ -584,9 +583,9 @@ export default function AISideDrawer({
               {t('aiDrawer.turnsLabel') || '세션'}: {MAX_SESSION_QUESTIONS - questionCount}/{MAX_SESSION_QUESTIONS}
             </span>
           )}
-          {isStarter && (
+          {isStarter && remainingCalls !== null && (
             <span className="flex items-center gap-1 text-forest dark:text-slate-400 font-medium">
-              오늘 남은 대화: {remainingCalls !== null ? remainingCalls : '...'}/{STARTER_DAILY_LIMIT}
+              남은 토큰: {remainingCalls !== null ? remainingCalls.toLocaleString() : '...'}
             </span>
           )}
         </div>

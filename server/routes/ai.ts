@@ -4,14 +4,14 @@ import { db } from "../db.js";
 import { storage } from "../storage.js";
 import { z } from "zod";
 import * as schema from "@shared/schema";
+import { PLAN_LIMITS } from "@shared/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 import {
   GeminiService,
-  STARTER_DAILY_LIMIT,
-  PRO_DAILY_THRESHOLD,
   MAX_CONVERSATION_MESSAGES,
   MAX_SESSION_QUESTIONS,
 } from "../services/GeminiService.js";
+import { TokenTrackingService } from "../services/TokenTrackingService.js";
 
 const router = Router();
 
@@ -39,31 +39,6 @@ const aiAssistRequestSchema = z.object({
   documentId: z.number().optional(),
   fullDocumentContent: z.string().optional(),
 });
-
-async function checkAndUpdateDailyUsage(
-  userId: number,
-  userPlan: string,
-): Promise<{
-  allowed: boolean;
-  remaining: number;
-  isFallback?: boolean;
-}> {
-  const usageData = await storage.getDailyAiCount(userId);
-  const currentCount = usageData.count;
-
-  if (userPlan === "pro" || userPlan === "admin") {
-    const isFallback = currentCount >= PRO_DAILY_THRESHOLD;
-    await storage.incrementDailyAiCount(userId);
-    return { allowed: true, remaining: -1, isFallback };
-  }
-
-  if (currentCount >= STARTER_DAILY_LIMIT) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  await storage.incrementDailyAiCount(userId);
-  return { allowed: true, remaining: STARTER_DAILY_LIMIT - currentCount - 1 };
-}
 
 function buildSystemPrompt(
   mode: "hover" | "edit" | "chat",
@@ -163,35 +138,31 @@ router.post(
       }
 
       const validatedData = aiAssistRequestSchema.parse(req.body);
-      const userPlan = user.plan as string;
-      const isStarter = userPlan === "starter";
+      const userPlan = (user.plan || "starter") as "starter" | "pro" | "admin";
       const isPro = userPlan === "pro" || userPlan === "admin";
 
       const sessionCheck = GeminiService.checkSessionLimit(
         validatedData.questionCount + 1,
       );
       if (sessionCheck.shouldEnd) {
-        const usageData = await storage.getDailyAiCount(userId);
+        const usage = await TokenTrackingService.getOrCreateMonthlyUsage(userId);
+        const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.starter;
         return res.json({
           response: sessionCheck.message,
           sessionEnded: true,
           sessionEndMessage: sessionCheck.message,
-          remaining: isStarter
-            ? Math.max(0, STARTER_DAILY_LIMIT - usageData.count)
-            : -1,
+          remaining: Math.max(0, limits.monthlyTokenCap - usage.totalTokensUsed),
           isFallback: false,
-          dailyLimit: isStarter ? STARTER_DAILY_LIMIT : undefined,
         });
       }
 
-      const usageCheck = await checkAndUpdateDailyUsage(userId, user.plan);
-      if (!usageCheck.allowed) {
+      const tokenCheck = await TokenTrackingService.checkTokenLimit(userId, userPlan);
+      if (!tokenCheck.canProceed) {
         return res.json({
           limitReached: true,
-          message: "오늘의 대화 횟수를 모두 사용했습니다",
+          message: tokenCheck.message || "이번 달 토큰 사용량을 초과했습니다.",
           remaining: 0,
           isFallback: false,
-          dailyLimit: STARTER_DAILY_LIMIT,
         });
       }
 
@@ -247,6 +218,7 @@ router.post(
               plan: userPlan as "pro" | "admin",
               maxTokens: 1000,
               temperature: 0.7,
+              userId,
             },
           );
           assistantResponse = fallbackResult;
@@ -269,7 +241,7 @@ router.post(
         ];
 
         const result = await GeminiService.chat(messages, {
-          userPlan: userPlan as "starter" | "pro" | "admin",
+          userPlan,
           userId,
           userEmail: user.email || undefined,
           sourceLanguage: user.learningLanguage || "en",
@@ -282,12 +254,15 @@ router.post(
         modelUsed = result.modelUsed;
       }
 
+      const usageAfter = await TokenTrackingService.getOrCreateMonthlyUsage(userId);
+      const limitsAfter = PLAN_LIMITS[userPlan] || PLAN_LIMITS.starter;
+      const remainingTokens = Math.max(0, limitsAfter.monthlyTokenCap - usageAfter.totalTokensUsed);
+
       res.json({
         response: assistantResponse,
-        remaining: usageCheck.remaining,
-        isFallback: usageCheck.isFallback || false,
+        remaining: remainingTokens,
+        isFallback: tokenCheck.shouldFallbackModel,
         modelUsed,
-        dailyLimit: isStarter ? STARTER_DAILY_LIMIT : undefined,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -315,29 +290,19 @@ router.get(
         return res.status(401).json({ error: "User not found" });
       }
 
-      const userPlan = user.plan as string;
-      const isStarter = userPlan === "starter";
+      const userPlan = (user.plan || "starter") as "starter" | "pro" | "admin";
+      const snapshot = await TokenTrackingService.getUsageSnapshot(userId, userPlan);
+      const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.starter;
+      const nearingLimit = TokenTrackingService.isNearing80Percent(snapshot.totalTokensUsed, userPlan);
 
-      const usageData = await storage.getDailyAiCount(userId);
-      const currentCount = usageData.count;
-
-      if (isStarter) {
-        const remaining = Math.max(0, STARTER_DAILY_LIMIT - currentCount);
-        return res.json({
-          plan: userPlan,
-          remaining,
-          dailyLimit: STARTER_DAILY_LIMIT,
-          limitReached: remaining === 0,
-        });
-      }
-
-      const isFallback = currentCount >= PRO_DAILY_THRESHOLD;
       return res.json({
         plan: userPlan,
-        remaining: -1,
-        isFallback,
-        usageCount: currentCount,
-        fallbackThreshold: PRO_DAILY_THRESHOLD,
+        remaining: snapshot.remainingTokens,
+        limitReached: snapshot.remainingTokens === 0,
+        isFallback: userPlan === "pro" && snapshot.remainingPremiumTokens === 0,
+        nearingLimit,
+        totalTokensUsed: snapshot.totalTokensUsed,
+        monthlyTokenCap: limits.monthlyTokenCap,
       });
     } catch (error) {
       console.error("[Usage Status Error]", error);

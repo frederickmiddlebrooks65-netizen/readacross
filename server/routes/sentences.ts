@@ -312,7 +312,7 @@ Respond in JSON format:
     const content = await GeminiService.generateText(
       prompt,
       "You are a helpful Korean language tutor. Respond only in valid JSON format.",
-      { maxTokens: 1000, plan: "starter", jsonMode: true }
+      { maxTokens: 1000, plan: "starter", jsonMode: true, userId }
     );
 
     if (!content) {

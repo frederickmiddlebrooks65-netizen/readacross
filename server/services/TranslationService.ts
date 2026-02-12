@@ -3,8 +3,6 @@ import { storage } from "../storage.js";
 
 export type UserPlan = "starter" | "pro" | "admin";
 
-export const STARTER_DAILY_LIMIT = 3;
-export const PRO_DAILY_THRESHOLD = 50;
 export const MAX_CONVERSATION_MESSAGES = 5;
 export const MAX_SESSION_QUESTIONS = 15;
 
@@ -61,10 +59,6 @@ export class TranslationService {
     return GeminiService.checkUsageLimit(userId, plan);
   }
 
-  static async incrementUsage(userId: number): Promise<number> {
-    return GeminiService.incrementUsage(userId);
-  }
-
   static applySlidingWindow(
     messages: ConversationMessage[],
     maxMessages: number = MAX_CONVERSATION_MESSAGES
@@ -93,8 +87,6 @@ export class TranslationService {
 }
 
 export const AI_LIMITS = {
-  STARTER_DAILY_LIMIT,
-  PRO_DAILY_THRESHOLD,
   MAX_CONVERSATION_MESSAGES,
   MAX_SESSION_QUESTIONS
 };
