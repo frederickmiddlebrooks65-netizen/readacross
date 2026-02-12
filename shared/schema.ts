@@ -1160,6 +1160,62 @@ export const aiUsage = pgTable("ai_usage", {
 
 export type AIUsage = typeof aiUsage.$inferSelect;
 
+// ============================================
+// Token Usage Tracking (Monthly)
+// ============================================
+export const tokenUsage = pgTable("token_usage", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  month: text("month").notNull(), // YYYY-MM format
+  totalTokensUsed: integer("total_tokens_used").default(0).notNull(),
+  premiumTokensUsed: integer("premium_tokens_used").default(0).notNull(),
+  fullDocTranslations: integer("full_doc_translations").default(0).notNull(),
+  ocrCount: integer("ocr_count").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userMonthUnique: unique().on(table.userId, table.month),
+}));
+
+export type TokenUsage = typeof tokenUsage.$inferSelect;
+export type InsertTokenUsage = typeof tokenUsage.$inferInsert;
+
+// Plan limits constants
+export const PLAN_LIMITS = {
+  starter: {
+    monthlyTokenCap: 50_000,
+    premiumTokenCap: 0,
+    maxConcurrentDocuments: 3,
+    maxFullDocTranslations: 3,
+    maxOcr: 3,
+    canExport: false,
+    model: "gemini-2.0-flash-lite" as const,
+    premiumModel: null,
+    priorityProcessing: false,
+  },
+  pro: {
+    monthlyTokenCap: 500_000,
+    premiumTokenCap: 200_000,
+    maxConcurrentDocuments: Infinity,
+    maxFullDocTranslations: Infinity,
+    maxOcr: Infinity,
+    canExport: true,
+    model: "gemini-2.0-flash-lite" as const,
+    premiumModel: "gemini-2.5-flash" as const,
+    priorityProcessing: true,
+  },
+  admin: {
+    monthlyTokenCap: Infinity,
+    premiumTokenCap: Infinity,
+    maxConcurrentDocuments: Infinity,
+    maxFullDocTranslations: Infinity,
+    maxOcr: Infinity,
+    canExport: true,
+    model: "gemini-2.0-flash-lite" as const,
+    premiumModel: "gemini-2.5-flash" as const,
+    priorityProcessing: true,
+  },
+} as const;
+
 export type InsertPracticeSession = z.infer<typeof insertPracticeSessionSchema>;
 export type PracticeSession = typeof practiceSessions.$inferSelect;
 export type UpdatePracticeSession = z.infer<typeof updatePracticeSessionSchema>;
