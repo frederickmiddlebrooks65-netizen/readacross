@@ -4,6 +4,8 @@ import {
   HarmBlockThreshold,
 } from "@google/generative-ai";
 import { storage } from "../storage.js";
+import { TokenTrackingService } from "./TokenTrackingService.js";
+import { PLAN_LIMITS } from "@shared/schema";
 
 export type UserPlan = "starter" | "pro" | "admin";
 
@@ -159,52 +161,60 @@ export class GeminiService {
       };
     }
 
-    const { wasReset, currentCount } =
-      await storage.resetDailyAiCountIfNeeded(userId);
-    if (wasReset) {
-      console.log(`[AI Usage] Reset daily count for user ${userId}`);
-    }
+    const tokenCheck = await TokenTrackingService.checkTokenLimit(userId, plan);
 
-    if (plan === "starter") {
-      const remainingCalls = Math.max(0, STARTER_DAILY_LIMIT - currentCount);
-      if (currentCount >= STARTER_DAILY_LIMIT) {
-        return {
-          canProceed: false,
-          remainingCalls: 0,
-          shouldFallback: false,
-          error: {
-            error: true,
-            errorCode: "DAILY_LIMIT_EXCEEDED",
-            message: "오늘의 대화 횟수를 모두 사용했습니다",
-            remainingCalls: 0,
-          },
-        };
-      }
-      return { canProceed: true, remainingCalls, shouldFallback: false };
-    }
-
-    if (plan === "pro") {
-      const remainingBeforeFallback = Math.max(
-        0,
-        PRO_DAILY_THRESHOLD - currentCount,
-      );
-      const shouldFallback = currentCount >= PRO_DAILY_THRESHOLD;
+    if (!tokenCheck.canProceed) {
       return {
-        canProceed: true,
-        remainingCalls: remainingBeforeFallback,
-        shouldFallback,
+        canProceed: false,
+        remainingCalls: 0,
+        shouldFallback: false,
+        error: {
+          error: true,
+          errorCode: "DAILY_LIMIT_EXCEEDED",
+          message: tokenCheck.message || "이번 달 토큰 사용량을 초과했습니다.",
+          remainingCalls: 0,
+        },
       };
     }
 
     return {
       canProceed: true,
-      remainingCalls: Infinity,
-      shouldFallback: false,
+      remainingCalls: Math.max(0, tokenCheck.limit - tokenCheck.currentUsage),
+      shouldFallback: tokenCheck.shouldFallbackModel,
     };
   }
 
   static async incrementUsage(userId: number): Promise<number> {
     return await storage.incrementDailyAiCount(userId);
+  }
+
+  static extractAndRecordTokens(
+    response: any,
+    userId: number | undefined,
+    modelName: string
+  ): number {
+    if (!userId) return 0;
+
+    let totalTokens = 0;
+    try {
+      const usageMetadata = response?.usageMetadata;
+      if (usageMetadata) {
+        totalTokens =
+          (usageMetadata.promptTokenCount || 0) +
+          (usageMetadata.candidatesTokenCount || 0);
+      }
+    } catch (e) {
+      // Fallback: no metadata available
+    }
+
+    if (totalTokens > 0) {
+      const isPremium = modelName === MODEL_CONFIG.pro;
+      TokenTrackingService.recordTokens(userId, totalTokens, isPremium).catch(
+        (err) => console.error("[TokenTracking] Failed to record tokens:", err)
+      );
+    }
+
+    return totalTokens;
   }
 
   static applySlidingWindow(
@@ -346,6 +356,10 @@ export class GeminiService {
             `[GeminiService] WARNING: Cached chat unexpected finishReason: ${finishReason}`,
           );
         }
+
+        const parts = cacheKey.split("-");
+        const cacheUserId = parseInt(parts[0]);
+        GeminiService.extractAndRecordTokens(result.response, cacheUserId, modelName);
 
         return responseText;
       } catch (error: any) {
@@ -497,6 +511,8 @@ export class GeminiService {
           );
         }
 
+        GeminiService.extractAndRecordTokens(result.response, userId, modelName);
+
         return responseText;
       } catch (error: any) {
         if (
@@ -519,13 +535,10 @@ export class GeminiService {
       const response = await executeChat();
 
       await this.incrementUsage(userId);
-      const newCount = await storage.getDailyAiCount(userId);
-      const remainingCalls =
-        context.userPlan === "starter"
-          ? Math.max(0, STARTER_DAILY_LIMIT - newCount.count)
-          : context.userPlan === "pro"
-            ? Math.max(0, PRO_DAILY_THRESHOLD - newCount.count)
-            : Infinity;
+
+      const usage = await TokenTrackingService.getOrCreateMonthlyUsage(userId);
+      const limits = PLAN_LIMITS[context.userPlan] || PLAN_LIMITS.starter;
+      const remainingCalls = Math.max(0, limits.monthlyTokenCap - usage.totalTokensUsed);
 
       return {
         response,
@@ -620,15 +633,13 @@ ${text}`;
         );
       }
 
+      this.extractAndRecordTokens(result.response, userId, modelName);
+
       if (userId) {
         await this.incrementUsage(userId);
-        const newCount = await storage.getDailyAiCount(userId);
-        remainingCalls =
-          context.userPlan === "starter"
-            ? Math.max(0, STARTER_DAILY_LIMIT - newCount.count)
-            : context.userPlan === "pro"
-              ? Math.max(0, PRO_DAILY_THRESHOLD - newCount.count)
-              : undefined;
+        const usage = await TokenTrackingService.getOrCreateMonthlyUsage(userId);
+        const limits = PLAN_LIMITS[context.userPlan] || PLAN_LIMITS.starter;
+        remainingCalls = Math.max(0, limits.monthlyTokenCap - usage.totalTokensUsed);
       }
 
       return {
@@ -735,7 +746,37 @@ ${text}`;
     }
   }
 
-  static async processImageOCR(imageBase64: string): Promise<string> {
+  static async generateTextWithTracking(
+    prompt: string,
+    userId: number,
+    systemPrompt?: string,
+    options?: {
+      maxTokens?: number;
+      temperature?: number;
+      plan?: UserPlan;
+      jsonMode?: boolean;
+    },
+  ): Promise<string> {
+    const plan = options?.plan || "starter";
+    const modelName = this.getModelForPlan(plan, false);
+
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      systemInstruction: systemPrompt,
+      safetySettings: SAFETY_SETTINGS,
+      generationConfig: {
+        maxOutputTokens: options?.maxTokens || 1000,
+        temperature: options?.temperature || 0.7,
+        responseMimeType: options?.jsonMode ? "application/json" : undefined,
+      },
+    });
+
+    const result = await model.generateContent(prompt);
+    this.extractAndRecordTokens(result.response, userId, modelName);
+    return result.response.text();
+  }
+
+  static async processImageOCR(imageBase64: string, userId?: number): Promise<string> {
     try {
       const model = genAI.getGenerativeModel({
         model: MODEL_CONFIG.flash,
@@ -760,6 +801,8 @@ ${text}`;
           text: "Extract text from this image, preserving paragraph structures and fixing line breaks. If the text is ambiguous, infer based on context but do not invent content. Focus on the main body text only. Return only the extracted text.",
         },
       ]);
+
+      this.extractAndRecordTokens(result.response, userId, MODEL_CONFIG.flash);
 
       return result.response.text();
     } catch (error) {
@@ -1045,6 +1088,8 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
         model.generateContent(prompt),
         timeoutPromise,
       ]);
+
+      this.extractAndRecordTokens(result.response, context.userId, modelName);
 
       const responseText = result.response.text();
       const expectedIds = chunk.map(s => s.id);
