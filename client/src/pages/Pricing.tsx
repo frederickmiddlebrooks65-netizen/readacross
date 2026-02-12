@@ -205,21 +205,21 @@ export default function Pricing() {
   const isPro = user?.plan === "pro" || user?.plan === "admin";
 
   const starterFeatures = [
-    { icon: FileText, text: t('pricing.starterFeature1'), subtext: t('pricing.starterFeature1Sub') },
-    { icon: Languages, text: t('pricing.starterFeature2'), subtext: t('pricing.starterFeature2Sub') },
-    { icon: MessageCircle, text: t('pricing.starterFeature3'), subtext: t('pricing.starterFeature3Sub') },
-    { icon: Camera, text: t('pricing.starterFeature4'), subtext: t('pricing.starterFeature4Sub') },
-    { icon: GraduationCap, text: t('pricing.starterFeature5'), subtext: t('pricing.starterFeature5Sub') },
+    { icon: FileText, text: t('pricing.starterFeature1') },
+    { icon: Zap, text: t('pricing.starterFeature2') },
+    { icon: Languages, text: t('pricing.starterFeature3') },
+    { icon: Camera, text: t('pricing.starterFeature4') },
+    { icon: X, text: t('pricing.starterFeature5') },
   ];
 
   const proFeatures = [
-    { icon: Infinity, text: t('pricing.proFeature1') },
-    { icon: Sparkles, text: t('pricing.proFeature2'), subtext: t('pricing.proFeature2Sub') },
-    { icon: Brain, text: t('pricing.proFeature3'), subtext: t('pricing.proFeature3Sub') },
-    { icon: Camera, text: t('pricing.proFeature4'), subtext: t('pricing.proFeature4Sub') },
-    { icon: GraduationCap, text: t('pricing.proFeature5'), subtext: t('pricing.proFeature5Sub') },
-    { icon: Download, text: t('pricing.proFeature6'), subtext: t('pricing.proFeature6Sub') },
-    { icon: Shield, text: t('pricing.proFeature7'), subtext: null },
+    { icon: Zap, text: t('pricing.proFeature1') },
+    { icon: Sparkles, text: t('pricing.proFeature2') },
+    { icon: FileText, text: t('pricing.proFeature3') },
+    { icon: Languages, text: t('pricing.proFeature4') },
+    { icon: Camera, text: t('pricing.proFeature5') },
+    { icon: Download, text: t('pricing.proFeature6') },
+    { icon: Shield, text: t('pricing.proFeature7') },
   ];
 
   if (authLoading) {
@@ -298,16 +298,14 @@ export default function Pricing() {
               <ul className="space-y-4">
                 {starterFeatures.map((feature, index) => (
                   <li key={index} className="flex items-start gap-3">
-                    <feature.icon className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-foreground">{feature.text}</span>
-                      {feature.subtext && (
-                        <span className="text-xs text-muted-foreground">{feature.subtext}</span>
-                      )}
-                    </div>
+                    <feature.icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${feature.icon === X ? 'text-red-400' : 'text-muted-foreground'}`} />
+                    <span className="text-sm font-medium text-foreground">{feature.text}</span>
                   </li>
                 ))}
               </ul>
+              <p className="text-xs text-muted-foreground mt-4">
+                {t('pricing.starterHelper')}
+              </p>
             </CardContent>
             <CardFooter>
               {!isAuthenticated ? (
@@ -369,15 +367,13 @@ export default function Pricing() {
                 {proFeatures.map((feature, index) => (
                   <li key={index} className="flex items-start gap-3">
                     <feature.icon className="h-5 w-5 flex-shrink-0 mt-0.5 text-brand/70" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-foreground">{feature.text}</span>
-                      {feature.subtext && (
-                        <span className="text-xs text-muted-foreground">{feature.subtext}</span>
-                      )}
-                    </div>
+                    <span className="text-sm font-medium text-foreground">{feature.text}</span>
                   </li>
                 ))}
               </ul>
+              <p className="text-xs text-muted-foreground mt-4">
+                {t('pricing.proHelper')}
+              </p>
             </CardContent>
             <CardFooter>
               {isPro ? (
