@@ -880,7 +880,8 @@ Text: "${sampleText}"`;
   static createSentenceAwareChunks(
     sentences: TranslationSentence[],
     minTokens: number = TOKEN_ESTIMATION.MIN_CHUNK_TOKENS,
-    maxTokens: number = TOKEN_ESTIMATION.MAX_CHUNK_TOKENS
+    maxTokens: number = TOKEN_ESTIMATION.MAX_CHUNK_TOKENS,
+    maxSentencesPerChunk: number = 15
   ): TranslationSentence[][] {
     const chunks: TranslationSentence[][] = [];
     let currentChunk: TranslationSentence[] = [];
@@ -889,8 +890,8 @@ Text: "${sampleText}"`;
     for (const sentence of sentences) {
       const sentenceTokens = this.estimateTokenCount(sentence.source);
 
-      // If adding this sentence exceeds max tokens, start a new chunk
-      if (currentTokens + sentenceTokens > maxTokens && currentChunk.length > 0) {
+      // Split if exceeding max tokens OR max sentence count
+      if ((currentTokens + sentenceTokens > maxTokens || currentChunk.length >= maxSentencesPerChunk) && currentChunk.length > 0) {
         chunks.push(currentChunk);
         currentChunk = [];
         currentTokens = 0;
@@ -898,11 +899,6 @@ Text: "${sampleText}"`;
 
       currentChunk.push(sentence);
       currentTokens += sentenceTokens;
-
-      // If we've reached a good stopping point (min tokens), check next sentence
-      if (currentTokens >= minTokens) {
-        // Continue adding until we hit max or natural break
-      }
     }
 
     // Don't forget the last chunk
@@ -1067,7 +1063,7 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
         model: modelName,
         safetySettings: SAFETY_SETTINGS,
         generationConfig: {
-          maxOutputTokens: Math.max(4096, chunk.reduce((sum, s) => sum + s.source.length * 2, 0)),
+          maxOutputTokens: Math.max(8192, chunk.reduce((sum, s) => sum + s.source.length * 3, 0)),
           temperature: 0.2,
           responseMimeType: "application/json",
         },
@@ -1139,8 +1135,10 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
     const totalTokens = this.estimateSentencesTokenCount(sentences);
     console.log(`[GLOBAL_TRANSLATE] Starting translation of ${sentences.length} sentences (~${totalTokens} tokens)`);
 
-    // If under threshold, use direct translation (no chunking needed)
-    if (totalTokens <= TOKEN_ESTIMATION.MIN_CHUNK_TOKENS) {
+    const MAX_SENTENCES_PER_CHUNK = 15;
+
+    // If under threshold AND sentence count is manageable, use direct translation
+    if (totalTokens <= TOKEN_ESTIMATION.MIN_CHUNK_TOKENS && sentences.length <= MAX_SENTENCES_PER_CHUNK) {
       console.log(`[GLOBAL_TRANSLATE] Under threshold, using direct batch translation`);
       const directResult = await this.translateChunk(sentences, context, []);
       
@@ -1157,6 +1155,11 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
         totalChunks: 1,
         successfulChunks: failedSentences.length === 0 ? 1 : 0,
       };
+    }
+
+    // If tokens are low but too many sentences, split by sentence count
+    if (totalTokens <= TOKEN_ESTIMATION.MIN_CHUNK_TOKENS && sentences.length > MAX_SENTENCES_PER_CHUNK) {
+      console.log(`[GLOBAL_TRANSLATE] Low tokens but ${sentences.length} sentences - splitting by count (max ${MAX_SENTENCES_PER_CHUNK} per chunk)`);
     }
 
     // Create sentence-aware chunks
