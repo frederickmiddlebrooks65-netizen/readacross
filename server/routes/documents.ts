@@ -1135,7 +1135,27 @@ function sendSSEEvent(documentId: number, event: { type: string; data: any }) {
 }
 
 // SSE endpoint for translation progress
-router.get("/:id/translation-stream", authenticateJWT, async (req: AuthenticatedRequest, res) => {
+// EventSource cannot send Authorization headers, so we accept token via query parameter
+router.get("/:id/translation-stream", async (req: AuthenticatedRequest, res) => {
+  const token = req.query.token as string;
+  
+  if (!token) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  try {
+    const jwt = await import('jsonwebtoken');
+    const decoded = jwt.default.verify(token, process.env.JWT_SECRET || 'default-secret-change-in-production') as any;
+    const user = await storage.getUser(decoded.id);
+    if (!user) {
+      return res.status(403).json({ error: "Invalid token" });
+    }
+    req.userId = user.id;
+    req.user = user;
+  } catch (err) {
+    return res.status(403).json({ error: "Invalid token" });
+  }
+
   const documentId = parseInt(req.params.id);
   
   res.setHeader('Content-Type', 'text/event-stream');
@@ -1145,7 +1165,6 @@ router.get("/:id/translation-stream", authenticateJWT, async (req: Authenticated
   
   registerSSEClient(documentId, res);
   
-  // Send initial connection success
   res.write(`data: ${JSON.stringify({ type: 'connected', documentId })}\n\n`);
   
   req.on('close', () => {

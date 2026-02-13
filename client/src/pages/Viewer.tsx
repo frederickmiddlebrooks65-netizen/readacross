@@ -269,9 +269,10 @@ export default function Viewer() {
 
     console.log('[SSE] Connecting to translation stream for document', documentId);
     
-    const eventSource = new EventSource(`/api/documents/${documentId}/translation-stream`, {
-      withCredentials: true,
-    });
+    const accessToken = localStorage.getItem('accessToken');
+    if (!accessToken) return;
+    
+    const eventSource = new EventSource(`/api/documents/${documentId}/translation-stream?token=${encodeURIComponent(accessToken)}`);
 
     eventSource.onmessage = (event) => {
       try {
