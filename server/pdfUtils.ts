@@ -157,7 +157,7 @@ export type AcademicParsingStrictness = "strict" | "relaxed";
 // Separate axis from strictness - determines which RULES to apply
 // journal = STEM journal assumptions (section hierarchy, numbered headings, Method/Results)
 // essay_academic = humanities/theory academic (prose-focused, fewer structural assumptions)
-export type AcademicParsingProfile = "journal" | "essay_academic";
+export type AcademicParsingProfile = "journal" | "essay_academic" | "arxiv";
 
 export interface AcademicParsingDecision {
   strictness: AcademicParsingStrictness;
@@ -499,6 +499,14 @@ function detectParsingStrictness(
     profile = "essay_academic";
   } else {
     profile = "journal";
+  }
+
+  // === arXiv Profile Override ===
+  // If arXiv ID detected in text sample, force profile to arxiv
+  if (/\barxiv:\d+\.\d+/i.test(textSample)) {
+    profile = "arxiv";
+    strictness = "relaxed";
+    signals.push("Profile override: arXiv");
   }
 
   // === FAIL-SAFE: Single-column + relaxed → essay_academic ===
@@ -1719,7 +1727,18 @@ function classifyLineSimplified(
     return "paragraph";
   }
 
-  if (isEssayAcademic) {
+  if (parsingProfile === "arxiv") {
+    // arXiv heading detection: numbering-based priority
+    const hasNumberedSection = /^(\d+(\.\d+)*)\s+[A-Z]/.test(text);
+    const isShortLine = text.length <= 120;
+    const endsWithPeriod = /[.!?]["']?\s*$/.test(text);
+
+    if (hasNumberedSection && isShortLine && !endsWithPeriod) {
+      return "heading";
+    }
+
+    return "paragraph";
+  } else if (isEssayAcademic) {
     // ============================================================
     // BLOCK HEADING DETECTION FOR ESSAY-ACADEMIC PROFILE
     // ============================================================
