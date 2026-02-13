@@ -599,7 +599,10 @@ export class GeminiService {
         },
       });
 
-      const systemPrompt = `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
+      const isKoreanTarget = context.targetLanguage === "ko";
+
+      const systemPrompt = isKoreanTarget
+        ? `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
 Output must be Korean 'plain academic style' (하다체): only ~다/~는다/~했다/~이다/~되다 endings.
 
 STRICT RULES:
@@ -607,11 +610,18 @@ STRICT RULES:
 - Prefer declarative academic tone; convert requests to "~하도록 한다"
 - Preserve meaning, numbers, entities, formatting; no extra commentary
 - Replace semicolons with appropriate punctuation; normalize dashes
-- No colloquialisms, no honorifics, no emojis`;
+- No colloquialisms, no honorifics, no emojis`
+        : `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
+
+STRICT RULES:
+- Write in natural, professional ${context.targetLanguage}
+- Preserve meaning, numbers, entities, formatting; no extra commentary
+- Do not add explanations or comments
+- No emojis`;
 
       const prompt = `${systemPrompt}
 
-Translate from ${context.sourceLanguage} to ${context.targetLanguage} in Korean 'plain academic style' (하다체):
+Translate from ${context.sourceLanguage} to ${context.targetLanguage}:
 
 ${text}`;
 
@@ -1001,7 +1011,10 @@ Text: "${sampleText}"`;
       .map((s) => `[${s.id}]: ${s.source}`)
       .join("\n\n");
 
-    const systemPrompt = `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
+    const isKoreanTarget = context.targetLanguage === "ko";
+
+    const systemPrompt = isKoreanTarget
+      ? `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
 Output must be Korean 'plain academic style' (하다체): only ~다/~는다/~했다/~이다/~되다 endings.
 
 CRITICAL RULES:
@@ -1011,6 +1024,24 @@ CRITICAL RULES:
 - Preserve meaning, numbers, entities, formatting; no extra commentary
 - Replace semicolons with appropriate punctuation; normalize dashes
 - No colloquialisms, no honorifics, no emojis
+- Use UTF-8 encoding for all text
+- Maintain consistency with the previous context if provided
+
+STRICT OUTPUT FORMAT:
+- Return ONLY a JSON object: {"sentence_id": "translated_text", ...}
+- Keys must be the exact sentence IDs as numbers or strings
+- Values must be the translated text only
+- NO arrays, NO reordered keys, NO merged sentences
+- NO additional fields, NO explanatory text
+- Each sentence ID maps to exactly ONE translated sentence
+${contextSection}`
+      : `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
+
+CRITICAL RULES:
+- Write in natural, professional ${context.targetLanguage}
+- Preserve ALL HTML tags, bold formatting, and structural markup - translate ONLY the content within tags
+- Preserve meaning, numbers, entities, formatting; no extra commentary
+- Do not add explanations or comments
 - Use UTF-8 encoding for all text
 - Maintain consistency with the previous context if provided
 
