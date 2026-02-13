@@ -560,12 +560,10 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
               </p>
             </div>
 
-            {/* BOTTOM SECTION: Empty left + Time right */}
-            <div className="flex justify-end mt-4">
-              <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
-                <Clock className="h-3 w-3" />
-                <time>{getRelativeTime()}</time>
-              </div>
+            {/* BOTTOM SECTION: Time pinned to bottom */}
+            <div className="flex items-center gap-1 mt-auto text-xs text-slate-400 dark:text-slate-500">
+              <Clock className="h-3 w-3" />
+              <span>{getRelativeTime()}</span>
             </div>
           </article>
         </div>
