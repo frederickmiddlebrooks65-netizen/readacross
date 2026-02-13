@@ -584,21 +584,25 @@ function StructuredBlockRenderer({
   // STRUCTURAL FIX: Use DB IDs when available, generate unique fallback IDs using block.order
   const getBlockSentences = (): Sentence[] => {
     if (block.sentences && block.sentences.length > 0) {
-      // Use block's own sentences (clean, no punctuation artifacts)
-      // ID strategy: prefer DB id, fallback to block.order * 10000 + index for uniqueness
       const blockOrderBase = (block.order || 0) * 10000;
-      return block.sentences.map((s: any, index: number) => ({
-        id: typeof s.id === 'number' ? s.id : blockOrderBase + index,
-        source: s.text || s.source || '',
-        target: s.target || null,
-        targetAi: s.targetAi || null,
-        targetEdited: s.targetEdited || null,
-        status: s.status || 'new' as const,
-        practiceCount: s.practiceCount || 0,
-        isScrapped: s.isScrapped || false,
-      }));
+      const anchorSentences = collectSentencesFromAnchor();
+      
+      return block.sentences.map((s: any, index: number) => {
+        const sentenceId = typeof s.id === 'number' ? s.id : blockOrderBase + index;
+        const dbSentence = sentencesById?.[sentenceId] || anchorSentences.find(a => a.id === sentenceId);
+        
+        return {
+          id: sentenceId,
+          source: s.text || s.source || '',
+          target: dbSentence?.target ?? s.target ?? null,
+          targetAi: dbSentence?.targetAi ?? s.targetAi ?? null,
+          targetEdited: dbSentence?.targetEdited ?? s.targetEdited ?? null,
+          status: (dbSentence as any)?.status || s.status || 'new' as const,
+          practiceCount: (dbSentence as any)?.practiceCount || s.practiceCount || 0,
+          isScrapped: (dbSentence as any)?.isScrapped || s.isScrapped || false,
+        };
+      });
     }
-    // Fallback to anchor-based lookup for backward compatibility
     return collectSentencesFromAnchor();
   };
 
