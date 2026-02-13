@@ -280,7 +280,6 @@ export default function Viewer() {
         console.log('[SSE] Received event:', data.type);
 
         if (data.type === 'paragraph_complete') {
-          // Update sentences in the query cache immediately
           queryClient.setQueryData<DocumentWithParagraphs>(
             [`/api/documents/${documentId}`],
             (oldData) => {
@@ -297,7 +296,28 @@ export default function Viewer() {
                 return p;
               });
               
-              return { ...oldData, paragraphs: updatedParagraphs };
+              const updatedSentencesById = { ...(oldData as any).sentencesById };
+              for (const translatedSentence of (data.sentences || [])) {
+                if (updatedSentencesById[translatedSentence.id]) {
+                  updatedSentencesById[translatedSentence.id] = {
+                    ...updatedSentencesById[translatedSentence.id],
+                    target: translatedSentence.target,
+                  };
+                } else {
+                  updatedSentencesById[translatedSentence.id] = {
+                    id: translatedSentence.id,
+                    target: translatedSentence.target,
+                    source: '',
+                  };
+                }
+              }
+              
+              return {
+                ...oldData,
+                paragraphs: updatedParagraphs,
+                sentencesById: updatedSentencesById,
+                translatedCount: data.progress?.translated || (oldData as any).translatedCount,
+              };
             }
           );
         } else if (data.type === 'complete') {
@@ -349,7 +369,7 @@ export default function Viewer() {
       if (currentStatus === 'completed') {
         toast({
           title: t('viewer.translationComplete'),
-          description: t('viewer.allSentencesTranslated', { count: document.totalCount || 0 }),
+          description: t('viewer.allSentencesTranslated', { count: document.translatedCount || document.paragraphs?.reduce((sum: number, p: any) => sum + (p.sentences?.length || 0), 0) || 0 }),
           duration: 4000,
         });
       } else if (currentStatus === 'failed') {

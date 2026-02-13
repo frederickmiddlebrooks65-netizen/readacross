@@ -584,11 +584,18 @@ function StructuredBlockRenderer({
   // STRUCTURAL FIX: Use DB IDs when available, generate unique fallback IDs using block.order
   const getBlockSentences = (): Sentence[] => {
     if (block.sentences && block.sentences.length > 0) {
-      const blockOrderBase = (block.order || 0) * 10000;
+      const anchorStartId = block.anchor?.sentenceStartId;
       const anchorSentences = collectSentencesFromAnchor();
       
       return block.sentences.map((s: any, index: number) => {
-        const sentenceId = typeof s.id === 'number' ? s.id : blockOrderBase + index;
+        let sentenceId: number;
+        if (typeof s.id === 'number') {
+          sentenceId = s.id;
+        } else if (anchorStartId != null) {
+          sentenceId = anchorStartId + index;
+        } else {
+          sentenceId = (block.order || 0) * 10000 + index;
+        }
         const dbSentence = sentencesById?.[sentenceId] || anchorSentences.find(a => a.id === sentenceId);
         
         return {
