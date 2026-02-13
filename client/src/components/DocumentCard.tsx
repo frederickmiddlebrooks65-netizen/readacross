@@ -492,13 +492,13 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             className="p-4 flex flex-col h-full rounded-lg"
           >
             {/* TOP SECTION: Archive Button (hover only) */}
-            <div className="flex items-start justify-end mb-4">
+            <div className={cn(
+              "flex items-start justify-end mb-2 transition-opacity duration-300",
+              isHovered ? "opacity-100" : "opacity-0"
+            )}>
               {/* Archive Button - Right (hover only for user documents) */}
               {!isPublic && !isExploreMode && (
-                <div className={cn(
-                  "transition-opacity duration-200",
-                  isHovered ? "opacity-100" : "opacity-0"
-                )}>
+                <div>
                   {document.isArchived ? (
                     <div className="flex gap-1">
                       {onRestore && (
@@ -541,11 +541,13 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
               )}
             </div>
 
+
             {/* MIDDLE SECTION: Title + Source (left aligned, grows to fill space) */}
             <div className="flex-1 flex flex-col justify-center text-left">
               <h3 
                 className={cn(
-                  "card-title font-sans font-semibold text-lg leading-snug text-brand-ink dark:text-slate-100 line-clamp-3 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-300",
+                  "card-title font-sans font-semibold text-lg text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-300",
+                  isHovered ? "" : "line-clamp-3",
                   document.isArchived && "opacity-60"
                 )}
                 style={{ lineHeight: '1.5' }}
@@ -561,7 +563,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             </div>
 
             {/* BOTTOM SECTION: Time pinned to bottom */}
-            <div className="flex items-center gap-1 mt-auto text-xs text-slate-400 dark:text-slate-500">
+            <div className="flex items-center gap-1 mt-3 text-xs text-slate-400 dark:text-slate-500">
               <Clock className="h-3 w-3" />
               <span>{getRelativeTime()}</span>
             </div>
