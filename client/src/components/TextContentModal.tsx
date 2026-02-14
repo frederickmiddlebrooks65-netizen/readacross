@@ -28,7 +28,7 @@ import UpgradePromptDialog from "./UpgradePromptDialog";
 interface TextContentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (title: string, content: string, sourceLanguage: string, targetLanguage: string) => Promise<void>;
+  onSubmit: (title: string, content: string, sourceLanguage: string) => Promise<void>;
 }
 
 type InputMode = 'text' | 'file' | 'url' | 'photo';
@@ -80,7 +80,7 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [sourceLanguage, setSourceLanguage] = useState("en");
-  const [targetLanguage, setTargetLanguage] = useState("ko");
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>('text');
@@ -204,11 +204,6 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
       return;
     }
 
-    if (sourceLanguage === targetLanguage) {
-      setError(t("modal.errors.sameLanguage"));
-      return;
-    }
-
     setIsSubmitting(true);
     setError(null);
 
@@ -224,7 +219,6 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
           title: title.trim(),
           content: extractedText.trim(),
           sourceLanguage,
-          targetLanguage,
         }),
       });
 
@@ -245,7 +239,7 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
     } finally {
       setIsSubmitting(false);
     }
-  }, [title, extractedText, sourceLanguage, targetLanguage, t, toast]);
+  }, [title, extractedText, sourceLanguage, t, toast]);
 
   const handleFullClose = () => {
     if (!isSubmitting) {
@@ -355,7 +349,7 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
           title: title || urlPreview.title,
           author: urlPreview.author,
           sourceLanguage: sourceLanguage,
-          targetLanguage: targetLanguage,
+          
         }),
       });
 
@@ -402,22 +396,15 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
       return;
     }
 
-    if (sourceLanguage === targetLanguage) {
-      setError(t('modal.errors.sameLanguage'));
-      return;
-    }
-
     setError(null);
     setIsSubmitting(true);
 
     try {
       if (inputMode === 'file' && file && file.type !== 'text/plain') {
-        // Handle file upload through existing file upload API
         const formData = new FormData();
         formData.append("file", file);
         formData.append("title", title.trim());
         formData.append("sourceLanguage", sourceLanguage);
-        formData.append("targetLanguage", targetLanguage);
 
         const token = localStorage.getItem('accessToken');
         const response = await fetch("/api/documents/upload", {
@@ -443,7 +430,7 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
         // Redirect to library instead of viewer to avoid 404 if document is still processing
         window.location.href = `/library`;
       } else {
-        await onSubmit(title.trim(), finalContent, sourceLanguage, targetLanguage);
+        await onSubmit(title.trim(), finalContent, sourceLanguage);
       }
 
       // Reset form after successful submission
@@ -766,23 +753,7 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label>{t('ocr.targetLanguage')}</Label>
-                      <Select value={targetLanguage} onValueChange={setTargetLanguage} disabled={isSubmitting}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ko">한국어</SelectItem>
-                          <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="ja">日本語</SelectItem>
-                          <SelectItem value="zh">中文</SelectItem>
-                          <SelectItem value="fr">Français</SelectItem>
-                          <SelectItem value="de">Deutsch</SelectItem>
-                          <SelectItem value="es">Español</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    
                   </div>
 
                   <div className="space-y-2">

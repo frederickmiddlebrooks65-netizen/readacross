@@ -7,7 +7,6 @@ export interface LibraryDocument {
   id: number;
   title: string;
   sourceLanguage: string;
-  targetLanguage: string;
   createdAt: string;
   progress: number;
   fileType?: string;
@@ -81,13 +80,11 @@ export interface SentenceWithDocument extends Sentence {
   documentId: number;
   documentTitle: string;
   documentSourceLanguage?: string;
-  documentTargetLanguage?: string;
   averageScore?: number;
   document?: {
     id: number;
     title: string;
     sourceLanguage: string;
-    targetLanguage: string;
   };
   
   // User state fields - required for My Sentences page
@@ -127,7 +124,6 @@ export interface DocumentWithParagraphs {
   id: number;
   title: string;
   sourceLanguage: string;
-  targetLanguage: string;
   createdAt: string;
   publishedAt?: string | null;
   userId: number | null;

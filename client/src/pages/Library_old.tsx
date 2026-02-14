@@ -201,17 +201,15 @@ export default function Library() {
   });
 
   const createDocumentMutation = useMutation({
-    mutationFn: async ({ title, content, sourceLanguage, targetLanguage }: {
+    mutationFn: async ({ title, content, sourceLanguage }: {
       title: string;
       content: string;
       sourceLanguage: string;
-      targetLanguage: string;
     }) => {
       const response = await apiRequest("/api/documents/create-from-text", "POST", {
         title,
         content,
         sourceLanguage,
-        targetLanguage,
       });
       return response;
     },
@@ -380,8 +378,8 @@ export default function Library() {
     },
   });
 
-  const handleAddDocument = async (title: string, content: string, sourceLanguage: string, targetLanguage: string) => {
-    await createDocumentMutation.mutateAsync({ title, content, sourceLanguage, targetLanguage });
+  const handleAddDocument = async (title: string, content: string, sourceLanguage: string) => {
+    await createDocumentMutation.mutateAsync({ title, content, sourceLanguage });
   };
 
   const handleDeleteDocument = async (documentId: number) => {

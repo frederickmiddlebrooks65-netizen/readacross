@@ -774,7 +774,7 @@ export default function Viewer() {
         definition: glossaryDefinition.trim() || undefined,
         contextSentence: glossaryDialogSentence.source,
         sourceLanguage: document?.sourceLanguage || "English",
-        targetLanguage: document?.targetLanguage || "Korean",
+        targetLanguage: "Korean",
         documentId: documentId,
         difficulty: "beginner",
       };
@@ -922,7 +922,7 @@ export default function Viewer() {
           title: document.title,
           author: document.author,
           sourceLanguage: document.sourceLanguage || "ko",
-          targetLanguage: document.targetLanguage || "en",
+          
           sourceType: "explore",
           origin: {
             provider: document.source === "rss" ? "RSS" : document.sourceType,

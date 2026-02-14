@@ -32,19 +32,17 @@ export class DocumentService {
     title: string;
     content: string;
     sourceLanguage: string;
-    targetLanguage: string;
     userId?: number | null;
   }): Promise<Document> {
     const {
       title,
       content,
       sourceLanguage,
-      targetLanguage,
       userId = null,
     } = params;
 
     // Validate required fields
-    if (!title || !content || !sourceLanguage || !targetLanguage) {
+    if (!title || !content || !sourceLanguage) {
       throw new Error("Missing required fields");
     }
 
@@ -95,7 +93,6 @@ export class DocumentService {
     const document = await storage.createDocumentWithParagraphs({
       title,
       sourceLanguage,
-      targetLanguage,
       userId,
       fileType: "text",
       sourceType: "uploaded",
@@ -233,7 +230,6 @@ export class DocumentService {
     // Document metadata
     title: string;
     sourceLanguage: string;
-    targetLanguage: string;
     userId?: number | null;
 
     // Content data
@@ -268,8 +264,7 @@ export class DocumentService {
       if (
         !params.title ||
         !params.rawContent ||
-        !params.sourceLanguage ||
-        !params.targetLanguage
+        !params.sourceLanguage
       ) {
         throw new Error("Missing required fields for document creation");
       }
@@ -316,7 +311,6 @@ export class DocumentService {
       const document = await storage.createDocumentWithParagraphs({
         title: params.title,
         sourceLanguage: params.sourceLanguage,
-        targetLanguage: params.targetLanguage,
         userId: params.userId,
         fileType: params.fileType || "text",
         sourceType: params.sourceType || "uploaded",
@@ -421,7 +415,6 @@ export class DocumentService {
     title: string;
     content: string;
     sourceLanguage: string;
-    targetLanguage: string;
     userId?: number | null;
     source?: string;
     contentType?: "html" | "text" | "pdf" | "auto" | "rss_html";
@@ -516,7 +509,6 @@ export class DocumentService {
       const document = await storage.createDocumentWithParagraphs({
         title: params.title,
         sourceLanguage: params.sourceLanguage,
-        targetLanguage: params.targetLanguage,
         userId: params.userId || null,
         fileType: contentType === "pdf" ? "pdf" : "text",
         sourceType: params.isPublic ? "explore" : "uploaded",
@@ -643,7 +635,6 @@ export class DocumentService {
       page?: number;
     }>;
     sourceLanguage: string;
-    targetLanguage: string;
     userId?: number | null;
     source?: string;
     author?: string;
@@ -782,7 +773,6 @@ export class DocumentService {
       const document = await storage.createDocumentWithParagraphs({
         title: params.title,
         sourceLanguage: params.sourceLanguage,
-        targetLanguage: params.targetLanguage,
         userId: params.userId || null,
         fileType: "pdf",
         sourceType: "uploaded",
@@ -1482,7 +1472,6 @@ export class DocumentService {
     title: string;
     content: string;
     sourceLanguage: string;
-    targetLanguage: string;
     source?: string;
     contentType?: "html" | "text" | "pdf" | "rss_html";
     isPublic?: boolean;
@@ -1513,7 +1502,6 @@ export class DocumentService {
       const document = await storage.createDocument({
         title: params.title,
         sourceLanguage: params.sourceLanguage,
-        targetLanguage: params.targetLanguage,
         publishedAt: params.publishedAt || null,
         lastActivityAt: new Date(),
         userId: null,
@@ -1627,7 +1615,6 @@ export class DocumentService {
         title: params.title || originalDoc.title,
         content: contentToProcess,
         sourceLanguage: originalDoc.sourceLanguage,
-        targetLanguage: originalDoc.targetLanguage,
         userId: userId, // Use authenticated user ID
         source: originalDoc.source || undefined,
         contentType: (originalDoc.contentSourceType as any) || "html",

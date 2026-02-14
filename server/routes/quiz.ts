@@ -589,7 +589,9 @@ router.post("/quiz/ai-diff", adminOnlyQuiz, async (req: AuthenticatedRequest, re
 
     const { baseLanguage, learningLanguage } = user;
     const feedbackLang = baseLanguage === "ko" ? "Korean" : "English";
-    const targetLang = direction === "ko-en" ? "English" : "Korean";
+    const computedDirection = direction || `${learningLanguage}-${baseLanguage}`;
+    const targetLangCode = computedDirection.split("-")[1] || baseLanguage;
+    const targetLang = targetLangCode === "ko" ? "Korean" : "English";
 
     const systemPrompt = `You are a language learning assistant providing constructive feedback on translation attempts.
 Compare the user's translation with the expected answer and provide:
@@ -635,8 +637,10 @@ Analyze the semantic accuracy and provide feedback.`;
 router.get("/quiz/sentences/:notebookId", adminOnlyQuiz, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { notebookId } = req.params;
-    const { direction = "en-ko" } = req.query; // "en-ko" or "ko-en"
     const userId = req.userId!;
+    const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+    const defaultDirection = `${user?.learningLanguage || "en"}-${user?.baseLanguage || "ko"}`;
+    const { direction = defaultDirection } = req.query;
 
     if (!notebookId) {
       return res.status(400).json({ error: "notebookId is required" });
@@ -718,8 +722,10 @@ router.get("/quiz/sentences/:notebookId", adminOnlyQuiz, async (req: Authenticat
 // GET /api/quiz/multi-notebook - Get sentences from multiple notebooks for practice
 router.get("/quiz/multi-notebook", adminOnlyQuiz, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { notebookIds, direction = "en-ko" } = req.query;
     const userId = req.userId!;
+    const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+    const defaultDirection = `${user?.learningLanguage || "en"}-${user?.baseLanguage || "ko"}`;
+    const { notebookIds, direction = defaultDirection } = req.query;
 
     if (!notebookIds || typeof notebookIds !== 'string') {
       return res.status(400).json({ error: "notebookIds query parameter is required (comma-separated)" });

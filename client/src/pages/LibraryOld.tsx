@@ -309,12 +309,12 @@ export default function Library() {
     localStorage.setItem('library-view-mode', value);
   };
 
-  const handleAddDocument = async (title: string, content: string, sourceLanguage: string, targetLanguage: string) => {
+  const handleAddDocument = async (title: string, content: string, sourceLanguage: string) => {
     try {
       const response = await fetch('/api/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, sourceLanguage, targetLanguage, type: 'upload' })
+        body: JSON.stringify({ title, content, sourceLanguage, type: 'upload' })
       });
 
       if (response.ok) {

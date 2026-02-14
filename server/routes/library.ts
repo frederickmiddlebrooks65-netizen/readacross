@@ -921,7 +921,6 @@ router.post("/library/save", authenticateJWT, async (req: AuthenticatedRequest, 
     title,
     author,
     sourceLanguage,
-    targetLanguage,
     sourceType,
     origin,
   } = req.body;

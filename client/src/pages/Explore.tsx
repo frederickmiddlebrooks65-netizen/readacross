@@ -647,7 +647,7 @@ export default function Explore() {
           title: document.title,
           author: document.author,
           sourceLanguage: document.sourceLanguage || "ko",
-          targetLanguage: "en",
+          
           sourceType: "explore",
           origin: {
             provider:

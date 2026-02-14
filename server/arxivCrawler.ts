@@ -531,7 +531,6 @@ export async function seedArxivPapers(): Promise<void> {
       const document = await storage.createDocumentWithParagraphs({
         title: paper.title,
         sourceLanguage: "en",
-        targetLanguage: "ko",
         userId: undefined, // Public document
         fileType: "pdf",
         author: authors,
@@ -781,7 +780,6 @@ async function processAndSaveRssPaper(
     await storage.createDocumentWithParagraphs({
       title: paper.title,
       sourceLanguage: "en",
-      targetLanguage: "ko",
       userId: undefined,
       fileType: "pdf",
       author: authors,

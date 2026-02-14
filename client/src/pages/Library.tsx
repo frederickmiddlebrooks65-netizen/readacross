@@ -356,7 +356,6 @@ export default function Library() {
     title: string,
     content: string,
     sourceLanguage: string,
-    targetLanguage: string,
   ) => {
     try {
       const token = localStorage.getItem('accessToken');
@@ -370,7 +369,6 @@ export default function Library() {
           title,
           content,
           sourceLanguage,
-          targetLanguage,
         }),
       });
 

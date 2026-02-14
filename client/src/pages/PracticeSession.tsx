@@ -99,9 +99,11 @@ export default function PracticeSession() {
         return await apiRequest(`/api/quiz/glossary-items?limit=7`);
       }
       if (sessionMode === "multi-notebook" && notebookIdsParam) {
-        return await apiRequest(`/api/quiz/multi-notebook?notebookIds=${notebookIdsParam}&direction=en-ko`);
+        const direction = user?.learningLanguage && user?.baseLanguage ? `${user.learningLanguage}-${user.baseLanguage}` : "en-ko";
+        return await apiRequest(`/api/quiz/multi-notebook?notebookIds=${notebookIdsParam}&direction=${direction}`);
       }
-      return await apiRequest(`/api/quiz/sentences/${id}?direction=en-ko`);
+      const direction = user?.learningLanguage && user?.baseLanguage ? `${user.learningLanguage}-${user.baseLanguage}` : "en-ko";
+      return await apiRequest(`/api/quiz/sentences/${id}?direction=${direction}`);
     },
     enabled: isAuthenticated && (sessionMode === "smart-review" || sessionMode === "vocabulary" || sessionMode === "glossary-only" || sessionMode === "multi-notebook" || !!id),
   });

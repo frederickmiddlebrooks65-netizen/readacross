@@ -15,7 +15,6 @@ import {
 interface DocumentHeaderProps {
   title: string;
   sourceLanguage: string;
-  targetLanguage: string;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onTitleChange?: (newTitle: string) => void;
@@ -35,7 +34,6 @@ interface DocumentHeaderProps {
 export default function DocumentHeader({
   title,
   sourceLanguage,
-  targetLanguage,
   viewMode,
   onViewModeChange,
   onTitleChange,

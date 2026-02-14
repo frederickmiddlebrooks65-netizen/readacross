@@ -31,19 +31,16 @@ export async function seedDatabase() {
       {
         title: "Modern AI Applications in Healthcare",
         sourceLanguage: "en",
-        targetLanguage: "ko",
         progress: 75,
       },
       {
         title: "Introduction to Neural Networks",
         sourceLanguage: "en",
-        targetLanguage: "ko",
         progress: 30,
       },
       {
         title: "The Future of Sustainable Energy",
         sourceLanguage: "en",
-        targetLanguage: "ko",
         progress: 100,
       },
     ];
@@ -53,7 +50,6 @@ export async function seedDatabase() {
       const [document] = await db.insert(documents).values({
         title: doc.title,
         sourceLanguage: doc.sourceLanguage,
-        targetLanguage: doc.targetLanguage,
         userId: user.id,
         progress: doc.progress,
         category: "Academic" as const // Default category for sample documents

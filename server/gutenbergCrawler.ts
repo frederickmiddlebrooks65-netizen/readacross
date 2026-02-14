@@ -374,7 +374,6 @@ async function processAndSaveBook(
     const document = await storage.createDocumentWithParagraphs({
       title: book.title,
       sourceLanguage: "en",
-      targetLanguage: "ko",
       userId: null,
       fileType: "text",
       author: book.author,

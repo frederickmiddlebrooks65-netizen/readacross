@@ -82,7 +82,7 @@ export default function PhotoImportModal({ isOpen, onClose }: PhotoImportModalPr
   const [extractedText, setExtractedText] = useState("");
   const [title, setTitle] = useState("");
   const [sourceLanguage, setSourceLanguage] = useState("en");
-  const [targetLanguage, setTargetLanguage] = useState("ko");
+  
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -195,11 +195,6 @@ export default function PhotoImportModal({ isOpen, onClose }: PhotoImportModalPr
       return;
     }
 
-    if (sourceLanguage === targetLanguage) {
-      setError(t("modal.errors.sameLanguage"));
-      return;
-    }
-
     setIsSaving(true);
     setError(null);
 
@@ -215,7 +210,6 @@ export default function PhotoImportModal({ isOpen, onClose }: PhotoImportModalPr
           title: title.trim(),
           content: extractedText.trim(),
           sourceLanguage,
-          targetLanguage,
         }),
       });
 
@@ -236,7 +230,7 @@ export default function PhotoImportModal({ isOpen, onClose }: PhotoImportModalPr
     } finally {
       setIsSaving(false);
     }
-  }, [title, extractedText, sourceLanguage, targetLanguage, t, toast]);
+  }, [title, extractedText, sourceLanguage, t, toast]);
 
   const handleClose = useCallback(() => {
     if (!isProcessing && !isSaving) {
@@ -386,23 +380,7 @@ export default function PhotoImportModal({ isOpen, onClose }: PhotoImportModalPr
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>{t("ocr.targetLanguage")}</Label>
-                  <Select value={targetLanguage} onValueChange={setTargetLanguage} disabled={isSaving}>
-                    <SelectTrigger data-testid="ocr-target-language">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ko">한국어</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="ja">日本語</SelectItem>
-                      <SelectItem value="zh">中文</SelectItem>
-                      <SelectItem value="fr">Français</SelectItem>
-                      <SelectItem value="de">Deutsch</SelectItem>
-                      <SelectItem value="es">Español</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                
               </div>
 
               <div className="space-y-2">

@@ -25,7 +25,6 @@ export interface LibraryDocument {
   id: number;
   title: string;
   sourceLanguage: string;
-  targetLanguage: string;
   createdAt: string;
   progress: number;
   fileType?: string;

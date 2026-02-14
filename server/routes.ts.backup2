@@ -793,9 +793,9 @@ export async function registerRoutesOld(app: Express): Promise<void> {
   // Create document from text content
   app.post("/api/documents/create-from-text", async (req, res) => {
     try {
-      const { title, content, sourceLanguage, targetLanguage } = req.body;
+      const { title, content, sourceLanguage } = req.body;
 
-      if (!title || !content || !sourceLanguage || !targetLanguage) {
+      if (!title || !content || !sourceLanguage) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
@@ -833,7 +833,6 @@ export async function registerRoutesOld(app: Express): Promise<void> {
       const document = await storage.createDocumentWithParagraphs({
         title,
         sourceLanguage,
-        targetLanguage,
         userId: null,
         fileType: "text",
         sourceType: "uploaded", // Explicitly set sourceType for proper filtering
@@ -879,7 +878,6 @@ export async function registerRoutesOld(app: Express): Promise<void> {
         title: document.title,
         paragraphCount: paragraphsData.length,
         sourceLanguage: document.sourceLanguage,
-        targetLanguage: document.targetLanguage,
       });
     } catch (error) {
       console.error("Error creating document from text:", error);
@@ -1085,7 +1083,6 @@ export async function registerRoutesOld(app: Express): Promise<void> {
       const userDocument = await storage.createDocumentWithParagraphs({
         title: publicDocument.title,
         sourceLanguage: publicDocument.sourceLanguage,
-        targetLanguage: publicDocument.targetLanguage,
         userId: null, // For now, no user authentication
         fileType: publicDocument.fileType || "text",
         author: publicDocument.author || undefined,
@@ -1300,9 +1297,9 @@ export async function registerRoutesOld(app: Express): Promise<void> {
           return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const { title, sourceLanguage, targetLanguage } = req.body;
+        const { title, sourceLanguage } = req.body;
 
-        if (!title || !sourceLanguage || !targetLanguage) {
+        if (!title || !sourceLanguage) {
           return res.status(400).json({ message: "Missing required fields" });
         }
 
@@ -1516,7 +1513,6 @@ export async function registerRoutesOld(app: Express): Promise<void> {
         const document = await storage.createDocumentWithParagraphs({
           title,
           sourceLanguage,
-          targetLanguage,
           fileType,
           source: "Upload", // Mark as user upload
           paragraphs,
@@ -1643,7 +1639,6 @@ export async function registerRoutesOld(app: Express): Promise<void> {
         const {
           title,
           sourceLanguage = "en",
-          targetLanguage = "ko",
         } = req.body;
 
         if (!title) {
@@ -1755,7 +1750,6 @@ export async function registerRoutesOld(app: Express): Promise<void> {
         const document = await storage.createDocumentWithParagraphs({
           title,
           sourceLanguage,
-          targetLanguage,
           fileType: "pdf",
           source: "PDF Import",
           category: "Educational",
@@ -1808,7 +1802,6 @@ export async function registerRoutesOld(app: Express): Promise<void> {
           title: document.title,
           paragraphCount: paragraphs.length,
           sourceLanguage: document.sourceLanguage,
-          targetLanguage: document.targetLanguage,
           structuredBlocks: finalStructuredContent.length,
           message: "PDF imported successfully with structured content",
         });
@@ -3934,7 +3927,6 @@ Provide feedback in JSON format:
         id: document.id,
         title: document.title,
         sourceLanguage: document.sourceLanguage,
-        targetLanguage: document.targetLanguage,
       });
     } catch (error) {
       console.error("Error getting document info:", error);
@@ -6151,7 +6143,6 @@ async function addLibraryRoutes(app: any) {
       title,
       author,
       sourceLanguage,
-      targetLanguage,
       sourceType,
       origin,
     } = req.body;
@@ -6195,7 +6186,6 @@ async function addLibraryRoutes(app: any) {
       const newDocument = await storage.createDocumentWithParagraphs({
         title,
         sourceLanguage: originalDoc.sourceLanguage,
-        targetLanguage: originalDoc.targetLanguage,
         userId: 1,
         fileType: originalDoc.fileType || "text",
         sourceType: "explore",

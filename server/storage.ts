@@ -463,7 +463,6 @@ interface ParagraphWithSentences extends Paragraph {
 interface CreateDocumentWithParagraphsParams {
   title: string;
   sourceLanguage: string;
-  targetLanguage: string;
   userId?: number | null;
   fileType?: string;
   sourceType?: "uploaded" | "explore";
@@ -517,13 +516,11 @@ interface SentenceWithDocument extends Sentence {
   documentTitle: string;
   documentId: number;
   documentSourceLanguage: string;
-  documentTargetLanguage: string;
   averageScore?: number;
   document: {
     id: number;
     title: string;
     sourceLanguage: string;
-    targetLanguage: string;
   };
 }
 
@@ -672,7 +669,6 @@ export class DatabaseStorage implements IStorage {
       id: documents.id,
       title: documents.title,
       sourceLanguage: documents.sourceLanguage,
-      targetLanguage: documents.targetLanguage,
       createdAt: documents.createdAt,
       publishedAt: documents.publishedAt,
       lastActivityAt: documents.lastActivityAt,
@@ -844,7 +840,6 @@ export class DatabaseStorage implements IStorage {
       .values({
         title: document.title,
         sourceLanguage: document.sourceLanguage,
-        targetLanguage: document.targetLanguage,
         userId: document.userId,
         progress: 0,
         fileType: document.fileType || "text",
@@ -897,7 +892,6 @@ export class DatabaseStorage implements IStorage {
     const newDocument = await this.createDocument({
       title: data.title,
       sourceLanguage: data.sourceLanguage,
-      targetLanguage: data.targetLanguage,
       userId: data.userId || null,
       fileType: data.fileType || "text",
       isArchived: false,
@@ -1571,7 +1565,6 @@ export class DatabaseStorage implements IStorage {
         documentTitle: documents.title,
         documentId: documents.id,
         documentSourceLanguage: documents.sourceLanguage,
-        documentTargetLanguage: documents.targetLanguage,
         // New schema fields
         isBookmarked: userSentenceState.isBookmarked,
         learningStatus: userSentenceState.learningStatus,
@@ -1669,7 +1662,6 @@ export class DatabaseStorage implements IStorage {
         id: sentence.documentId,
         title: sentence.documentTitle,
         sourceLanguage: sentence.documentSourceLanguage,
-        targetLanguage: sentence.documentTargetLanguage,
       }
     }));
   }

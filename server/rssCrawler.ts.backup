@@ -555,7 +555,6 @@ export async function convertRSSItemToDocument(item: any, feed: any, content: st
     const documentData = {
       title: item.title || 'Untitled RSS Article',
       sourceLanguage: 'en', // RSS 피드는 대부분 영어
-      targetLanguage: 'ko',
       source: feed.title || 'RSS',
       isPublic: true, // RSS 문서는 공개
       category: feed.category || 'News',
@@ -577,7 +576,6 @@ export async function convertRSSItemToDocument(item: any, feed: any, content: st
     const basicDocumentData = {
       title: item.title || 'Untitled RSS Article',
       sourceLanguage: 'en' as const,
-      targetLanguage: 'ko' as const,
       source: feed.title || 'RSS',
       isPublic: true,
       category: feed.category || 'News',
@@ -784,7 +782,6 @@ export async function convertRSSArticleToDocument(articleId: number): Promise<nu
     const documentData = {
       title: article.title,
       sourceLanguage: feed.language || 'en',
-      targetLanguage: 'ko', // 기본 타겟 언어
       userId: feed.userId,
       fileType: 'rss',
       author: article.author || undefined,

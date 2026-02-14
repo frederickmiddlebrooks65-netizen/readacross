@@ -136,7 +136,6 @@ router.post("/:id/add-to-library", authenticateJWT, async (req: AuthenticatedReq
     const newDocument = await storage.createDocumentWithParagraphs({
       title: originalDoc.title,
       sourceLanguage: originalDoc.sourceLanguage,
-      targetLanguage: originalDoc.targetLanguage,
       userId: userId, // ✅ Correctly set userId for library documents
       fileType: originalDoc.fileType || "text",
       sourceType: "explore", // Mark as saved from explore
@@ -430,7 +429,7 @@ router.post("/upload", authenticateJWT, upload.single("file"),
       });
     }
 
-    const { title, targetLanguage = "ko" } = req.body;
+    const { title } = req.body;
 
     try {
       let content: string;
@@ -478,7 +477,6 @@ router.post("/upload", authenticateJWT, upload.single("file"),
           title: title || filename,
           blocks,
           sourceLanguage: detectedSourceLanguage,
-          targetLanguage,
           userId: req.userId,
           source: "Upload",
           archetype: archetype.archetype,
@@ -524,7 +522,6 @@ router.post("/upload", authenticateJWT, upload.single("file"),
           title: title || filename,
           content,
           sourceLanguage: detectedSourceLanguage,
-          targetLanguage,
         });
       }
 
@@ -609,7 +606,7 @@ router.get("/:id/download", authenticateJWT, async (req: AuthenticatedRequest, r
 // Create document from text content
 router.post("/create-from-text", authenticateJWT, async (req: AuthenticatedRequest, res) => {
   try {
-    const { title, content, sourceLanguage, targetLanguage } = req.body;
+    const { title, content, sourceLanguage } = req.body;
     const userId = req.userId!;
 
     const user = await storage.getUser(userId);
@@ -625,7 +622,6 @@ router.post("/create-from-text", authenticateJWT, async (req: AuthenticatedReque
       title,
       content,
       sourceLanguage,
-      targetLanguage,
       userId,
     });
 
@@ -798,14 +794,14 @@ router.post("/preview-url", async (req: Request, res: Response) => {
 // Create Library document directly from URL (same as file upload)
 router.post("/create-from-url-library", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { url, title, author, sourceLanguage, targetLanguage } = req.body;
+    const { url, title, author, sourceLanguage } = req.body;
     const userId = req.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    if (!url || !title || !sourceLanguage || !targetLanguage) {
+    if (!url || !title || !sourceLanguage) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -822,7 +818,6 @@ router.post("/create-from-url-library", authenticateJWT, async (req: Authenticat
       title: title,
       content: urlResult.content,
       sourceLanguage: sourceLanguage,
-      targetLanguage: targetLanguage,
       userId: userId,
       source: urlResult.source || "Web Import",
       contentType: "html",
@@ -919,7 +914,6 @@ router.post("/create-from-url", async (req: Request, res: Response) => {
       title,
       content: article.content,
       sourceLanguage,
-      targetLanguage: "ko", // Default target language
       source: metadata.siteName || hostname,
       contentType: "html",
       isPublic: true, // Create in Explore initially
@@ -1210,6 +1204,15 @@ async function translateDocumentInBackground(
       console.warn(`[TRANSLATE] Failed to parse structured content for heading detection:`, e);
     }
 
+    // Compute target language dynamically from user preferences
+    const sourceLanguage = document.sourceLanguage || "en";
+    const translationUser = userId ? await storage.getUser(userId) : null;
+    const targetLanguage = sourceLanguage === translationUser?.baseLanguage
+      ? (translationUser?.learningLanguage || "en")
+      : (translationUser?.baseLanguage || "ko");
+
+    console.log(`[TRANSLATE] Dynamic target language: ${targetLanguage} (source: ${sourceLanguage}, user base: ${translationUser?.baseLanguage}, learning: ${translationUser?.learningLanguage})`);
+
     // Count total sentences
     for (const paragraph of paragraphs) {
       totalSentences += (paragraph.sentences || []).length;
@@ -1250,8 +1253,8 @@ async function translateDocumentInBackground(
             userEmail,
             userPlan,
             userId,
-            sourceLanguage: document.sourceLanguage || "en",
-            targetLanguage: document.targetLanguage || "ko",
+            sourceLanguage,
+            targetLanguage,
           },
           previousContext
         );

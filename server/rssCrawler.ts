@@ -411,7 +411,6 @@ export async function convertRSSItemToDocument(
     const document = await DocumentService.createDocumentWithPSAndStructureV2({
       title: item.title || "Untitled RSS Article",
       sourceLanguage: "en" as const,
-      targetLanguage: "ko" as const,
       content: finalContent,
       contentType: "html", // 🔧 CRITICAL FIX: Use html to match ParserMode.HTML in DocumentService
       source: feed.title || feed.alias || "RSS",
@@ -485,7 +484,6 @@ export async function convertRSSArticleToDocument(
       title: article.title,
       content: content,
       sourceLanguage: "en" as const,
-      targetLanguage: "ko" as const,
       source: feed.alias || "RSS",
       contentType: "rss_html", // Specific content type for RSS
       author: article.author || undefined,
@@ -686,7 +684,6 @@ export async function convertRSSItemToDocumentEnhanced(
     const document = await DocumentService.createDocumentWithPSAndStructureV2({
       title: item.title || "Untitled Article",
       sourceLanguage: "en" as const,
-      targetLanguage: "ko" as const,
       content: content,
       contentType: "html",
       source: feed.title || "RSS",

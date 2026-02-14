@@ -20,7 +20,7 @@ type QuizLevel = 1 | 2 | 3;
 interface SentenceEngineProps {
   source: string;
   target: string | null;
-  direction: "en-ko" | "ko-en";
+  direction: string;
   masteryLevel: number;
   quizLevel: QuizLevel;
   onAnswer: (userAnswer: string, isCorrect: boolean) => void;
@@ -30,6 +30,20 @@ interface SentenceEngineProps {
 }
 
 const dmp = new DiffMatchPatch();
+
+const LANG_NAMES: Record<string, string> = {
+  ko: "한국어",
+  en: "English",
+  ja: "日本語",
+  zh: "中文",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+};
+
+function getLangName(code: string): string {
+  return LANG_NAMES[code] || code.toUpperCase();
+}
 
 export function SentenceEngine({
   source,
@@ -49,13 +63,15 @@ export function SentenceEngine({
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedTranslation, setEditedTranslation] = useState("");
 
+  const [fromLang, toLang] = useMemo(() => direction.split("-"), [direction]);
+
   const prompt = useMemo(() => {
-    return direction === "ko-en" ? (target || "") : source;
-  }, [source, target, direction]);
+    return source;
+  }, [source]);
 
   const answer = useMemo(() => {
-    return direction === "ko-en" ? source : (target || "");
-  }, [source, target, direction]);
+    return target || "";
+  }, [target]);
 
   const shuffledWords = useMemo(() => {
     if (!answer) return [];
@@ -143,14 +159,14 @@ export function SentenceEngine({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg text-muted-foreground">
-            {direction === "en-ko" ? "영어 → 한국어" : "한국어 → 영어"}
+            {getLangName(fromLang)} → {getLangName(toLang)}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge className={getMasteryColor(masteryLevel)}>
               숙달도 {masteryLevel}/5
             </Badge>
             <Badge variant="outline">Level {quizLevel}</Badge>
-            {direction === "en-ko" && onEditTranslation && !showResult && (
+            {onEditTranslation && !showResult && (
               <Button variant="ghost" size="sm" onClick={() => {
                 setEditedTranslation(target || "");
                 setIsEditMode(true);
