@@ -73,6 +73,23 @@ The PDF processing pipeline prioritizes stable position anchoring with a 2-track
   - `PREMIUM_FALLBACK_BUFFER = 2,000`: Triggers lite-model fallback when remaining premium tokens <= 2,000
 - **Legacy Cleanup**: Removed all daily-count infrastructure (`STARTER_DAILY_LIMIT`, `PRO_DAILY_THRESHOLD`, `incrementUsage`, `checkAndUpdateDailyUsage`). Frontend `AISideDrawer.tsx` updated to show token-based messaging.
 
+### 2026-02-14: Dynamic Translation Direction Architecture
+- **Purpose**: Language policy architecture cleanup — translation direction is no longer a document attribute but a user-based dynamic computation
+- **Removed**: `targetLanguage` column from `documents` table (Drizzle migration applied)
+- **Preserved**: `targetLanguage` in `translations` (TM), `glossary`, `quiz/coaching` tables — these still store language pair per record
+- **Dynamic Computation Logic** (in `translateDocumentInBackground` and all routes):
+  ```typescript
+  if (sourceLanguage === user.baseLanguage) {
+    targetLanguage = user.learningLanguage;
+  } else {
+    targetLanguage = user.baseLanguage;
+  }
+  ```
+- **User Schema**: `baseLanguage` (default: "ko"), `learningLanguage` (default: "en")
+- **Files Changed**: `shared/schema.ts`, `server/storage.ts`, `server/routes/documents.ts`, `server/services/DocumentService.ts`, `server/seed.ts`, `server/routes/library.ts`, `server/routes/quiz.ts`, all crawlers, client types/pages/modals
+- **Direction Hardcoding Removed**: "en-ko"/"ko-en" strings in `quiz.ts`, `PracticeSession.tsx`, `SentenceEngine.tsx` replaced with dynamic `${user.learningLanguage}-${user.baseLanguage}`
+- **Schema Changes**: Removed `targetLanguage` from `insertDocumentSchema` and `insertLibraryDocumentSchema`
+
 ### 2026-02-04: Hard Block Boundary Rule for Headings
 - **Root Cause**: Headings were being merged with following prose at paragraph block construction stage
   - Block-level promotion cannot work if heading never exists as a separate block
