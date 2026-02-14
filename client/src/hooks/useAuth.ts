@@ -73,7 +73,6 @@ export function useAuth() {
   // Extract user from the auth response - server returns { message, user }
   const user = (authResponse as { message?: string; user: User } | undefined)?.user;
 
-  // Enhanced token validation
   const hasValidTokens = !!accessToken && !!refreshToken;
   const isTokenExpired = error && (
     (error as any).message?.includes('401') || 
@@ -82,14 +81,14 @@ export function useAuth() {
     (error as any).status === 403
   );
 
-  // Handle token expiration
-  if (isTokenExpired) {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    queryClient.clear();
-  }
+  React.useEffect(() => {
+    if (isTokenExpired) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      queryClient.clear();
+    }
+  }, [isTokenExpired, queryClient]);
 
-  // Check if user is authenticated - require both tokens and valid user data
   const isAuthenticated = hasValidTokens && !!user && !error && !isTokenExpired;
 
   // Logout mutation

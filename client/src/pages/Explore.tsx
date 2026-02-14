@@ -559,25 +559,33 @@ export default function Explore() {
 
   const { data: userUploadDocuments } = useQuery({
     queryKey: ["/api/documents", "uploads"],
+    enabled: isAuthenticated,
     queryFn: () => {
       const token = localStorage.getItem('accessToken');
       const headers: HeadersInit = {};
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
-      return fetch("/api/documents?type=uploads", { headers }).then((res) => res.json());
+      return fetch("/api/documents?type=uploads", { headers }).then((res) => {
+        if (!res.ok) return [];
+        return res.json();
+      });
     },
   });
 
   const { data: userSavedDocuments } = useQuery({
     queryKey: ["/api/documents", "saved"],
+    enabled: isAuthenticated,
     queryFn: () => {
       const token = localStorage.getItem('accessToken');
       const headers: HeadersInit = {};
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
-      return fetch("/api/documents?type=saved", { headers }).then((res) => res.json());
+      return fetch("/api/documents?type=saved", { headers }).then((res) => {
+        if (!res.ok) return [];
+        return res.json();
+      });
     },
   });
 
