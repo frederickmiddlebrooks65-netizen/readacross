@@ -166,7 +166,6 @@ export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   sourceLanguage: text("source_language").notNull(),
-  targetLanguage: text("target_language").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   publishedAt: timestamp("published_at"), // Original publication date from source
   lastActivityAt: timestamp("last_activity_at").defaultNow().notNull(), // For sorting by recent activity
@@ -700,14 +699,12 @@ export const resetPasswordSchema = z.object({
 export const insertDocumentSchema = createInsertSchema(documents).pick({
   title: true,
   sourceLanguage: true,
-  targetLanguage: true,
   userId: true,
 });
 
 export const insertLibraryDocumentSchema = createInsertSchema(documents).pick({
   title: true,
   sourceLanguage: true,
-  targetLanguage: true,
   author: true,
   source: true,
   category: true,
