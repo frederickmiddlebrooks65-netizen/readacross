@@ -90,6 +90,7 @@ interface DocumentCacheEntry {
 export interface TranslationSentence {
   id: number;
   source: string;
+  type?: 'heading' | 'sentence';
 }
 
 export interface ChunkTranslationResult {
@@ -679,7 +680,7 @@ ${text}`;
    * Maintains backward compatibility with existing API.
    */
   static async translateParagraphBatch(
-    sentences: Array<{ id: number; source: string }>,
+    sentences: Array<{ id: number; source: string; type?: 'heading' | 'sentence' }>,
     context: TranslationContext,
     previousContext?: string,
   ): Promise<Map<number, string>> {
@@ -687,10 +688,10 @@ ${text}`;
       return new Map<number, string>();
     }
 
-    // Convert to TranslationSentence format
     const translationSentences: TranslationSentence[] = sentences.map(s => ({
       id: s.id,
       source: s.source,
+      type: s.type,
     }));
 
     // Estimate total tokens
@@ -1003,8 +1004,9 @@ Text: "${sampleText}"`;
       contextSection += `[END OF CONTEXT]\n`;
     }
 
+    const hasHeadings = chunk.some(s => s.type === 'heading');
     const sentenceList = chunk
-      .map((s) => `[${s.id}]: ${s.source}`)
+      .map((s) => s.type === 'heading' ? `[${s.id}] [HEADING]: ${s.source}` : `[${s.id}]: ${s.source}`)
       .join("\n\n");
 
     const isKoreanTarget = context.targetLanguage === "ko";
@@ -1022,6 +1024,7 @@ CRITICAL RULES:
 - No colloquialisms, no honorifics, no emojis
 - Use UTF-8 encoding for all text
 - Maintain consistency with the previous context if provided
+- Sentences marked [HEADING] are section titles: translate as noun phrases (명사구), NOT full sentences. Do NOT add verb endings like ~이다/~하다. Example: "Ethical considerations" → "윤리적 고려 사항" (NOT "윤리적 고려 사항이다.")
 
 STRICT OUTPUT FORMAT:
 - Return ONLY a JSON object: {"sentence_id": "translated_text", ...}
@@ -1040,6 +1043,7 @@ CRITICAL RULES:
 - Do not add explanations or comments
 - Use UTF-8 encoding for all text
 - Maintain consistency with the previous context if provided
+- Sentences marked [HEADING] are section titles: translate as noun phrases, NOT full sentences. Keep them concise without verb endings.
 
 STRICT OUTPUT FORMAT:
 - Return ONLY a JSON object: {"sentence_id": "translated_text", ...}

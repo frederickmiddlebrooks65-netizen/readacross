@@ -1188,6 +1188,28 @@ async function translateDocumentInBackground(
     let totalSentences = 0;
     let previousContext = "";
 
+    const headingSentenceIds = new Set<number>();
+    try {
+      let structuredBlocks: any[] = [];
+      const sc = document.structuredContent;
+      if (sc) {
+        structuredBlocks = typeof sc === 'string' ? JSON.parse(sc) : (Array.isArray(sc) ? sc : []);
+      }
+      const headingTypes = new Set(['heading', 'document_title', 'abstract_label']);
+      for (const block of structuredBlocks) {
+        if (headingTypes.has(block.type) && block.anchor?.sentenceStartId != null) {
+          for (let id = block.anchor.sentenceStartId; id <= block.anchor.sentenceEndId; id++) {
+            headingSentenceIds.add(id);
+          }
+        }
+      }
+      if (headingSentenceIds.size > 0) {
+        console.log(`[TRANSLATE] Found ${headingSentenceIds.size} heading sentence IDs from structured content`);
+      }
+    } catch (e) {
+      console.warn(`[TRANSLATE] Failed to parse structured content for heading detection:`, e);
+    }
+
     // Count total sentences
     for (const paragraph of paragraphs) {
       totalSentences += (paragraph.sentences || []).length;
@@ -1203,7 +1225,11 @@ async function translateDocumentInBackground(
       // Filter untranslated sentences
       const untranslatedSentences = sentences
         .filter((s: any) => !s.target)
-        .map((s: any) => ({ id: s.id, source: s.source }));
+        .map((s: any) => ({
+          id: s.id,
+          source: s.source,
+          type: headingSentenceIds.has(s.id) ? 'heading' as const : 'sentence' as const,
+        }));
       
       // Count already translated
       const alreadyTranslated = sentences.filter((s: any) => s.target).length;
