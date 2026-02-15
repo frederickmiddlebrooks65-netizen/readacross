@@ -2157,30 +2157,41 @@ function shouldEndParagraphSimplified(
   if (currentLine.page !== nextLine.page) {
     const curText = currentLine.text.trim();
     const nxtText = nextLine.text.trim();
-    const lineTerminated =
-      SENTENCE_TERMINATOR_EXTENDED.test(curText) &&
-      !COMMON_ABBREVIATIONS.test(curText);
-    const endsWithColonSemicolon = /[:;]\s*$/.test(curText);
 
-    if (!lineTerminated && !endsWithColonSemicolon && nxtText.length > 0) {
-      const nextStartsLower = /^[a-z]/.test(nxtText);
-      const nextStartsWithContinuationWord =
-        /^(and|or|but|nor|yet|so|that|which|who|whom|whose|where|when|while|because|since|although|though|if|as|to|of|in|on|at|by|with|from|for|into|onto|upon|depending|including|may|might|can|could|should|would|will|shall|must|also|then|thus|hence|thereby|furthermore|moreover|however|nevertheless|nonetheless|whereas|whether|unless|until|after|before|during|between|through|within|without|against|among|beyond|despite|regarding|especially|particularly|specifically)\b/i.test(
-          nxtText,
-        );
+    if (/-\s*$/.test(curText)) {
+      console.log(
+        `[PAGE_BOUNDARY_HYPHEN] Hyphenated word at page ${currentLine.page}->${nextLine.page} -> CONTINUE`,
+      );
+      return false;
+    }
 
-      if (nextStartsLower || nextStartsWithContinuationWord) {
-        console.log(
-          `[PAGE_BOUNDARY_CONTINUE] Incomplete sentence at page ${currentLine.page}->${nextLine.page}: "${curText.substring(Math.max(0, curText.length - 40))}" -> "${nxtText.substring(0, 40)}" -> CONTINUE`,
-        );
-        return false;
-      }
+    const currentType = currentClassification;
+    const nextType = nextClassification;
+    if (isSentenceContinuation(currentLine, nextLine, currentType, nextType)) {
+      console.log(
+        `[PAGE_BOUNDARY_SENTENCE_CONT] Sentence continues at page ${currentLine.page}->${nextLine.page}: "${curText.substring(Math.max(0, curText.length - 40))}" -> "${nxtText.substring(0, 40)}" -> CONTINUE`,
+      );
+      return false;
+    }
+
+    const pageBoundaryYGap = nextLine.y - currentLine.y;
+    const pageBoundaryXDiff = Math.abs(nextLine.xStart - currentLine.xStart);
+    if (pageBoundaryYGap >= stats.medianLineHeight * 2.0) {
+      console.log(
+        `[PAGE_BOUNDARY_LAYOUT_BREAK] yGap=${pageBoundaryYGap.toFixed(1)} at page ${currentLine.page}->${nextLine.page} -> BREAK`,
+      );
+      return true;
+    }
+    if (pageBoundaryXDiff >= stats.medianBodyFont * 1.5) {
+      console.log(
+        `[PAGE_BOUNDARY_LAYOUT_BREAK] xDiff=${pageBoundaryXDiff.toFixed(1)} at page ${currentLine.page}->${nextLine.page} -> BREAK`,
+      );
+      return true;
     }
 
     console.log(
-      `[PAGE_BOUNDARY_BREAK] page ${currentLine.page}->${nextLine.page} -> BREAK`,
+      `[PAGE_BOUNDARY_NO_BREAK] No strong signal at page ${currentLine.page}->${nextLine.page} -> letting layout rules decide -> NO BREAK`,
     );
-    return true;
   }
 
   // 3) Structural/metadata break checks
