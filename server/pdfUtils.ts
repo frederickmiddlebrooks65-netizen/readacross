@@ -123,16 +123,6 @@ export function isReferencesHeading(text: string): boolean {
   return REFERENCES_HEADING_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
-function isExplicitSectionHeading(text: string): boolean {
-  const trimmed = text.trim();
-  const isAllCapsHeading = /^[A-Z][A-Z\s]{3,}$/.test(trimmed);
-  const matchesExplicitKeyword =
-    /^(bionote|bio\s*note|notes|endnotes|appendix|acknowledg(e)?ments?|about\s+the\s+author|author\s+note|author\s+bio(graphy|graphies)?|biographical\s+note(s)?)$/i.test(
-      trimmed,
-    );
-  return (isAllCapsHeading || matchesExplicitKeyword) && !isReferencesHeading(trimmed);
-}
-
 // ========== Archetype Detection per instructions.md ==========
 // Document archetype determines parsing strategy (not rendering option)
 // Archetype is decided at parsing time because sentence segmentation is irreversible
@@ -157,7 +147,7 @@ export type AcademicParsingStrictness = "strict" | "relaxed";
 // Separate axis from strictness - determines which RULES to apply
 // journal = STEM journal assumptions (section hierarchy, numbered headings, Method/Results)
 // essay_academic = humanities/theory academic (prose-focused, fewer structural assumptions)
-export type AcademicParsingProfile = "journal" | "essay_academic" | "arxiv";
+export type AcademicParsingProfile = "journal" | "essay_academic";
 
 export interface AcademicParsingDecision {
   strictness: AcademicParsingStrictness;
@@ -165,6 +155,64 @@ export interface AcademicParsingDecision {
   confidence: number; // 0-1 confidence score
   score: number; // Raw point score (0-12)
   signals: string[]; // Debug info: which signals contributed to score
+}
+
+// ========== Layout Clustering (Phase 1 optimization) ==========
+// Group consecutive text lines by layout signals BEFORE paragraph segmentation
+// This reduces paragraph merging conflicts and stabilizes block boundaries
+export interface LayoutCluster {
+  lines: TextLine[];
+  startIndex: number; // Index in original lines array
+  endIndex: number; // Inclusive end index in original lines array
+}
+
+// Build layout clusters from raw lines using layout signals only
+export function buildLayoutClusters(
+  lines: TextLine[],
+  stats: PDFStats,
+): LayoutCluster[] {
+  const clusters: LayoutCluster[] = [];
+
+  if (!lines.length) return clusters;
+
+  let currentCluster: TextLine[] = [lines[0]];
+  let startIndex = 0;
+
+  for (let i = 1; i < lines.length; i++) {
+    const prev = lines[i - 1];
+    const curr = lines[i];
+
+    const yGap = Math.abs(curr.y - prev.y);
+    const xDiff = Math.abs(curr.xStart - prev.xStart);
+
+    // Layout-only break signals
+    const strongYBreak = yGap >= stats.medianLineHeight * 2.2;
+    const strongXBreak = xDiff >= stats.medianBodyFont * 2.0;
+    const emptyLineBreak = prev.text.trim() === "";
+
+    const shouldBreak = strongYBreak || strongXBreak || emptyLineBreak;
+
+    if (shouldBreak) {
+      clusters.push({
+        lines: currentCluster,
+        startIndex,
+        endIndex: i - 1,
+      });
+      currentCluster = [curr];
+      startIndex = i;
+    } else {
+      currentCluster.push(curr);
+    }
+  }
+
+  // Flush final cluster
+  clusters.push({
+    lines: currentCluster,
+    startIndex,
+    endIndex: lines.length - 1,
+  });
+
+  return clusters;
 }
 
 /**
@@ -501,14 +549,6 @@ function detectParsingStrictness(
     profile = "journal";
   }
 
-  // === arXiv Profile Override ===
-  // If arXiv ID detected in text sample, force profile to arxiv
-  if (/\barxiv:\d+\.\d+/i.test(textSample)) {
-    profile = "arxiv";
-    strictness = "relaxed";
-    signals.push("Profile override: arXiv");
-  }
-
   // === FAIL-SAFE: Single-column + relaxed → essay_academic ===
   // Per instructions.md: humanities/translation/philosophy papers protection rule
   // "archetype === academic AND strictness === relaxed AND single-column → essay_academic (강제)"
@@ -529,87 +569,6 @@ function detectParsingStrictness(
     score,
     signals,
   };
-}
-
-/**
- * Detect hyphenated slug pattern (URL-like text)
- * Phase-1 safety guard for missing origin/bbox data
- *
- * Examples:
- * - "Multilingual-Communication-Across-Global-Industries-Research-by-SNS-" → true
- * - "Multi-word phrase" → false (has space)
- * - "Ethical-considerations" → true (but later filtered by sentence criteria)
- *
- * NOTE:
- * This filter is a Phase-1 safety guard.
- * It compensates for missing layout/origin data from PyMuPDF.
- * Proper footnote / layout-based protection will be enabled
- * once bbox is provided (Phase 2).
- */
-function looksLikeHyphenatedSlug(text: string): boolean {
-  const trimmed = text.trim();
-  if (trimmed.includes(" ")) return false;
-  // Hyphens only, 3+ parts, no spaces, allow trailing hyphen
-  // e.g. "Multilingual-Communication-Across-Global-Industries-Research-by-SNS-"
-  return /^[A-Za-z]+(-[A-Za-z]+){2,}-?$/.test(trimmed);
-}
-
-/**
- * Detect author/affiliation metadata blocks
- * Phase-2 semantic gate: prevent metadata from being promoted to heading
- *
- * Examples of true cases:
- * - "Corina DOBROTĂ" (name pattern)
- * - "John Smith, PhD" (name with title)
- * - "University of Galati" (affiliation keyword)
- * - "Department of Computer Science" (institutional affiliation)
- *
- * Examples of false cases:
- * - "Ethical considerations" (no affiliation keyword, not a name)
- * - "The translator as a cultural mediator" (too long, has article)
- *
- * This filter is applied BEFORE heading promotion heuristics
- * to ensure metadata never enters the heading pool.
- */
-function looksLikeAuthorBlock(block: Block): boolean {
-  if (!block.content) return false;
-  
-  const text = block.content.trim();
-  
-  // Position guard: Author/affiliation typically appear near document start
-  // (document_title, abstract_label, then author metadata)
-  // Blocks beyond position 10 are unlikely to be author metadata
-  const isEarlyPosition = (block as any).order !== undefined ? (block as any).order <= 10 : true;
-  if (!isEarlyPosition) return false;
-  
-  // Length guard: Author names and affiliations are typically < 120 chars
-  if (text.length >= 120) return false;
-  
-  // Sentence guard: Author blocks don't end with sentence terminators
-  if (/[.!?]["']?\s*$/.test(text)) return false;
-  
-  // Space guard: Must have at least one space (not a single word)
-  if (!text.includes(" ")) return false;
-  
-  // Pattern 1: Name pattern (First Last, possibly with middle initials/accented names)
-  // "Corina DOBROTĂ", "Jean-Pierre Dubois", "Maria García López"
-  // Allow both uppercase and lowercase letters in surnames
-  const namePattern = /^[A-Z][A-Za-zÀ-ÿ]+([\s\-][A-Z][A-Za-zÀ-ÿ]+)*$/;
-  if (namePattern.test(text)) {
-    // DEBUG: Additional validation for name patterns
-    const parts = text.split(/[\s\-]+/);
-    // Name should have 2-4 parts (First Last, or First Middle Last, etc.)
-    if (parts.length >= 2 && parts.length <= 4) {
-      return true;
-    }
-  }
-  
-  // Pattern 2: Institutional affiliation keywords
-  // "University of X", "Institute of X", "Department of X", etc.
-  const affiliationKeywords = /(University|Institute|Department|Faculty|College|School|Laboratory|Center|Centre|Research Lab|Academy)/i;
-  if (affiliationKeywords.test(text)) return true;
-  
-  return false;
 }
 
 /**
@@ -654,197 +613,7 @@ function isStandaloneBlock(block: Block): boolean {
  * 2. Running footer removal (global rule - applies to all profiles)
  * 3. Essay-academic heading recovery (essay_academic profile only)
  */
-/**
- * LAYER 1: Block-level STRUCTURAL post-processing (archetype-independent)
- * 
- * Applies to ALL document types (academic, essay, literary, generic)
- * Focuses on semantic role correction without document-type assumptions.
- * 
- * Responsibilities:
- * 1. Author/affiliation/journal metadata protection (never promote to heading)
- * 2. Footnote/footer zone heading ban (bottom 20% of page)
- * 3. References section protection (no heading promotion inside)
- * 4. Hyphenated slug/URL fragment rejection
- * 5. Noun-phrase heading promotion (common structural rule)
- * 
- * DOES NOT handle:
- * - Running header/footer removal (academic-specific)
- * - STEM journal conventions (academic-specific)
- * - Profile-based strictness adjustments (academic-specific)
- */
-function postProcessBlocksStructural(
-  blocks: Block[],
-  log: (msg: string) => void,
-): Block[] {
-  if (blocks.length === 0) return blocks;
-
-  log(
-    `[PostProcess_Structural] Starting block-level structural analysis. Input blocks: ${blocks.length}`,
-  );
-
-  let promotedCount = 0;
-
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i];
-    const prevBlock = i > 0 ? blocks[i - 1] : undefined;
-    const nextBlock = i < blocks.length - 1 ? blocks[i + 1] : undefined;
-
-    // Only process paragraph blocks for potential heading promotion
-    if (block.type !== "paragraph") continue;
-
-    // === PROTECTION 1: Author/Affiliation Metadata ===
-    // Author and affiliation blocks must NEVER be promoted to heading.
-    // This is a semantic rule independent of document type.
-    if (looksLikeAuthorBlock(block)) {
-      log(
-        `[Structural_SKIP] author/affiliation metadata: "${block.content.substring(0, 60)}..."`,
-      );
-      continue;
-    }
-
-    // === PROTECTION 2: References Section Content ===
-    // Never promote content inside References sections
-    const blockTextLower = block.content.trim().toLowerCase();
-    if (
-      blockTextLower === "references" ||
-      blockTextLower === "bibliography" ||
-      blockTextLower === "works cited" ||
-      blockTextLower === "literature cited" ||
-      blockTextLower === "cited references" ||
-      blockTextLower === "reference list"
-    ) {
-      log(`[Structural_SKIP] references section keyword: "${blockTextLower}"`);
-      continue;
-    }
-
-    // === PROTECTION 3: Footnote/Footer Zone (bottom 20%) ===
-    // Footnotes contain short noun phrases but are not structural headings
-    if ((block as any).origin?.bbox) {
-      const [, yStart] = (block as any).origin.bbox;
-      const pageHeight = 792; // standard PDF height
-      const yRatio = yStart / pageHeight;
-      if (yRatio > 0.8) {
-        log(
-          `[Structural_SKIP] footnote zone (yRatio=${yRatio.toFixed(2)}): "${blockTextLower.substring(0, 40)}..."`,
-        );
-        continue;
-      }
-    }
-
-    // === PROTECTION 4: Metadata Block Types ===
-    // Reject blocks already classified as metadata
-    const blockType = block.type as string;
-    if (
-      blockType === "header" ||
-      blockType === "footer" ||
-      blockType === "author" ||
-      blockType === "journal" ||
-      blockType === "affiliation" ||
-      blockType === "doi" ||
-      blockType === "abstract_label"
-    ) {
-      log(`[Structural_SKIP] metadata block type: "${blockType}"`);
-      continue;
-    }
-
-    // === REJECTION 1: Sentence Terminal Punctuation ===
-    // Headings do not end with periods/question marks
-    const text = block.content.trim();
-    if (/[.!?]["']?\s*$/.test(text)) {
-      log(`[Structural_SKIP] sentence terminal punctuation: "${text.substring(0, 40)}..."`);
-      continue;
-    }
-
-    // === REJECTION 2: Length Threshold ===
-    // Noun-phrase headings are typically < 120 characters
-    if (text.length > 120) {
-      log(`[Structural_SKIP] too long (${text.length}): "${text.substring(0, 40)}..."`);
-      continue;
-    }
-
-    // === REJECTION 3: Hyphenated Slug / URL Pattern ===
-    // URLs and citation fragments should not become headings
-    if (looksLikeHyphenatedSlug(text)) {
-      log(
-        `[Structural_SKIP] hyphenated slug (URL fragment): "${text.substring(0, 60)}"`,
-      );
-      continue;
-    }
-
-    // === PROMOTION CRITERIA: Structural Context ===
-    // Block qualifies for heading promotion if:
-    // 1. It is visually isolated (standalone or surrounded by paragraphs)
-    // 2. It has paragraph neighbors (context for prose connection)
-    // 3. All protection rules pass
-    
-    let isVisuallyIsolated = false;
-    if ((block as any).isStandalone === true) {
-      isVisuallyIsolated = true;
-    } else {
-      // Consider isolated if surrounded by paragraphs
-      // (typical structure: heading + body paragraph)
-      if (
-        prevBlock &&
-        nextBlock &&
-        prevBlock.type === "paragraph" &&
-        nextBlock.type === "paragraph"
-      ) {
-        isVisuallyIsolated = true;
-      }
-    }
-
-    if (!isVisuallyIsolated) {
-      log(`[Structural_SKIP] not visually isolated: "${text.substring(0, 40)}..."`);
-      continue;
-    }
-
-    // === FINAL SAFETY CHECK: Redundant Author/Affiliation Check ===
-    // Second defense for metadata protection
-    if (looksLikeAuthorBlock(block)) {
-      log(`[Structural_SKIP] author/affiliation (redundant check): "${text.substring(0, 60)}..."`);
-      continue;
-    }
-
-    // === PROMOTE TO HEADING ===
-    log(`[Structural_PROMOTE] noun-phrase heading: "${text}"`);
-    (block as any).type = "heading";
-    (block as any).level = 2;
-
-    // Ensure sentences[] exists after promotion
-    const tBlock = block as any;
-    if (!tBlock.sentences || tBlock.sentences.length === 0) {
-      tBlock.sentences = [
-        {
-          id: `block-${block.order}-sent-1`,
-          text: text.replace(/\.\s*$/, ""), // Remove trailing period only
-          order: 1,
-          type: "sentence",
-        },
-      ];
-      log(`[Structural_PROMOTE] generated sentence for heading: "${text}"`);
-    }
-    promotedCount++;
-  }
-
-  log(
-    `[PostProcess_Structural] Complete. Promoted ${promotedCount} blocks to heading.`,
-  );
-  return blocks;
-}
-
-/**
- * LAYER 2: Academic-specific post-processing
- *
- * Applies ONLY to academic archetype documents.
- * Handles document-type-specific rules:
- * - Running header/footer removal (profile-dependent)
- * - STEM journal conventions
- * - Strictness-based thresholds
- *
- * MUST NOT alter heading/paragraph structure decided by Layer 1.
- * Only performs profile-specific filtering and cleanup.
- */
-function postProcessBlocksAcademic(
+function postProcessBlocksForEssayAcademic(
   blocks: Block[],
   parsingProfile: AcademicParsingProfile,
   log: (msg: string) => void,
@@ -852,10 +621,25 @@ function postProcessBlocksAcademic(
   if (blocks.length === 0) return blocks;
 
   log(
-    `[PostProcess_Academic] Starting academic-specific filtering. Profile: ${parsingProfile}, Input blocks: ${blocks.length}`,
+    `[PostProcess] Starting block-level cleanup. Profile: ${parsingProfile}, Input blocks: ${blocks.length}`,
   );
 
-  // Build a map of block text -> pages it appears on (for running header/footer detection)
+  // NOTE: Heading handling policy
+  // - Definite headings (ALL CAPS, References, numbered sections, abstract_label)
+  //   are detected earlier at line-level via `isDefiniteHeading` and
+  //   `classifyLineSimplified` and MUST NOT be absorbed into paragraphs.
+  // - Weak/noun-phrase headings are recovered HERE at block-level only.
+  //   This is the SOLE location where short paragraph blocks may be
+  //   promoted to `heading` based on surrounding block context.
+
+  // === 1. Running Header Detection & Removal (Global Rule) ===
+  // Conditions (ALL must match):
+  // - Page top 5-8% (y position)
+  // - Same text repeated on ≥2 pages
+  // - Word count ≤ 4
+  // - No sentence-ending punctuation (., ?, !)
+
+  // Build a map of block text -> pages it appears on (for detecting running headers/footers)
   const blockTextPages: Map<string, Set<number>> = new Map();
   const blocksByPage: Map<number, Block[]> = new Map();
 
@@ -872,59 +656,87 @@ function postProcessBlocksAcademic(
     blocksByPage.get(block.page)!.push(block);
   }
 
-  // === Academic Profile-Based Filtering ===
-  // Pattern: essay_academic uses aggressive pattern-based detection
-  // journal uses conservative repetition-based detection
+  // === Pattern-Based H/F Removal for essay_academic ===
+  // For essay_academic: Remove by PATTERN, not by repetition
+  // For journal: Use repetition-based detection
 
   let filteredBlocks: Block[];
 
   if (parsingProfile === "essay_academic") {
-    // Essay-academic: Pattern-based immediate removal
+    // Essay-academic: Pattern-based immediate removal (no repetition required)
+    // This catches any H/F artifacts that slipped through line-level detection
     filteredBlocks = blocks.filter((block) => {
       const text = block.content.trim();
       const normalizedText = text.toLowerCase();
 
       // Pure page number - always remove
       if (/^\d+$/.test(text)) {
-        log(`[Academic] Removing page number: "${text}"`);
+        log(`[PostProcess] Removing page number: "${text}"`);
         return false;
       }
 
-      // Journal metadata patterns (volume, issue, year)
+      // Journal metadata patterns
+      // IMPORTANT: Journal metadata itself is NOT deletion-worthy.
+      // Only remove if it is clearly header/footer noise (position + repetition).
       if (
         /\b(vol\.?|volume|issue|special\s*issue|\d{4})\b/i.test(text) &&
         text.length < 80
       ) {
         const pages = blockTextPages.get(normalizedText);
+
+        // Remove ONLY if repeated across pages (running header/footer)
         if (pages && pages.size >= 2) {
           log(
-            `[Academic] Removing repeated journal metadata: "${text.substring(0, 50)}..."`,
+            `[PostProcess] Removing repeated journal metadata (running H/F): "${text.substring(
+              0,
+              50,
+            )}..."`,
           );
           return false;
         }
+
+        // Otherwise, preserve as metadata (untranslatable)
         log(
-          `[Academic] Preserving journal metadata (not repeated): "${text.substring(0, 50)}..."`,
+          `[PostProcess] Preserving journal metadata as untranslatable block: "${text.substring(
+            0,
+            50,
+          )}..."`,
         );
         return true;
       }
 
-      // Author name pattern (only remove if repeated)
+      // Author name pattern (short, 2-3 words, one word all caps)
+      // ⚠️ CRITICAL: Only remove if REPEATED across multiple pages + at header/footer position
+      // Otherwise, legitimate subheadings like "Ethical considerations" will be deleted
       if (text.length < 40 && /^[A-Z][a-z]+\s+[A-ZĂÎșț]+$/i.test(text)) {
+        // Skip if it's a References heading
         if (isReferencesHeading(text)) {
+          log(`[PostProcess] Keeping References heading: "${text}"`);
           return true;
         }
+
+        // Skip if heading/standalone candidate (must not remove potential subheadings)
         if ((block as any).isStandalone || (block as any).mergeProtected) {
+          log(
+            `[PostProcess] Keeping potential subheading (standalone/mergeProtected): "${text}"`,
+          );
           return true;
         }
+
+        // REQUIRED: Block must appear on ≥2 pages to be author name (not one-off subheading)
         const pages = blockTextPages.get(normalizedText);
         if (!pages || pages.size < 2) {
+          log(
+            `[PostProcess] Keeping unique block (not repeated): "${text.substring(0, 40)}..."`,
+          );
           return true;
         }
-        log(`[Academic] Removing author name (repeated): "${text}"`);
+
+        log(`[PostProcess] Removing author name (repeated ${pages.size} pages): "${text}"`);
         return false;
       }
 
-      // Running title pattern
+      // Running title pattern - appears on multiple pages, short, no sentence end
       const pages = blockTextPages.get(normalizedText);
       if (
         pages &&
@@ -932,14 +744,21 @@ function postProcessBlocksAcademic(
         text.length < 80 &&
         !/[.!?]\s*$/.test(text)
       ) {
-        log(`[Academic] Removing running title: "${text.substring(0, 50)}..."`);
+        log(
+          `[PostProcess] Removing running title: "${text.substring(0, 50)}..."`,
+        );
         return false;
       }
 
       return true;
     });
+
+    const removedCount = blocks.length - filteredBlocks.length;
+    if (removedCount > 0) {
+      log(`[PostProcess] Removed ${removedCount} H/F blocks (pattern-based)`);
+    }
   } else {
-    // Journal profile: Repetition-based detection
+    // Journal profile: Original repetition-based detection
     const runningHeaderTexts = new Set<string>();
     const requiredPageCount = 2;
     const headerYThreshold = 0.08;
@@ -969,7 +788,9 @@ function postProcessBlocksAcademic(
           }
           if (topZoneCount >= requiredPageCount) {
             runningHeaderTexts.add(text);
-            log(`[Academic] Identified running header: "${text.substring(0, 50)}..."`);
+            log(
+              `[PostProcess] Identified running header: "${text.substring(0, 50)}..."`,
+            );
           }
         }
       }
@@ -1001,7 +822,7 @@ function postProcessBlocksAcademic(
         }
         if (bottomZoneCount >= requiredPageCount) {
           runningFooterTexts.add(text);
-          log(`[Academic] Identified running footer: "${text}"`);
+          log(`[PostProcess] Identified running footer: "${text}"`);
         }
       }
     }
@@ -1010,27 +831,151 @@ function postProcessBlocksAcademic(
       const normalizedText = block.content.trim().toLowerCase();
       if (runningHeaderTexts.has(normalizedText)) {
         log(
-          `[Academic] Removing header block: "${block.content.substring(0, 40)}..."`,
+          `[PostProcess] Removing header block: "${block.content.substring(0, 40)}..."`,
         );
         return false;
       }
       if (runningFooterTexts.has(normalizedText)) {
-        log(`[Academic] Removing footer block: "${block.content}"`);
+        log(`[PostProcess] Removing footer block: "${block.content}"`);
         return false;
       }
       return true;
     });
+
+    const removedCount = blocks.length - filteredBlocks.length;
+    if (removedCount > 0) {
+      log(`[PostProcess] Removed ${removedCount} running H/F blocks`);
+    }
   }
 
-  const removedCount = blocks.length - filteredBlocks.length;
-  if (removedCount > 0) {
-    log(`[PostProcess_Academic] Removed ${removedCount} academic-specific blocks`);
+  // === 3. Essay-Academic Block Heading Detection (2-phase approach) ===
+  // Per user principle: "Heading은 line의 속성이 아니라 block의 역할"
+  //
+  // Line-level detection cannot reliably identify noun phrase headings like
+  // "Ethical considerations" without seeing the following context.
+  //
+  // STRATEGY: Detect headings at block level where we can see:
+  // - Short paragraph block (noun phrase characteristics)
+  // - Followed by long prose paragraph
+  // → Promote to heading
+
+  // === 3. Block-Level Heading Detection (ALL academic profiles) ===
+  // Per user principle: "Heading은 line의 속성이 아니라 block의 역할"
+  // This applies to BOTH journal AND essay_academic profiles
+  // Humanities papers often get classified as "journal" but still need heading detection
+  log(
+    `[PostProcess] Block-level heading detection for profile: ${parsingProfile}`,
+  );
+
+  let promotedCount = 0;
+
+  for (let i = 0; i < filteredBlocks.length; i++) {
+    const block = filteredBlocks[i];
+    const prevBlock = i > 0 ? filteredBlocks[i - 1] : undefined;
+    const nextBlock = i < filteredBlocks.length - 1 ? filteredBlocks[i + 1] : undefined;
+
+    // Only process paragraph blocks
+    if (block.type !== "paragraph") continue;
+
+    // (c) Block is NOT inside or after a References section
+    // Reference blocks are already marked as "reference_block" type, but
+    // ensure we don't accidentally promote any paragraph-typed reference content
+    // Use stricter detection: never promote if content is "References", "Bibliography", "Works Cited"
+    const blockTextLower = block.content.trim().toLowerCase();
+    if (
+      blockTextLower === "references" ||
+      blockTextLower === "bibliography" ||
+      blockTextLower === "works cited" ||
+      blockTextLower === "literature cited" ||
+      blockTextLower === "cited references" ||
+      blockTextLower === "reference list"
+    ) {
+      continue;
+    }
+
+    // (c-1) Never promote footnote-origin content to heading
+    // Footnotes often contain short noun phrases (e.g. article titles)
+    // but are not structural headings.
+    if ((block as any).origin?.bbox) {
+      const [, yStart] = (block as any).origin.bbox;
+      const pageHeight = 792; // default PDF height used elsewhere
+      const yRatio = yStart / pageHeight;
+      // Bottom 20% of page is considered footnote zone
+      if (yRatio > 0.8) {
+        continue;
+      }
+    }
+
+    // (d) Block is NOT classified as header/footer/author/journal metadata
+    if (
+      block.type === "header" ||
+      block.type === "footer" ||
+      block.type === "author" ||
+      block.type === "journal" ||
+      block.type === "affiliation" ||
+      block.type === "doi" ||
+      block.type === "abstract_label"
+    ) {
+      continue;
+    }
+
+    // (b) Block content does NOT end with sentence terminal punctuation (. ! ?)
+    const text = block.content.trim();
+    if (/[.!?]["']?\s*$/.test(text)) continue;
+
+    // (f) Block length is ≤ 120 characters (soft cap)
+    if (text.length > 120) continue;
+
+    // (e) Block is visually isolated:
+    // - Either: (block as any).isStandalone === true
+    // - OR: block is surrounded by paragraph boundaries (previous block is paragraph AND next block is paragraph, but block has its own paragraph boundary)
+    let isVisuallyIsolated = false;
+    if ((block as any).isStandalone === true) {
+      isVisuallyIsolated = true;
+    } else {
+      // Check for paragraph boundaries: previous and next blocks are paragraphs, but block is visually separated
+      // (for simplicity, require both neighbors are paragraphs and block is not obviously merged)
+      if (
+        prevBlock &&
+        nextBlock &&
+        prevBlock.type === "paragraph" &&
+        nextBlock.type === "paragraph"
+      ) {
+        // Optionally, check for visual separation: block is not too short/long, or has its own paragraph break
+        // Here, we treat a block as visually isolated if it is not merged with neighbors (i.e., not the result of a merge)
+        isVisuallyIsolated = true;
+      }
+    }
+    if (!isVisuallyIsolated) continue;
+
+    // (a) Block type is "paragraph" -- already checked above
+
+    // === Promote to heading ===
+    log(`[PostProcess] PROMOTE to heading (structure-first rule): "${text}"`);
+    (block as any).type = "heading";
+    (block as any).level = 2;
+    const tBlock = block as any;
+    // After promotion to heading, ALWAYS ensure sentences[] exists and contains exactly one sentence with the full heading text
+    if (!tBlock.sentences || tBlock.sentences.length === 0) {
+      tBlock.sentences = [
+        {
+          id: `block-${block.order}-sent-1`,
+          text: text.replace(/\.\s*$/, ""), // Remove trailing period ONLY, preserve other content
+          order: 1,
+          type: "sentence",
+        },
+      ];
+      log(`[PostProcess] Generated sentence for promoted heading: "${text}"`);
+    }
+    promotedCount++;
   }
 
-  log(`[PostProcess_Academic] Complete. Output blocks: ${filteredBlocks.length}`);
-  return filteredBlocks;
+  log(
+    `[PostProcess] Complete. Output blocks: ${filteredBlocks.length} (${blocks.length - filteredBlocks.length} removed). Promoted ${promotedCount} blocks to heading.`,
+  );
+
+  return filteredBlocks as Block[];
 }
-
 
 // Extended result type for parsePDFToBlocks
 export interface PDFParseResult {
@@ -1727,18 +1672,7 @@ function classifyLineSimplified(
     return "paragraph";
   }
 
-  if (parsingProfile === "arxiv") {
-    // arXiv heading detection: numbering-based priority
-    const hasNumberedSection = /^(\d+(\.\d+)*)\s+[A-Z]/.test(text);
-    const isShortLine = text.length <= 120;
-    const endsWithPeriod = /[.!?]["']?\s*$/.test(text);
-
-    if (hasNumberedSection && isShortLine && !endsWithPeriod) {
-      return "heading";
-    }
-
-    return "paragraph";
-  } else if (isEssayAcademic) {
+  if (isEssayAcademic) {
     // ============================================================
     // BLOCK HEADING DETECTION FOR ESSAY-ACADEMIC PROFILE
     // ============================================================
@@ -1985,8 +1919,6 @@ const NON_PROSE_TYPES = [
   "footer",
   "abstract_label",
   "reference_block",
-  "heading",
-  "document_title",
 ];
 
 // Minimal abbreviation protection for layout-stage sentence boundary decisions.
@@ -2028,41 +1960,13 @@ function isSentenceContinuation(
   // If previous line ends with explicit non-terminal punctuation, it likely continues.
   if (/[,;:]\s*$/.test(prevText)) return true;
 
-  // Hanging sentence check: do not continue if the previous line looks complete.
-  const endsWithColonOrSemicolon = /[:;]\s*$/.test(prevText);
-  const endsWithSentenceTerminator = looksTerminated && !isAbbrevEnd;
-  const wordCount = prevText.split(/\s+/).filter((w) => w.length > 0).length;
-  const hasUnclosedParen =
-    (prevText.match(/\(/g)?.length || 0) >
-      (prevText.match(/\)/g)?.length || 0) ||
-    (prevText.match(/\[/g)?.length || 0) >
-      (prevText.match(/\]/g)?.length || 0) ||
-    (prevText.match(/\{/g)?.length || 0) >
-      (prevText.match(/\}/g)?.length || 0);
-  const doubleQuoteCount =
-    (prevText.match(/["\u201C\u201D]/g)?.length || 0);
-  const hasUnclosedQuote = doubleQuoteCount % 2 === 1;
-  const isHangingSentence =
-    !endsWithSentenceTerminator &&
-    !endsWithColonOrSemicolon &&
-    !hasUnclosedParen &&
-    !hasUnclosedQuote &&
-    wordCount >= 3;
-
   // Next line grammatical dependency signals.
   const startsLowercase = /^[a-z]/.test(nextText);
   const startsWithContinuationToken =
-    /^(and|or|but|that|which|who|whom|whose|where|when|while|because|since|although|though|if|as|to|of|in|on|at|by|with|from|for|into|onto|upon|depending|including)\b/i.test(
+    /^(and|or|but|that|which|who|whom|whose|where|when|while|because|since|although|though|if|as|to|of|in|on|at|by|with|from|for|into|onto|upon)\b/i.test(
       nextText,
     );
-  const startsWithDigit = /^\d/.test(nextText);
-  const startsWithInlineSymbol = /^[%$\(]/.test(nextText);
-  const nextLooksLikeContinuation =
-    startsLowercase ||
-    startsWithContinuationToken ||
-    startsWithDigit ||
-    startsWithInlineSymbol;
-  if (isHangingSentence && nextLooksLikeContinuation) return true;
+  if (startsLowercase || startsWithContinuationToken) return true;
 
   // Default policy: be conservative. If we don't have explicit evidence of continuation,
   // return false so layout/paragraph heuristics can decide.
@@ -2116,81 +2020,20 @@ function shouldEndParagraphSimplified(
   }
 
   // 2) Page boundary check
-  if (!nextLine) {
-    const currentText = currentLine.text.trim();
-    const endsWithSentenceEnd =
-      SENTENCE_TERMINATOR_EXTENDED.test(currentText) &&
-      !COMMON_ABBREVIATIONS.test(currentText);
-    const endsWithColonOrSemicolon = /[:;]\s*$/.test(currentText);
-    const wordCount = currentText
-      .split(/\s+/)
-      .filter((w) => w.length > 0).length;
-    const hasUnclosedParen =
-      (currentText.match(/\(/g)?.length || 0) >
-        (currentText.match(/\)/g)?.length || 0) ||
-      (currentText.match(/\[/g)?.length || 0) >
-        (currentText.match(/\]/g)?.length || 0) ||
-      (currentText.match(/\{/g)?.length || 0) >
-        (currentText.match(/\}/g)?.length || 0);
-    const doubleQuoteCount =
-      (currentText.match(/["\u201C\u201D]/g)?.length || 0);
-    const hasUnclosedQuote = doubleQuoteCount % 2 === 1;
-    const isNonProseCurrent =
-      NON_PROSE_TYPES.includes(currentClassification) ||
-      currentClassification === "heading" ||
-      currentClassification === "document_title";
-    const isHangingSentence =
-      !isNonProseCurrent &&
-      !endsWithSentenceEnd &&
-      !endsWithColonOrSemicolon &&
-      !hasUnclosedParen &&
-      !hasUnclosedQuote &&
-      wordCount >= 3;
-
-    // IMPORTANT:
-    // Colon handling must NEVER merge already-finalized sentences.
-    // Sentence splitting is strictly left-to-right and irreversible.
-    // If we lack a next prose line but current line is hanging, merge conservatively.
-    if (isHangingSentence) return false;
-    return true;
-  }
+  if (!nextLine) return true;
   if (currentLine.page !== nextLine.page) {
-    const curText = currentLine.text.trim();
-    const nxtText = nextLine.text.trim();
-
-    if (/-\s*$/.test(curText)) {
+    // journal → always breaks at page boundaries
+    // essay_academic → allows continuation across pages unless strong layout signal
+    if (parsingProfile === "journal") {
       console.log(
-        `[PAGE_BOUNDARY_HYPHEN] Hyphenated word at page ${currentLine.page}->${nextLine.page} -> CONTINUE`,
-      );
-      return false;
-    }
-
-    const currentType = currentClassification;
-    const nextType = nextClassification;
-    if (isSentenceContinuation(currentLine, nextLine, currentType, nextType)) {
-      console.log(
-        `[PAGE_BOUNDARY_SENTENCE_CONT] Sentence continues at page ${currentLine.page}->${nextLine.page}: "${curText.substring(Math.max(0, curText.length - 40))}" -> "${nxtText.substring(0, 40)}" -> CONTINUE`,
-      );
-      return false;
-    }
-
-    const pageBoundaryYGap = nextLine.y - currentLine.y;
-    const pageBoundaryXDiff = Math.abs(nextLine.xStart - currentLine.xStart);
-    if (pageBoundaryYGap >= stats.medianLineHeight * 2.0) {
-      console.log(
-        `[PAGE_BOUNDARY_LAYOUT_BREAK] yGap=${pageBoundaryYGap.toFixed(1)} at page ${currentLine.page}->${nextLine.page} -> BREAK`,
+        `[PAGE_BOUNDARY_BREAK] journal profile: page ${currentLine.page}->${nextLine.page} -> BREAK`,
       );
       return true;
     }
-    if (pageBoundaryXDiff >= stats.medianBodyFont * 1.5) {
-      console.log(
-        `[PAGE_BOUNDARY_LAYOUT_BREAK] xDiff=${pageBoundaryXDiff.toFixed(1)} at page ${currentLine.page}->${nextLine.page} -> BREAK`,
-      );
-      return true;
-    }
-
+    // essay_academic: allow cross-page continuation for now
+    // (sentence continuation logic already filters this)
     console.log(
-      `[PAGE_BOUNDARY_NO_BREAK] No strong signal at page ${currentLine.page}->${nextLine.page} -> letting layout rules decide -> NO BREAK`,
+      `[PAGE_BOUNDARY_CONTINUE] essay_academic profile: page ${currentLine.page}->${nextLine.page} -> ALLOW (check sentence logic)`,
     );
   }
 
@@ -2345,7 +2188,6 @@ function createTranslatableBlock(
   content: string,
   page: number,
   order: number,
-  origin?: { page: number; bbox: [number, number, number, number] },
   archetype?: "academic" | "literary" | "essay" | "generic",
   deferSentenceSplitting: boolean = false,
 ): TranslatableBlock {
@@ -2394,7 +2236,6 @@ function createTranslatableBlock(
     sentences, // Single semantic unit for headings, split sentences for body blocks
     page,
     order,
-    origin, // Layout information for post-processing (yRatio calculation)
   };
 
   if (type === "document_title") block.level = 1; // Document title is level 1
@@ -2409,7 +2250,6 @@ function createMetadataBlock(
   content: string,
   page: number,
   order: number,
-  origin?: { page: number; bbox: [number, number, number, number] },
 ): MetadataBlock {
   let trimmedContent = content.trim();
 
@@ -2423,7 +2263,6 @@ function createMetadataBlock(
     content: trimmedContent,
     page,
     order,
-    origin, // Layout information for post-processing
     // NO sentences[] - metadata blocks are non-translatable
   };
 }
@@ -2434,7 +2273,6 @@ function createNonSemanticBlock(
   content: string,
   page: number,
   order: number,
-  origin?: { page: number; bbox: [number, number, number, number] },
   preserveLineBreaks: boolean = true,
 ): NonSemanticBlock {
   return {
@@ -2442,7 +2280,6 @@ function createNonSemanticBlock(
     content: content.trim(),
     page,
     order,
-    origin, // Layout information for post-processing
     preserveLineBreaks,
     // NO sentences[] - non-semantic blocks are not for translation
   };
@@ -2461,7 +2298,6 @@ function createBlock(
   content: string,
   page: number,
   order: number,
-  origin?: { page: number; bbox: [number, number, number, number] },
   archetype?: "academic" | "literary" | "essay" | "generic",
   deferSentenceSplitting: boolean = false,
 ): Block {
@@ -2478,8 +2314,6 @@ function createBlock(
       content,
       page,
       order,
-      origin,
-      true,
     );
   }
 
@@ -2491,7 +2325,6 @@ function createBlock(
       normalizedContent,
       page,
       order,
-      origin,
       archetype,
       deferSentenceSplitting,
     );
@@ -2501,7 +2334,6 @@ function createBlock(
     normalizedContent,
     page,
     order,
-    origin,
   );
 }
 
@@ -2515,18 +2347,7 @@ async function parsePDFToBlocksWithPyMuPDF(
   deferSentenceSplitting: boolean = false,
 ): Promise<Block[]> {
   const result = await extractPdfLines(buffer);
-  let lines = result.lines;
-  
-  // === ENRICHMENT: Add origin (bbox) information to each TextLine ===
-  // This enables layout role detection in post-processing
-  lines = lines.map((line) => ({
-    ...line,
-    origin: {
-      page: line.page,
-      bbox: [line.xStart, line.y, line.xEnd, line.y + line.fontHeight] as [number, number, number, number],
-    },
-  }));
-
+  const lines = result.lines;
   const stats = calculateStatsFromLines(lines, result.pageHeights);
 
   // File-based logging for debugging (bypasses workflow log truncation)
@@ -2539,6 +2360,13 @@ async function parsePDFToBlocksWithPyMuPDF(
     );
     console.log(msg);
   };
+
+  // === PHASE 1 OPTIMIZATION: Build layout clusters ===
+  // Cluster consecutive lines by layout signals BEFORE paragraph segmentation
+  const clusters = buildLayoutClusters(lines, stats);
+  debugLog(
+    `[LAYOUT_CLUSTERING] Created ${clusters.length} clusters from ${lines.length} lines`,
+  );
 
   // Log verification info
   debugLog(
@@ -2600,15 +2428,12 @@ async function parsePDFToBlocksWithPyMuPDF(
       const paraContent = joinLinesWithHyphenPreservation(currentParaLines);
 
       if (paraContent.length > 20) {
-        // Use first line's origin for block layout role
-        const firstLineOrigin = currentParaLines[0].origin;
         blocks.push(
           createBlock(
             "paragraph",
             paraContent,
             lastPage,
             blocks.length,
-            firstLineOrigin,
             undefined,
             deferSentenceSplitting,
           ),
@@ -2624,15 +2449,12 @@ async function parsePDFToBlocksWithPyMuPDF(
       const abstractContent =
         joinLinesWithHyphenPreservation(abstractBodyLines);
       if (abstractContent.length > 20) {
-        // Use first line's origin for block layout role
-        const firstLineOrigin = abstractBodyLines[0].origin;
         blocks.push(
           createBlock(
             "abstract_body",
             abstractContent,
             lastPage,
             blocks.length,
-            firstLineOrigin,
             undefined,
             deferSentenceSplitting,
           ),
@@ -2644,24 +2466,20 @@ async function parsePDFToBlocksWithPyMuPDF(
   };
 
   // Phase 2-3a: Helper to flush reference block
-  // NOTE:
-  // reference_block is presentation-only.
-  // content intentionally preserves original line breaks.
-  // This block is non-translatable and excluded from semantic / TM processing.
+  // Creates a single reference_block preserving original line breaks
   const flushReferenceBlock = () => {
     if (referenceLines.length > 0) {
-      const rawContent = referenceLines.map((l) => l.text).join("\n");
-      if (rawContent.length > 10) {
-        // Use first line's origin for block layout role
-        const firstLineOrigin = referenceLines[0].origin;
+      // Preserve original line breaks for reference presentation
+      const refContent = referenceLines.map((l) => l.text.trim()).join("\n");
+      if (refContent.length > 10) {
         blocks.push(
-          createNonSemanticBlock(
+          createBlock(
             "reference_block",
-            rawContent,
+            refContent,
             lastPage,
             blocks.length,
-            firstLineOrigin,
-            true,
+            undefined,
+            deferSentenceSplitting,
           ),
         );
       }
@@ -2695,7 +2513,6 @@ async function parsePDFToBlocksWithPyMuPDF(
       "affiliation",
       "doi",
       "footnote",
-      "abstract_label",
     ];
 
     // Check if current line is incomplete (no sentence terminator)
@@ -2734,46 +2551,52 @@ async function parsePDFToBlocksWithPyMuPDF(
   // Track indices that have been pulled into previous paragraphs (for page boundary continuation)
   const processedIndices = new Set<number>();
 
-  for (let i = 0; i < lines.length; i++) {
-    // Skip lines that were already pulled into a previous paragraph
-    if (processedIndices.has(i)) {
-      continue;
-    }
+  // === PHASE 1: Main loop wrapped by cluster iteration ===
+  // Iterate through clusters to limit paragraph judgment scope to layout clusters
+  for (const cluster of clusters) {
+    debugLog(
+      `[CLUSTER_LOOP] Processing cluster ${cluster.startIndex}-${cluster.endIndex} (${cluster.lines.length} lines)`,
+    );
 
-    const line = lines[i];
-    // CRITICAL: Definite headings override classifiedTypes
-    // This ensures ALL CAPS standalone headings like "CONCLUSIONS" are treated as headings
-    // even when essay_academic profile disables ALL CAPS heading detection in classifyLineSimplified
-    let type = definiteHeadings[i] ? "heading" : classifiedTypes[i];
-
-    // Debug: Track specific content to understand classification
-    if (
-      line.text.toLowerCase().includes("ai vs") ||
-      line.text.toLowerCase().includes("human translator")
-    ) {
-      debugLog(
-        `[LINE_CLASSIFY] Line ${i}: type="${type}", text="${line.text.substring(0, 80)}..."`,
-      );
-    }
-
-    // Find effective next line (skipping headers/footers)
-    // This ensures page boundary continuation checks against actual content
-    // Pass current page and text to enable smart heading skip when current line is incomplete
-    const effective = findEffectiveNextLine(i + 1, line.page, line.text);
-    const nextLine = effective.line;
-    const nextClassification = effective.classification;
-
-    // Skip headers/footers (removed from output entirely)
-    // But allow explicit section headings to terminate References even if misclassified
-    if (type === "header" || type === "footer") {
-      if (inReferencesSection && isExplicitSectionHeading(line.text)) {
-        flushReferenceBlock();
-        inReferencesSection = false;
-        type = "heading";
-      } else {
+    for (let i = cluster.startIndex; i <= cluster.endIndex; i++) {
+      // Skip lines that were already pulled into a previous paragraph
+      if (processedIndices.has(i)) {
         continue;
       }
-    }
+
+      const line = lines[i];
+      // CRITICAL: Definite headings override classifiedTypes
+      // This ensures ALL CAPS standalone headings like "CONCLUSIONS" are treated as headings
+      // even when essay_academic profile disables ALL CAPS heading detection in classifyLineSimplified
+      const type = definiteHeadings[i] ? "heading" : classifiedTypes[i];
+
+      // Debug: Track specific content to understand classification
+      if (
+        line.text.toLowerCase().includes("ai vs") ||
+        line.text.toLowerCase().includes("human translator")
+      ) {
+        debugLog(
+          `[LINE_CLASSIFY] Line ${i}: type="${type}", text="${line.text.substring(0, 80)}..."`,
+        );
+      }
+
+      // Find effective next line (skipping headers/footers)
+      // This ensures page boundary continuation checks against actual content
+      // Pass current page and text to enable smart heading skip when current line is incomplete
+      // PHASE 1 MODIFICATION: Limit nextLine search to cluster boundaries
+      let nextLine: TextLine | undefined = undefined;
+      let nextClassification: LineClassification | undefined = undefined;
+      let effectiveIndex = -1;
+
+      if (i < cluster.endIndex) {
+        const effective = findEffectiveNextLine(i + 1, line.page, line.text);
+        nextLine = effective.line;
+        nextClassification = effective.classification;
+        effectiveIndex = effective.index;
+      }
+
+      // Skip headers/footers (removed from output entirely)
+      if (type === "header" || type === "footer") continue;
 
     // === METADATA BLOCKS (non-translatable, per instructions.md section 4.3) ===
     // These are isolated BEFORE semantic unit creation
@@ -2782,7 +2605,7 @@ async function parsePDFToBlocksWithPyMuPDF(
       flushParagraph();
       flushAbstractBody();
       blocks.push(
-        createMetadataBlock("doi", line.text.trim(), line.page, blocks.length, line.origin),
+        createMetadataBlock("doi", line.text.trim(), line.page, blocks.length),
       );
       lastPage = line.page;
       continue;
@@ -2797,7 +2620,6 @@ async function parsePDFToBlocksWithPyMuPDF(
           line.text.trim(),
           line.page,
           blocks.length,
-          line.origin,
         ),
       );
       lastPage = line.page;
@@ -2813,7 +2635,6 @@ async function parsePDFToBlocksWithPyMuPDF(
           line.text.trim(),
           line.page,
           blocks.length,
-          line.origin,
         ),
       );
       lastPage = line.page;
@@ -2829,7 +2650,6 @@ async function parsePDFToBlocksWithPyMuPDF(
           line.text.trim(),
           line.page,
           blocks.length,
-          line.origin,
         ),
       );
       lastPage = line.page;
@@ -2849,7 +2669,6 @@ async function parsePDFToBlocksWithPyMuPDF(
           line.text.trim(),
           line.page,
           blocks.length,
-          line.origin,
         ),
       );
       inAbstractBody = true; // Start collecting abstract body
@@ -2924,7 +2743,6 @@ async function parsePDFToBlocksWithPyMuPDF(
           titleText,
           line.page,
           blocks.length,
-          line.origin,
           undefined,
           deferSentenceSplitting,
         ),
@@ -2958,7 +2776,6 @@ async function parsePDFToBlocksWithPyMuPDF(
             headingText,
             line.page,
             blocks.length,
-            line.origin,
             undefined,
             deferSentenceSplitting,
           ),
@@ -2974,44 +2791,12 @@ async function parsePDFToBlocksWithPyMuPDF(
     // Once in References, collect ALL lines without classification or heading detection.
     // No heading, no paragraph split, no sentence analysis.
     if (inReferencesSection) {
-      const headingText = line.text.trim();
-      const nextHeadingText = nextLine?.text.trim() || "";
-      const nextIsHeading = nextClassification === "heading";
-      const nextIsReferenceHeading =
-        nextIsHeading && isReferencesHeading(nextHeadingText);
-      const yGapToNext = nextLine ? nextLine.y - line.y : 0;
-      const hasHeadingGap = yGapToNext >= stats.medianLineHeight * 1.5;
-      const pageBreakToHeading =
-        nextLine && nextLine.page !== line.page && nextIsHeading;
-
-      // End references BEFORE creating/extending reference_block if a new section heading appears
-      if (
-        (nextIsHeading && !nextIsReferenceHeading && hasHeadingGap) ||
-        (pageBreakToHeading && !nextIsReferenceHeading)
-      ) {
-        referenceLines.push(line);
+      referenceLines.push(line);
+      // Create reference block at page breaks only
+      if (line.page !== nextLine?.page && referenceLines.length > 0) {
         flushReferenceBlock();
-        inReferencesSection = false;
-        continue;
       }
-
-      // End references when current line is an explicit non-reference section heading
-      if (isExplicitSectionHeading(headingText)) {
-        flushReferenceBlock();
-        inReferencesSection = false;
-        // fall through to normal heading processing
-      } else if (type === "heading" && !isReferencesHeading(headingText)) {
-        flushReferenceBlock();
-        inReferencesSection = false;
-        // fall through to normal heading processing
-      } else {
-        referenceLines.push(line);
-        // Create reference block at page breaks only
-        if (line.page !== nextLine?.page && referenceLines.length > 0) {
-          flushReferenceBlock();
-        }
-        continue; // ❗ Skip ALL further processing - no classification, no heading, no paragraph logic
-      }
+      continue; // ❗ Skip ALL further processing - no classification, no heading, no paragraph logic
     }
 
     // Heading processing with lookahead merge (for "Post-" + "Humanism" etc.)
@@ -3094,7 +2879,6 @@ async function parsePDFToBlocksWithPyMuPDF(
           headingText,
           line.page,
           blocks.length,
-          line.origin,
           undefined,
           deferSentenceSplitting,
         ),
@@ -3114,7 +2898,6 @@ async function parsePDFToBlocksWithPyMuPDF(
           line.text,
           line.page,
           blocks.length,
-          line.origin,
           undefined,
           deferSentenceSplitting,
         ),
@@ -3171,7 +2954,6 @@ async function parsePDFToBlocksWithPyMuPDF(
             blockContent,
             line.page,
             blocks.length,
-            line.origin,
             undefined,
             deferSentenceSplitting,
           ),
@@ -3246,39 +3028,6 @@ async function parsePDFToBlocksWithPyMuPDF(
       const lineText = line.text.trim();
       const lineEndsSentence = /[.!?]["'\u201D\u2019]?\s*$/.test(lineText);
       const lineIsIncomplete = !lineEndsSentence && !/:\s*$/.test(lineText);
-      const nextHeadingText = nextLine?.text.trim() || "";
-      const nextIsHeading = nextClassification === "heading";
-      const nextIsReferenceHeading = nextIsHeading && isReferencesHeading(nextHeadingText);
-      const yGapToNext = nextLine ? nextLine.y - line.y : 0;
-      const hasHeadingGap = yGapToNext >= stats.medianLineHeight * 1.5;
-      const pageBreakToHeading =
-        nextLine && nextLine.page !== line.page && nextIsHeading;
-
-      if (inReferencesSection) {
-        // End references if a new section heading appears
-        if (
-          (nextIsHeading && !nextIsReferenceHeading && hasHeadingGap) ||
-          (pageBreakToHeading && !nextIsReferenceHeading)
-        ) {
-          referenceLines.push(line);
-          flushReferenceBlock();
-          inReferencesSection = false;
-          continue;
-        }
-
-        if ((type as string) === "heading" && !isReferencesHeading(lineText)) {
-          flushReferenceBlock();
-          inReferencesSection = false;
-          // fall through to normal heading processing
-        } else {
-          referenceLines.push(line);
-          // Create reference block at page breaks only
-          if (line.page !== nextLine?.page && referenceLines.length > 0) {
-            flushReferenceBlock();
-          }
-          continue; // Skip ALL further processing - no classification, no heading, no paragraph logic
-        }
-      }
 
       currentParaLines.push(line);
 
@@ -3288,10 +3037,11 @@ async function parsePDFToBlocksWithPyMuPDF(
         flushParagraph();
       } else if (!shouldSplit) {
         // Line is incomplete - check for page boundary continuation
+
         if (lineIsIncomplete && nextLine && nextLine.page !== line.page) {
           // We're at a page boundary with incomplete sentence
           // Pull in all continuation lines until sentence completes or we hit a real break
-          let pullIdx = effective.index;
+          let pullIdx = effectiveIndex;
           while (pullIdx < lines.length && pullIdx >= 0) {
             const pullLine = lines[pullIdx];
             const pullType = classifiedTypes[pullIdx];
@@ -3336,6 +3086,7 @@ async function parsePDFToBlocksWithPyMuPDF(
             currentParaLines.push(pullLine);
 
             // Mark this line as processed (skip in main loop)
+            // We'll use a Set to track processed indices
             processedIndices.add(pullIdx);
 
             // Check if this line completes the sentence
@@ -3572,18 +3323,7 @@ async function parsePDFToBlocksWithPdftotext(
     const medianHeight = heights[Math.floor(heights.length / 2)] || 12;
     const medianLineHeight = medianHeight * 1.2;
 
-    let lines = groupWordsIntoLinesLegacy(elements, medianLineHeight);
-    
-    // === ENRICHMENT: Add origin (bbox) information to each TextLine ===
-    // This enables layout role detection in post-processing
-    lines = lines.map((line) => ({
-      ...line,
-      origin: {
-        page: line.page,
-        bbox: [line.xStart, line.y, line.xEnd, line.y + line.fontHeight] as [number, number, number, number],
-      },
-    }));
-    
+    const lines = groupWordsIntoLinesLegacy(elements, medianLineHeight);
     const pageHeightsRecord: Record<number, number> = {};
     pageHeights.forEach((v, k) => {
       pageHeightsRecord[k] = v;
@@ -3614,15 +3354,12 @@ async function parsePDFToBlocksWithPdftotext(
       if (currentParaLines.length > 0) {
         const paraContent = joinLinesWithHyphenPreservation(currentParaLines);
         if (paraContent.length > 20) {
-          // Use first line's origin for block layout role
-          const firstLineOrigin = currentParaLines[0].origin;
           blocks.push(
             createBlock(
               "paragraph",
               paraContent,
               lastPage,
               blocks.length,
-              firstLineOrigin,
               undefined,
               deferSentenceSplitting,
             ),
@@ -3638,15 +3375,12 @@ async function parsePDFToBlocksWithPdftotext(
         const abstractContent =
           joinLinesWithHyphenPreservation(abstractBodyLines);
         if (abstractContent.length > 20) {
-          // Use first line's origin for block layout role
-          const firstLineOrigin = abstractBodyLines[0].origin;
           blocks.push(
             createBlock(
               "abstract_body",
               abstractContent,
               lastPage,
               blocks.length,
-              firstLineOrigin,
               undefined,
               deferSentenceSplitting,
             ),
@@ -3658,24 +3392,18 @@ async function parsePDFToBlocksWithPdftotext(
     };
 
     // Helper to flush reference block
-    // NOTE:
-    // reference_block is presentation-only.
-    // content intentionally preserves original line breaks.
-    // This block is non-translatable and excluded from semantic / TM processing.
     const flushReferenceBlock = () => {
       if (referenceLines.length > 0) {
-        const rawContent = referenceLines.map((l) => l.text).join("\n");
-        if (rawContent.length > 10) {
-          // Use first line's origin for block layout role
-          const firstLineOrigin = referenceLines[0].origin;
+        const refContent = referenceLines.map((l) => l.text.trim()).join("\n");
+        if (refContent.length > 10) {
           blocks.push(
-            createNonSemanticBlock(
+            createBlock(
               "reference_block",
-              rawContent,
+              refContent,
               lastPage,
               blocks.length,
-              firstLineOrigin,
-              true,
+              undefined,
+              deferSentenceSplitting,
             ),
           );
         }
@@ -3687,17 +3415,9 @@ async function parsePDFToBlocksWithPdftotext(
       const line = lines[i];
       const nextLine = i < lines.length - 1 ? lines[i + 1] : undefined;
       const nextClassification = classifiedTypes[i + 1];
-      let type = classifiedTypes[i];
+      const type = classifiedTypes[i];
 
-      if (type === "header" || type === "footer") {
-        if (inReferencesSection && isExplicitSectionHeading(line.text)) {
-          flushReferenceBlock();
-          inReferencesSection = false;
-          type = "heading";
-        } else {
-          continue;
-        }
-      }
+      if (type === "header" || type === "footer") continue;
 
       // === METADATA BLOCKS (non-translatable) ===
       if (type === "doi") {
@@ -3709,7 +3429,6 @@ async function parsePDFToBlocksWithPdftotext(
             line.text.trim(),
             line.page,
             blocks.length,
-            line.origin,
           ),
         );
         lastPage = line.page;
@@ -3725,7 +3444,6 @@ async function parsePDFToBlocksWithPdftotext(
             line.text.trim(),
             line.page,
             blocks.length,
-            line.origin,
           ),
         );
         lastPage = line.page;
@@ -3741,7 +3459,6 @@ async function parsePDFToBlocksWithPdftotext(
             line.text.trim(),
             line.page,
             blocks.length,
-            line.origin,
           ),
         );
         lastPage = line.page;
@@ -3757,7 +3474,6 @@ async function parsePDFToBlocksWithPdftotext(
             line.text.trim(),
             line.page,
             blocks.length,
-            line.origin,
           ),
         );
         lastPage = line.page;
@@ -3774,7 +3490,6 @@ async function parsePDFToBlocksWithPdftotext(
             line.text.trim(),
             line.page,
             blocks.length,
-            line.origin,
           ),
         );
         inAbstractBody = true;
@@ -3807,7 +3522,6 @@ async function parsePDFToBlocksWithPdftotext(
               headingText,
               line.page,
               blocks.length,
-              line.origin,
               undefined,
               deferSentenceSplitting,
             ),
@@ -3821,44 +3535,12 @@ async function parsePDFToBlocksWithPdftotext(
       // REFERENCES SECTION STATE - SKIP ALL LINE PROCESSING
       // ============================================================
       if (inReferencesSection) {
-        const headingText = line.text.trim();
-        const nextHeadingText = nextLine?.text.trim() || "";
-        const nextIsHeading = nextClassification === "heading";
-        const nextIsReferenceHeading =
-          nextIsHeading && isReferencesHeading(nextHeadingText);
-        const yGapToNext = nextLine ? nextLine.y - line.y : 0;
-        const hasHeadingGap = yGapToNext >= stats.medianLineHeight * 1.5;
-        const pageBreakToHeading =
-          nextLine && nextLine.page !== line.page && nextIsHeading;
-
-        // End references BEFORE creating/extending reference_block if a new section heading appears
-        if (
-          (nextIsHeading && !nextIsReferenceHeading && hasHeadingGap) ||
-          (pageBreakToHeading && !nextIsReferenceHeading)
-        ) {
-          referenceLines.push(line);
+        referenceLines.push(line);
+        // Create reference block at page breaks only
+        if (line.page !== nextLine?.page && referenceLines.length > 0) {
           flushReferenceBlock();
-          inReferencesSection = false;
-          continue;
         }
-
-        // End references when current line is an explicit non-reference section heading
-        if (isExplicitSectionHeading(headingText)) {
-          flushReferenceBlock();
-          inReferencesSection = false;
-          // fall through to normal heading processing
-        } else if (type === "heading" && !isReferencesHeading(headingText)) {
-          flushReferenceBlock();
-          inReferencesSection = false;
-          // fall through to normal heading processing
-        } else {
-          referenceLines.push(line);
-          // Create reference block at page breaks only
-          if (line.page !== nextLine?.page && referenceLines.length > 0) {
-            flushReferenceBlock();
-          }
-          continue; // ❗ Skip ALL further processing
-        }
+        continue; // ❗ Skip ALL further processing
       }
 
       // Heading processing with lookahead merge
@@ -3895,7 +3577,6 @@ async function parsePDFToBlocksWithPdftotext(
             headingText,
             line.page,
             blocks.length,
-            line.origin,
             undefined,
             deferSentenceSplitting,
           ),
@@ -3915,7 +3596,6 @@ async function parsePDFToBlocksWithPdftotext(
             line.text,
             line.page,
             blocks.length,
-            line.origin,
             undefined,
             deferSentenceSplitting,
           ),
@@ -3941,7 +3621,6 @@ async function parsePDFToBlocksWithPdftotext(
                 lastPage,
                 blocks.length,
                 undefined,
-                undefined,
                 deferSentenceSplitting,
               ),
             );
@@ -3958,7 +3637,6 @@ async function parsePDFToBlocksWithPdftotext(
               blockContent,
               line.page,
               blocks.length,
-              undefined,
               undefined,
               deferSentenceSplitting,
             ),
@@ -4001,7 +3679,6 @@ async function parsePDFToBlocksWithPdftotext(
                 lastPage,
                 blocks.length,
                 undefined,
-                undefined,
                 deferSentenceSplitting,
               ),
             );
@@ -4014,9 +3691,15 @@ async function parsePDFToBlocksWithPdftotext(
 
       lastPage = line.page;
     }
-
-    // Final flush for remaining content
+    // End of inner for loop - flush remaining content at cluster boundary
+    flushParagraph();
     flushAbstractBody();
+    flushReferenceBlock();
+  }
+  // End of cluster loop
+
+  // Final flush for remaining content (after all clusters)
+  flushAbstractBody();
     if (currentParaLines.length > 0) {
       const paraContent = joinLinesWithHyphenPreservation(currentParaLines);
       if (paraContent.length > 20) {
@@ -4026,7 +3709,6 @@ async function parsePDFToBlocksWithPdftotext(
             paraContent,
             lastPage,
             blocks.length,
-            undefined,
             undefined,
             deferSentenceSplitting,
           ),
@@ -4289,29 +3971,21 @@ export async function parsePDFWithArchetype(
     );
   }
 
-  // Step 4.5: Block-level post-processing (structural + academic-specific)
-  // Layer 1: Structural post-processing (all archetype-independent rules)
-  log(
-    `Step 4.5a: Applying block-level structural post-processing`,
-  );
-  const blocksAfterStructural = postProcessBlocksStructural(blocks, log);
-
-  // Layer 2: Academic-specific post-processing (running headers, profile-specific rules)
-  let blocksAfterPostProcess = blocksAfterStructural;
+  // Step 4.5: Block-level post-processing (header/footer removal, heading recovery)
+  // This applies to academic documents and handles:
+  // - Running header removal (global rule)
+  // - Running footer removal (global rule)
+  // - Essay-academic heading recovery (profile-specific)
   if (detectedArchetype.archetype === "academic") {
     log(
-      `Step 4.5b: Applying academic-specific post-processing (profile=${targetProfile})`,
+      `Step 4.5: Applying block-level post-processing (profile=${targetProfile})`,
     );
-    const blocksBeforeAcademic = blocksAfterStructural.length;
-    blocksAfterPostProcess = postProcessBlocksAcademic(blocksAfterStructural, targetProfile, log);
+    const blocksBeforePostProcess = blocks.length;
+    blocks = postProcessBlocksForEssayAcademic(blocks, targetProfile, log);
     log(
-      `Step 4.5b complete: ${blocksBeforeAcademic} -> ${blocksAfterPostProcess.length} blocks after academic filtering`,
+      `Step 4.5 complete: ${blocksBeforePostProcess} -> ${blocks.length} blocks after post-processing`,
     );
-  } else {
-    log(`Step 4.5b: Skipping academic-specific filtering (archetype=${detectedArchetype.archetype})`);
   }
-
-  blocks = blocksAfterPostProcess;
 
   // Step 5: Reprocess blocks with archetype-aware sentence splitting for ALL archetypes
   // Each archetype (academic, literary, essay, generic) has its own sentence splitting rules
@@ -4361,13 +4035,6 @@ export async function parsePDF(buffer: Buffer): Promise<string> {
 function isStandaloneParagraphCandidate(line: TextLine, stats: PDFStats): boolean {
   const text = line.text.trim();
   if (!text) return false;
-
-  // === PHASE-1 SAFETY GUARD ===
-  // Reject URL slug patterns (compensates for missing origin/bbox from PyMuPDF)
-  // These are typically footnote URLs or artifact fragments that should not be heading candidates
-  if (looksLikeHyphenatedSlug(text)) {
-    return false;
-  }
 
   // Must NOT look like a sentence
   if (/[.!?]["']?\s*$/.test(text)) return false;
