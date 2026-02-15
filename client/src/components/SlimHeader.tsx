@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Type, Palette, PanelRight, ChevronDown, Languages, BookPlus, Loader2, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, Type, Palette, PanelRight, ChevronDown, Languages, BookPlus, Loader2, Sparkles, Zap, Eye, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -149,31 +149,28 @@ export default function SlimHeader({
         transform transition-transform duration-300 ease-in-out
         ${isVisible ? 'translate-y-0' : '-translate-y-full'}
         ${className}
-        
-        /* Responsive height: larger on mobile for better touch targets */
-        h-12 max-[900px]:h-14
+        h-12 sm:h-12
       `}
       data-testid="slim-header"
     >
-      <div className="h-full flex items-center justify-between px-4 max-[900px]:px-3">
+      <div className="h-full flex items-center justify-between px-2 sm:px-4">
         {/* 좌측: 뒤로가기 + 제목/진행률 */}
-        <div className="flex items-center gap-2 max-[900px]:gap-3 flex-1 min-w-0">
+        <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0 overflow-hidden">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleBackToHome}
-            className="flex items-center gap-1 text-muted-foreground hover:text-foreground
-                       /* Mobile: larger touch target */
-                       max-[900px]:min-h-[44px] max-[900px]:min-w-[44px] max-[900px]:px-2"
+            className="flex items-center gap-1 text-muted-foreground hover:text-foreground shrink-0
+                       h-10 w-10 sm:h-auto sm:w-auto p-0 sm:px-3 sm:py-2 justify-center sm:justify-start"
             data-testid="button-back-to-home"
           >
-            <ArrowLeft className="h-4 w-4 max-[900px]:h-5 max-[900px]:w-5" />
+            <ArrowLeft className="h-5 w-5 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">{t('common.home')}</span>
           </Button>
           
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3">
-              <h1 className="text-sm font-medium truncate flex-1 text-foreground" title={title}>
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <h1 className="text-xs sm:text-sm font-medium truncate flex-1 text-foreground" title={title}>
                 {title}
               </h1>
               
@@ -244,13 +241,13 @@ export default function SlimHeader({
                   size="sm"
                   onClick={isAlreadyInLibrary ? () => setLocation('/library') : onAddToLibrary}
                   disabled={isAddingToLibrary}
-                  className="sm:hidden flex items-center justify-center h-8 w-8 rounded-full bg-muted hover:bg-muted/80 text-foreground"
+                  className="sm:hidden flex items-center justify-center h-7 w-7 rounded-full bg-muted hover:bg-muted/80 text-foreground shrink-0"
                   data-testid="button-save-to-library-mobile"
                 >
                   {isAddingToLibrary ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <BookPlus className="h-4 w-4" />
+                    <BookPlus className="h-3.5 w-3.5" />
                   )}
                 </Button>
               ) : (
@@ -259,13 +256,13 @@ export default function SlimHeader({
                   size="sm"
                   onClick={onTranslateDocument}
                   disabled={isTranslationComplete}
-                  className="sm:hidden flex items-center justify-center h-8 w-8 rounded-full bg-muted hover:bg-muted/80 text-foreground"
+                  className="sm:hidden flex items-center justify-center h-7 w-7 rounded-full bg-muted hover:bg-muted/80 text-foreground shrink-0"
                   data-testid="button-translate-all-mobile"
                 >
                   {isTranslating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <Languages className={`h-4 w-4 ${isTranslationComplete ? 'text-green-600 dark:text-green-400' : ''}`} />
+                    <Languages className={`h-3.5 w-3.5 ${isTranslationComplete ? 'text-green-600 dark:text-green-400' : ''}`} />
                   )}
                 </Button>
               )}
@@ -274,8 +271,8 @@ export default function SlimHeader({
         </div>
 
         {/* 우측: AI Tier Badge / View/Aa/Theme/Help */}
-        <div className="flex items-center gap-1 max-[900px]:gap-2 ml-3">
-          {/* AI Tier Badge */}
+        <div className="flex items-center gap-1 sm:gap-1 ml-2 sm:ml-3 shrink-0">
+          {/* AI Tier Badge - desktop only */}
           {aiTierInfo && (
             <div 
               className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${
@@ -295,19 +292,19 @@ export default function SlimHeader({
             </div>
           )}
           
-          {/* View Mode Dropdown */}
+          {/* === Desktop buttons (sm+) === */}
+          
+          {/* View Mode Dropdown - desktop */}
           <DropdownMenu modal={false} open={viewDropdownOpen} onOpenChange={setViewDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-1 text-xs text-foreground
-                           /* Mobile: larger touch target */
-                           max-[900px]:min-h-[44px] max-[900px]:min-w-[44px] max-[900px]:px-2"
+                className="hidden sm:flex items-center gap-1 text-xs text-foreground"
                 data-testid="dropdown-view-mode"
               >
-                <span className="hidden sm:inline">{t('viewerControls.viewMode')}</span>
-                <ChevronDown className="h-3 w-3 max-[900px]:h-4 max-[900px]:w-4 text-foreground" />
+                <span>{t('viewerControls.viewMode')}</span>
+                <ChevronDown className="h-3 w-3 text-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="z-[70]">
@@ -323,19 +320,17 @@ export default function SlimHeader({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Typography Settings (Aa) Popover */}
+          {/* Typography Settings (Aa) Popover - desktop */}
           <Popover open={typographyPopoverOpen} onOpenChange={setTypographyPopoverOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-1 text-foreground
-                           /* Mobile: larger touch target */
-                           max-[900px]:min-h-[44px] max-[900px]:min-w-[44px] max-[900px]:px-2"
+                className="hidden sm:flex items-center gap-1 text-foreground"
                 data-testid="popover-typography"
               >
-                <Type className="h-4 w-4 max-[900px]:h-5 max-[900px]:w-5 text-foreground" />
-                <span className="hidden sm:inline text-xs text-foreground">Aa</span>
+                <Type className="h-4 w-4 text-foreground" />
+                <span className="text-xs text-foreground">Aa</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 z-[70]" align="end">
@@ -416,17 +411,17 @@ export default function SlimHeader({
             </PopoverContent>
           </Popover>
 
-          {/* Theme Dropdown */}
+          {/* Theme Dropdown - desktop */}
           <DropdownMenu modal={false} open={themeDropdownOpen} onOpenChange={setThemeDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-1 text-foreground"
+                className="hidden sm:flex items-center gap-1 text-foreground"
                 data-testid="dropdown-theme"
               >
                 <Palette className="h-4 w-4 text-foreground" />
-                <span className="hidden sm:inline text-xs text-foreground">{t('common.theme')}</span>
+                <span className="text-xs text-foreground">{t('common.theme')}</span>
                 <ChevronDown className="h-3 w-3 text-foreground" />
               </Button>
             </DropdownMenuTrigger>
@@ -443,17 +438,82 @@ export default function SlimHeader({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Reader Panel Toggle Button */}
+          {/* Reader Panel Toggle - desktop */}
           <Button
             variant="ghost"
             size="sm"
             onClick={onToggleReaderPanel}
             data-testid="button-reader-panel"
-            className={`text-foreground ${isReaderPanelOpen ? 'bg-muted' : ''}`}
+            className={`hidden sm:flex text-foreground ${isReaderPanelOpen ? 'bg-muted' : ''}`}
             title={t('viewer.readerPanel')}
           >
             <PanelRight className="h-4 w-4 text-foreground" />
           </Button>
+
+          {/* === Mobile buttons (below sm) === */}
+          
+          {/* View Mode - mobile icon button */}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="sm:hidden flex items-center justify-center h-10 w-10 min-h-[44px] min-w-[44px] p-0 text-foreground"
+                data-testid="dropdown-view-mode-mobile"
+              >
+                <Eye className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="z-[70]">
+              {Object.entries(viewModeLabels).map(([mode, label]) => (
+                <DropdownMenuItem
+                  key={mode}
+                  onClick={() => onViewModeChange(mode as ViewMode)}
+                  className={viewMode === mode ? 'bg-accent' : ''}
+                >
+                  {label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* More menu (Aa + Theme + Panel) - mobile */}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="sm:hidden flex items-center justify-center h-10 w-10 min-h-[44px] min-w-[44px] p-0 text-foreground"
+                data-testid="dropdown-more-mobile"
+              >
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="z-[70] w-56">
+              <DropdownMenuItem onClick={() => setTypographyPopoverOpen(true)}>
+                <Type className="h-4 w-4 mr-2" />
+                {t('viewerControls.readerSettings')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t('common.theme')}</div>
+              {Object.entries(themeLabels).map(([themeKey, label]) => (
+                <DropdownMenuItem
+                  key={themeKey}
+                  onClick={() => onThemeChange?.(themeKey as any)}
+                  className={theme === themeKey ? 'bg-accent' : ''}
+                >
+                  <Palette className="h-4 w-4 mr-2" />
+                  {label}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onToggleReaderPanel}>
+                <PanelRight className="h-4 w-4 mr-2" />
+                {t('viewer.readerPanel')}
+                {isReaderPanelOpen && <span className="ml-auto text-xs text-muted-foreground">ON</span>}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
