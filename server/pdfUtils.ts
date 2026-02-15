@@ -3108,6 +3108,7 @@ async function parsePDFToBlocksWithPyMuPDF(
     }
 
     lastPage = line.page;
+    }
   }
 
   // Final flush for remaining content
@@ -3691,15 +3692,13 @@ async function parsePDFToBlocksWithPdftotext(
 
       lastPage = line.page;
     }
-    // End of inner for loop - flush remaining content at cluster boundary
+    // End of for loop - flush remaining content
     flushParagraph();
     flushAbstractBody();
     flushReferenceBlock();
-  }
-  // End of cluster loop
 
-  // Final flush for remaining content (after all clusters)
-  flushAbstractBody();
+    // Final flush for remaining content
+    flushAbstractBody();
     if (currentParaLines.length > 0) {
       const paraContent = joinLinesWithHyphenPreservation(currentParaLines);
       if (paraContent.length > 20) {
