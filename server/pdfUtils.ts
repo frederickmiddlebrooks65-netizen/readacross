@@ -2069,94 +2069,54 @@ function isSentenceContinuation(
   return false;
 }
 
-// Paragraph break detection with enhanced signals
-// parsingProfile: "journal" always breaks at page boundaries
-//                 "essay_academic" allows continuation across pages with strong signals
-// parsingStrictness: Controls threshold sensitivity for layout-based paragraph breaks
-//                    "strict" = aggressive breaks (lower thresholds)
-//                    "relaxed" = conservative breaks (higher thresholds)
-function shouldEndParagraphSimplified(
+// ============================================================
+// LAYOUT-ONLY PARAGRAPH BREAK (Stage 1 of 3-stage pipeline)
+// ============================================================
+// This function decides paragraph boundaries using ONLY layout signals.
+// It does NOT use sentence terminators or grammar cues.
+// Sentence-level concerns are handled in Stage 3 (sentence split).
+//
+// Layout signals used:
+// - y-gap between lines (vertical spacing)
+// - x-alignment difference (indent change)
+// - page boundary (as layout information, NOT automatic break)
+// - classification type changes (metadata, heading, etc.)
+//
+// Key design principle: "문단은 layout 기반, 문장은 grammar 기반"
+// ============================================================
+function shouldBreakCluster_Layout(
   currentLine: TextLine,
   nextLine: TextLine | undefined,
   currentClassification: LineClassification,
   nextClassification: LineClassification,
   stats: PDFStats,
-  parsingProfile: AcademicParsingProfile = "journal",
   parsingStrictness: AcademicParsingStrictness = "relaxed",
 ): boolean {
-  // 1) Sentence continuation check (early return false)
-  if (
-    nextLine &&
-    isSentenceContinuation(
-      currentLine,
-      nextLine,
-      currentClassification,
-      nextClassification,
-    )
-  ) {
-    // Debug: Log sentence continuation merging
-    if (currentLine.page !== nextLine.page) {
-      console.log(
-        `[SENTENCE_CONTINUATION] MERGE across page ${currentLine.page}->${nextLine.page}: "${currentLine.text.trim().substring(currentLine.text.trim().length - 30)}" -> "${nextLine.text.trim().substring(0, 30)}..."`,
-      );
-    }
-    return false;
-  }
-
-  // Debug: Log specific cases to trace page boundary issue
-  const curTextLower = currentLine.text.trim().toLowerCase();
-  const nextTextLower = nextLine?.text.trim().toLowerCase() || "";
-  if (
-    curTextLower.includes("nuance") ||
-    nextTextLower.includes("are preserved")
-  ) {
-    console.log(
-      `[DEBUG_SPECIFIC] curPage=${currentLine.page}, nextPage=${nextLine?.page}, curText="${currentLine.text.substring(0, 50)}...", nextText="${nextLine?.text.substring(0, 50) || ""}..."`,
-    );
-  }
-
-  // 2) Page boundary check
   if (!nextLine) {
-    const currentText = currentLine.text.trim();
-    const endsWithSentenceEnd =
-      SENTENCE_TERMINATOR_EXTENDED.test(currentText) &&
-      !COMMON_ABBREVIATIONS.test(currentText);
-    const endsWithColonOrSemicolon = /[:;]\s*$/.test(currentText);
-    const wordCount = currentText
-      .split(/\s+/)
-      .filter((w) => w.length > 0).length;
-    const hasUnclosedParen =
-      (currentText.match(/\(/g)?.length || 0) >
-        (currentText.match(/\)/g)?.length || 0) ||
-      (currentText.match(/\[/g)?.length || 0) >
-        (currentText.match(/\]/g)?.length || 0) ||
-      (currentText.match(/\{/g)?.length || 0) >
-        (currentText.match(/\}/g)?.length || 0);
-    const doubleQuoteCount =
-      (currentText.match(/["\u201C\u201D]/g)?.length || 0);
-    const hasUnclosedQuote = doubleQuoteCount % 2 === 1;
-    const isNonProseCurrent =
-      NON_PROSE_TYPES.includes(currentClassification) ||
-      currentClassification === "heading" ||
-      currentClassification === "document_title";
-    const isHangingSentence =
-      !isNonProseCurrent &&
-      !endsWithSentenceEnd &&
-      !endsWithColonOrSemicolon &&
-      !hasUnclosedParen &&
-      !hasUnclosedQuote &&
-      wordCount >= 3;
-
-    // IMPORTANT:
-    // Colon handling must NEVER merge already-finalized sentences.
-    // Sentence splitting is strictly left-to-right and irreversible.
-    // If we lack a next prose line but current line is hanging, merge conservatively.
-    if (isHangingSentence) return false;
     return true;
   }
+
+  // Structural/metadata type boundaries always break clusters
+  const metadataTypes: string[] = ["document_title", "abstract_label", "footnote", "doi", "author", "journal", "affiliation"];
+  if (metadataTypes.includes(nextClassification)) return true;
+  if (metadataTypes.includes(currentClassification) && !metadataTypes.includes(nextClassification)) return true;
+
+  // Heading boundary: if next line is classified as heading, break
+  if (nextClassification === "heading") return true;
+  if (currentClassification === "heading") return true;
+
+  // Page boundary: treat as layout information, NOT automatic break
+  // Only break if there's no evidence of continuation
   if (currentLine.page !== nextLine.page) {
     const curText = currentLine.text.trim();
     const nxtText = nextLine.text.trim();
+
+    // Hyphen break at end of line = clear word-level continuation
+    if (/-\s*$/.test(curText)) {
+      return false;
+    }
+
+    // Check if current line looks incomplete (no sentence terminator, no colon)
     const lineTerminated =
       SENTENCE_TERMINATOR_EXTENDED.test(curText) &&
       !COMMON_ABBREVIATIONS.test(curText);
@@ -2168,107 +2128,67 @@ function shouldEndParagraphSimplified(
         /^(and|or|but|nor|yet|so|that|which|who|whom|whose|where|when|while|because|since|although|though|if|as|to|of|in|on|at|by|with|from|for|into|onto|upon|depending|including|may|might|can|could|should|would|will|shall|must|also|then|thus|hence|thereby|furthermore|moreover|however|nevertheless|nonetheless|whereas|whether|unless|until|after|before|during|between|through|within|without|against|among|beyond|despite|regarding|especially|particularly|specifically)\b/i.test(
           nxtText,
         );
-
       if (nextStartsLower || nextStartsWithContinuationWord) {
-        console.log(
-          `[PAGE_BOUNDARY_CONTINUE] Incomplete sentence at page ${currentLine.page}->${nextLine.page}: "${curText.substring(Math.max(0, curText.length - 40))}" -> "${nxtText.substring(0, 40)}" -> CONTINUE`,
-        );
         return false;
       }
     }
 
-    console.log(
-      `[PAGE_BOUNDARY_BREAK] page ${currentLine.page}->${nextLine.page} -> BREAK`,
-    );
-    return true;
+    // Page boundary with terminated line: check layout for actual paragraph break
+    // Instead of automatic break, use y-gap from first line of next page
+    // If the next content starts at a similar x-position, it's likely continuation
+    if (lineTerminated) {
+      // Terminated sentence at page boundary: break by default (new paragraph likely)
+      return true;
+    }
+
+    // Ambiguous: unterminated but next doesn't start lowercase
+    // Use conservative approach: don't break (let layout decide on same-page)
+    return false;
   }
 
-  // 3) Structural/metadata break checks
-  if (nextClassification === "document_title") return true;
-  if (nextClassification === "abstract_label") return true;
-  if (nextClassification === "footnote") return true;
-  if (["doi", "author", "journal", "affiliation"].includes(nextClassification))
-    return true;
-
-  // 4) Sentence termination gate
-  const currentText = currentLine.text.trim();
-  const nextText = nextLine.text.trim();
-  const endsWithSentenceEnd =
-    SENTENCE_TERMINATOR_EXTENDED.test(currentText) &&
-    !COMMON_ABBREVIATIONS.test(currentText);
-  if (!endsWithSentenceEnd) return false;
-  if (/:\s*$/.test(currentText)) return false;
-  if (/^[a-z(]/.test(nextText)) return false;
-  // List continuation protection
-  if (/^[•\-\*]/.test(currentText) || /^[•\-\*]/.test(nextText)) return false;
-  if (/[,;]\s*$/.test(currentText)) return false;
-  if (/\band\s*$/.test(currentText.toLowerCase())) return false;
-
-  // 5) Heading candidate detection (content-based, before layout checks)
-  // Short noun phrases without terminal punctuation that start with uppercase
-  // are likely section headings — force break even when yGap < threshold
-  // Safety: requires yGap > 1.2x median to avoid false positives on normal body lines
-  const nextWords = nextText.split(/\s+/);
-  const preLayoutYGap = nextLine.y - currentLine.y;
-  const mildGapPresent = preLayoutYGap > stats.medianLineHeight * 1.2;
-  const looksLikeHeading =
-    mildGapPresent &&
-    nextText.length > 0 &&
-    nextText.length < 60 &&
-    nextWords.length <= 7 &&
-    /^[A-Z]/.test(nextText) &&
-    !/[.?!:;,]$/.test(nextText) &&
-    !/^\d+\.?\s/.test(nextText) &&
-    !/^(The|A|An|In|On|At|For|With|By|To|From|And|But|Or|If|As|It|This|That|These|Those|However|Therefore|Moreover|Furthermore|Nevertheless|Although|While|Since|Because|After|Before|During|Between|Through|Within|Without|Against|Among|Beyond|Despite|Regarding|Including|According)\s/i.test(nextText);
-
-  if (looksLikeHeading) {
-    console.log(
-      `[HEADING_CANDIDATE_BREAK] next="${nextText}" (${nextText.length} chars, ${nextWords.length} words, yGap=${preLayoutYGap.toFixed(1)}) -> FORCED BREAK`,
-    );
-    return true;
-  }
-
-  // 6) Layout-only checks (yGap, xDiff)
-  const xDiff = Math.abs(nextLine.xStart - currentLine.xStart);
+  // Same-page layout checks: y-gap and x-alignment
   const yGap = nextLine.y - currentLine.y;
+  const xDiff = Math.abs(nextLine.xStart - currentLine.xStart);
   const isStrict = parsingStrictness === "strict";
+
+  // y-gap threshold: larger gap = paragraph break
   const yGapThreshold = isStrict
     ? stats.medianLineHeight * 1.5
     : stats.medianLineHeight * 2.0;
+
+  // x-alignment threshold: significant indent change = paragraph break
   const xDiffThreshold = isStrict
     ? stats.medianBodyFont * 1.2
     : stats.medianBodyFont * 1.5;
-  const debugInfo = `xDiff=${xDiff.toFixed(1)}, yGap=${yGap.toFixed(1)}, yThreshold=${yGapThreshold.toFixed(1)} (${parsingStrictness}), xThreshold=${xDiffThreshold.toFixed(1)} (${parsingStrictness})`;
-  console.log(
-    `[PARA_CHECK] cur="${currentText.substring(0, 35)}..." | next="${nextText.substring(0, 35)}..." | ${debugInfo}`,
-  );
 
-  // Enhanced y-gap standalone separation (strictness-controlled threshold)
   if (yGap >= yGapThreshold) {
-    const nextIsShort = nextText.length < 60;
-    const nextHasLargerFont =
-      nextLine.fontHeight >= stats.medianBodyFont * 1.05;
-    const hasXStartChange = xDiff > stats.medianBodyFont * 1.5;
-    if (nextIsShort || nextHasLargerFont || hasXStartChange) {
-      console.log(
-        `[PARA_BREAK] yGap=${yGap.toFixed(1)} >= ${yGapThreshold.toFixed(1)} (${parsingStrictness}) with secondary signal -> BREAK`,
-      );
-      return true;
-    }
-  }
-  if (yGap >= yGapThreshold) {
-    console.log(
-      `[PARA_BREAK] yGap=${yGap.toFixed(1)} >= ${yGapThreshold.toFixed(1)} (${parsingStrictness}) -> BREAK`,
-    );
     return true;
   }
   if (xDiff >= xDiffThreshold) {
-    console.log(
-      `[PARA_BREAK] xDiff=${xDiff.toFixed(1)} >= ${xDiffThreshold.toFixed(1)} (${parsingStrictness}) -> BREAK`,
-    );
     return true;
   }
+
   return false;
+}
+
+// Legacy wrapper for backward compatibility
+function shouldEndParagraphSimplified(
+  currentLine: TextLine,
+  nextLine: TextLine | undefined,
+  currentClassification: LineClassification,
+  nextClassification: LineClassification,
+  stats: PDFStats,
+  parsingProfile: AcademicParsingProfile = "journal",
+  parsingStrictness: AcademicParsingStrictness = "relaxed",
+): boolean {
+  return shouldBreakCluster_Layout(
+    currentLine,
+    nextLine,
+    currentClassification,
+    nextClassification,
+    stats,
+    parsingStrictness,
+  );
 }
 
 // Helper to generate sentences from content
@@ -2720,15 +2640,7 @@ async function parsePDFToBlocksWithPyMuPDF(
     return { line: undefined, classification: undefined, index: -1 };
   };
 
-  // Track indices that have been pulled into previous paragraphs (for page boundary continuation)
-  const processedIndices = new Set<number>();
-
   for (let i = 0; i < lines.length; i++) {
-    // Skip lines that were already pulled into a previous paragraph
-    if (processedIndices.has(i)) {
-      continue;
-    }
-
     const line = lines[i];
     // CRITICAL: Definite headings override classifiedTypes
     // This ensures ALL CAPS standalone headings like "CONCLUSIONS" are treated as headings
@@ -3221,20 +3133,7 @@ async function parsePDFToBlocksWithPyMuPDF(
           `[PARAGRAPH_PATH] Line added: shouldSplit=${shouldSplit}, currentParaLines.length=${currentParaLines.length}, text="${line.text.substring(0, 60)}..."`,
         );
       }
-      // Regular paragraph processing
-      // ============================================================
-      // LAYOUT-BASED PARAGRAPH BOUNDARIES (per user principle)
-      // ============================================================
-      // Paragraphs contain MULTIPLE sentences. A sentence ending does NOT
-      // indicate a paragraph break. Only LAYOUT signals (indent, gap, heading)
-      // should trigger paragraph breaks.
-      //
-      // REMOVED: "sentence ends → flush" logic (caused false positives)
-      // A paragraph like "Sentence one. Sentence two. Sentence three." must
-      // stay as ONE block, not split into 3 separate paragraphs.
       const lineText = line.text.trim();
-      const lineEndsSentence = /[.!?]["'\u201D\u2019]?\s*$/.test(lineText);
-      const lineIsIncomplete = !lineEndsSentence && !/:\s*$/.test(lineText);
       const nextHeadingText = nextLine?.text.trim() || "";
       const nextIsHeading = nextClassification === "heading";
       const nextIsReferenceHeading = nextIsHeading && isReferencesHeading(nextHeadingText);
@@ -3244,7 +3143,6 @@ async function parsePDFToBlocksWithPyMuPDF(
         nextLine && nextLine.page !== line.page && nextIsHeading;
 
       if (inReferencesSection) {
-        // End references if a new section heading appears
         if (
           (nextIsHeading && !nextIsReferenceHeading && hasHeadingGap) ||
           (pageBreakToHeading && !nextIsReferenceHeading)
@@ -3258,90 +3156,19 @@ async function parsePDFToBlocksWithPyMuPDF(
         if ((type as string) === "heading" && !isReferencesHeading(lineText)) {
           flushReferenceBlock();
           inReferencesSection = false;
-          // fall through to normal heading processing
         } else {
           referenceLines.push(line);
-          // Create reference block at page breaks only
           if (line.page !== nextLine?.page && referenceLines.length > 0) {
             flushReferenceBlock();
           }
-          continue; // Skip ALL further processing - no classification, no heading, no paragraph logic
+          continue;
         }
       }
 
       currentParaLines.push(line);
 
-      // Only flush when shouldSplit is true (layout-based conditions)
-      // NOT when sentence ends - that would create false positives
       if (shouldSplit && currentParaLines.length > 0) {
         flushParagraph();
-      } else if (!shouldSplit) {
-        // Line is incomplete - check for page boundary continuation
-        if (lineIsIncomplete && nextLine && nextLine.page !== line.page) {
-          // We're at a page boundary with incomplete sentence
-          // Pull in all continuation lines until sentence completes or we hit a real break
-          let pullIdx = effective.index;
-          while (pullIdx < lines.length && pullIdx >= 0) {
-            const pullLine = lines[pullIdx];
-            const pullType = classifiedTypes[pullIdx];
-
-            // Skip header/footer/footnote/metadata - they're not content
-            if (
-              [
-                "header",
-                "footer",
-                "footnote",
-                "doi",
-                "author",
-                "journal",
-                "affiliation",
-              ].includes(pullType)
-            ) {
-              pullIdx++;
-              continue;
-            }
-
-            // Skip "heading" if previous paragraph line is incomplete
-            // (real headings only come after complete sentences)
-            if (pullType === "heading") {
-              const lastPulled = currentParaLines[currentParaLines.length - 1];
-              const lastPulledText = lastPulled.text.trim();
-              const lastPulledIncomplete =
-                !/[.!?]["'\u201D\u2019]?\s*$/.test(lastPulledText) &&
-                !/:\s*$/.test(lastPulledText);
-              if (lastPulledIncomplete) {
-                debugLog(
-                  `[PAGE_BOUNDARY_SKIP_HEADING] Skipping "${pullLine.text.trim().substring(0, 40)}..." (last line incomplete)`,
-                );
-                pullIdx++;
-                continue;
-              }
-            }
-
-            // Found a content line - add it to current paragraph
-            debugLog(
-              `[PAGE_BOUNDARY_PULL] Pulling "${pullLine.text.trim().substring(0, 50)}..." into paragraph`,
-            );
-            currentParaLines.push(pullLine);
-
-            // Mark this line as processed (skip in main loop)
-            processedIndices.add(pullIdx);
-
-            // Check if this line completes the sentence
-            const pullText = pullLine.text.trim();
-            const pullComplete =
-              /[.!?]["'\u201D\u2019]?\s*$/.test(pullText) ||
-              /:\s*$/.test(pullText);
-            if (pullComplete) {
-              debugLog(
-                `[PAGE_BOUNDARY_COMPLETE] Sentence complete at "${pullText.substring(Math.max(0, pullText.length - 40))}"`,
-              );
-              break;
-            }
-
-            pullIdx++;
-          }
-        }
       }
     }
 
