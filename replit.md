@@ -41,6 +41,19 @@ The PDF processing pipeline prioritizes stable position anchoring with a 2-track
 
 ## Recent Changes
 
+### 2026-02-15: 3-Stage PDF Paragraph Pipeline (Layout-First Architecture)
+- **Root Cause**: `shouldEndParagraphSimplified` conflated layout, grammar, and classification signals in a single function, causing mid-sentence splits and table/reference fragmentation
+- **Architecture**: Implemented Option B — 3-stage pipeline separating concerns:
+  1. **Stage 1 (Layout Clustering)**: `shouldBreakCluster_Layout` uses ONLY layout signals (y-gap, x-alignment, indent, page boundary as layout info) — no sentence terminators
+  2. **Stage 2 (Structural Correction)**: Post-processing for heading/reference corrections (pending)
+  3. **Stage 3 (Sentence Split)**: Grammar-based sentence splitting within layout clusters (pending)
+- **Key Removals**:
+  - Removed sentence-terminator-based page boundary continuation pull logic from main loop (lines 3200-3263)
+  - Removed `processedIndices` tracking set (no longer needed without pull logic)
+  - Removed `lineIsIncomplete`/`lineEndsSentence` variables from main paragraph processing
+- **Design Principle**: "문단은 layout 기반, 문장은 grammar 기반" — paragraph boundaries from layout, sentence boundaries from grammar, processed in separate stages
+- **Files Changed**: `server/pdfUtils.ts`
+
 ### 2026-02-12: Beta Pro Plan for Private Beta
 - **New Plan**: `beta_pro` added to plan enum in `shared/schema.ts`
 - **Behavior**: Identical to `pro` plan (500K tokens, 200K premium cap, unlimited docs/OCR, export enabled, premium model)
