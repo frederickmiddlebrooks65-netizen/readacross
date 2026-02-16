@@ -589,15 +589,56 @@ export function postProcessBlocksAcademic(
     blocksByPage.get(block.page)!.push(block);
   }
 
+  // === Universal Running Header/Footer Removal (all academic profiles) ===
+  // Rule: same normalized text appearing on 3+ distinct pages, length 20-120 chars,
+  // in top 12% of page → drop regardless of block type.
+  // This catches paper titles used as running headers across all profiles.
+  const universalRunningHeaders = new Set<string>();
+  for (const [text, pages] of Array.from(blockTextPages.entries())) {
+    if (pages.size >= 3 && text.length >= 20 && text.length <= 120) {
+      let topZoneCount = 0;
+      for (const page of Array.from(pages)) {
+        const pageBlocks = blocksByPage.get(page) || [];
+        for (const b of pageBlocks) {
+          if (b.content.trim().toLowerCase() === text) {
+            if (b.origin) {
+              const yRatio = b.origin.bbox[1] / 792;
+              if (yRatio < 0.12) topZoneCount++;
+            } else {
+              const idx = pageBlocks.indexOf(b);
+              if (idx <= 1) topZoneCount++;
+            }
+          }
+        }
+      }
+      if (topZoneCount >= 3) {
+        universalRunningHeaders.add(text);
+        log(`[Academic] Universal running header (${pages.size} pages): "${text.substring(0, 60)}..."`);
+      }
+    }
+  }
+
+  // Pre-filter universal running headers before profile-specific logic
+  const preFilteredBlocks = universalRunningHeaders.size > 0
+    ? blocks.filter((block) => {
+        const normalizedText = block.content.trim().toLowerCase();
+        if (universalRunningHeaders.has(normalizedText)) {
+          log(`[Academic] Removing universal running header: "${block.content.substring(0, 60)}..."`);
+          return false;
+        }
+        return true;
+      })
+    : blocks;
+
   // === Academic Profile-Based Filtering ===
   // Pattern: essay_academic uses aggressive pattern-based detection
-  // journal uses conservative repetition-based detection
+  // journal/arxiv uses conservative repetition-based detection
 
   let filteredBlocks: Block[];
 
   if (parsingProfile === "essay_academic") {
     // Essay-academic: Pattern-based immediate removal
-    filteredBlocks = blocks.filter((block) => {
+    filteredBlocks = preFilteredBlocks.filter((block) => {
       const text = block.content.trim();
       const normalizedText = text.toLowerCase();
 
@@ -656,7 +697,7 @@ export function postProcessBlocksAcademic(
       return true;
     });
   } else {
-    // Journal profile: Repetition-based detection
+    // Journal/arxiv profile: Repetition-based detection
     const runningHeaderTexts = new Set<string>();
     const requiredPageCount = 2;
     const headerYThreshold = 0.08;
@@ -723,7 +764,7 @@ export function postProcessBlocksAcademic(
       }
     }
 
-    filteredBlocks = blocks.filter((block) => {
+    filteredBlocks = preFilteredBlocks.filter((block) => {
       const normalizedText = block.content.trim().toLowerCase();
       if (runningHeaderTexts.has(normalizedText)) {
         log(
