@@ -218,14 +218,14 @@ function createBlock(
     normalizedContent = normalizeHeadingLikeText(content);
   }
 
-  if (["reference_block"].includes(type)) {
+  if (["reference_block", "table"].includes(type)) {
     return createNonSemanticBlock(
       type as NonSemanticBlockType,
       content,
       page,
       order,
       origin,
-      true,
+      type === "reference_block",
     );
   }
 
@@ -597,6 +597,34 @@ async function parsePDFToBlocksWithPyMuPDF(
       } else {
         continue;
       }
+    }
+
+    // Table lines: group into non-semantic table blocks
+    if (line.isTable) {
+      flushParagraph();
+      flushAbstractBody();
+      // Collect consecutive table lines into a single table block
+      const tableLines: TextLine[] = [line];
+      let j = i + 1;
+      while (j < lines.length && lines[j].isTable) {
+        tableLines.push(lines[j]);
+        processedIndices.add(j);
+        j++;
+      }
+      const tableContent = tableLines.map((l) => l.text).join("\n");
+      blocks.push(
+        createNonSemanticBlock(
+          "table",
+          tableContent,
+          line.page,
+          blocks.length,
+          line.origin,
+          false,
+        ),
+      );
+      debugLog(`[TABLE_BLOCK] Created table block on page ${line.page} with ${tableLines.length} lines`);
+      lastPage = line.page;
+      continue;
     }
 
     if (type === "doi") {

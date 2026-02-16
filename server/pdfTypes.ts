@@ -24,7 +24,8 @@ export type MetadataBlockType =
 
 // Non-semantic block types (Phase 2-3a: excluded from sentence model entirely)
 // reference_block: References/Bibliography section - no sentence parsing, no TM storage
-export type NonSemanticBlockType = "reference_block";
+// table: Detected table region - no sentence parsing, no translation
+export type NonSemanticBlockType = "reference_block" | "table";
 
 // Translatable block types (own sentences[])
 // document_title: highest-level translatable block, detected on page 1, largest font
