@@ -647,8 +647,11 @@ export function postProcessBlocksAcademic(
   }
 
   // Pre-filter universal running headers before profile-specific logic
+  // IMPORTANT: Never remove heading blocks — they may share text with running headers
+  // (e.g., paper title used as both section heading and page running header)
   const preFilteredBlocks = universalRunningHeaders.size > 0
     ? blocks.filter((block) => {
+        if (block.type === "heading") return true;
         const normalizedText = block.content.trim().toLowerCase();
         if (universalRunningHeaders.has(normalizedText)) {
           log(`[Academic] Removing universal running header: "${block.content.substring(0, 60)}..."`);
@@ -667,6 +670,7 @@ export function postProcessBlocksAcademic(
   if (parsingProfile === "essay_academic") {
     // Essay-academic: Pattern-based immediate removal
     filteredBlocks = preFilteredBlocks.filter((block) => {
+      if (block.type === "heading") return true;
       const text = block.content.trim();
       const normalizedText = text.toLowerCase();
 
@@ -793,6 +797,7 @@ export function postProcessBlocksAcademic(
     }
 
     filteredBlocks = preFilteredBlocks.filter((block) => {
+      if (block.type === "heading") return true;
       const normalizedText = block.content.trim().toLowerCase();
       if (runningHeaderTexts.has(normalizedText)) {
         log(
