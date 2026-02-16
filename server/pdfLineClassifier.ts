@@ -618,6 +618,13 @@ export function classifyLineSimplified(
       return "heading";
     }
 
+    // Standalone section number extracted separately from heading text
+    // e.g., "4", "4.1", "3.2" when PDF separates number from title
+    const isStandaloneSectionNumber = /^\d+(\.\d+)*$/.test(text);
+    if (isStandaloneSectionNumber) {
+      return "heading";
+    }
+
     return "paragraph";
   } else if (isEssayAcademic) {
     // ============================================================

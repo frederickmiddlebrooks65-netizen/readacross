@@ -812,6 +812,20 @@ async function parsePDFToBlocksWithPyMuPDF(
       flushReferenceBlock();
 
       let headingText = line.text.trim();
+
+      // Merge with previous block if it's a standalone section number heading
+      // e.g., previous block "4" or "4.1" + current line "Provocations from..."
+      if (blocks.length > 0) {
+        const prevBlock = blocks[blocks.length - 1];
+        if (
+          prevBlock.type === "heading" &&
+          /^\d+(\.\d+)*$/.test(prevBlock.content.trim())
+        ) {
+          headingText = prevBlock.content.trim() + " " + headingText;
+          blocks.pop();
+        }
+      }
+
       let j = i;
       while (j + 1 < lines.length) {
         const nextCand = lines[j + 1];
