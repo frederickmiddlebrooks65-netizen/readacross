@@ -17,11 +17,18 @@ export interface TextLine {
   text: string;
   fontHeight: number;
   origin?: { page: number; bbox: [number, number, number, number] };
+  isTable?: boolean;
+}
+
+export interface TableBbox {
+  page: number;
+  bbox: [number, number, number, number]; // [x0, y0, x1, y1]
 }
 
 export interface PyMuPDFResult {
   lines: TextLine[];
   pageHeights: Record<number, number>;
+  tableBboxes: TableBbox[];
   extractorVersion: string;
   error?: string;
 }

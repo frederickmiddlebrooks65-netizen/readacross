@@ -381,6 +381,26 @@ async function parsePDFToBlocksWithPyMuPDF(
     },
   }));
 
+  // Mark lines that fall inside detected table bounding boxes
+  const tableBboxes = result.tableBboxes || [];
+  if (tableBboxes.length > 0) {
+    for (const line of lines) {
+      const lineMidY = line.y + line.fontHeight / 2;
+      for (const tb of tableBboxes) {
+        if (
+          line.page === tb.page &&
+          line.xStart >= tb.bbox[0] - 2 &&
+          line.xEnd <= tb.bbox[2] + 2 &&
+          lineMidY >= tb.bbox[1] - 2 &&
+          lineMidY <= tb.bbox[3] + 2
+        ) {
+          line.isTable = true;
+          break;
+        }
+      }
+    }
+  }
+
   const stats = calculateStatsFromLines(lines, result.pageHeights);
 
   const fsModule = await import("fs");
