@@ -237,9 +237,13 @@ export function classifyLineSimplified(
   }
 
   // Journal/Volume/Issue metadata - typically in first page header zone
+  // NOTE: "issue" and "no" require adjacent numbers to avoid false positives
+  // on body text like "social issue" or "no evidence"
   const isJournalMeta =
-    (/\b(volume|vol\.?|issue|no\.?|pp\.?|pages)\b/i.test(text) &&
+    (/\b(volume|vol\.?|pp\.?|pages)\b/i.test(text) &&
       text.length < 100) ||
+    (/\bissue\s*#?\s*\d/i.test(text) && text.length < 100) ||
+    (/\bno\.\s*\d/i.test(text) && text.length < 100) ||
     (/\b(journal|proceedings|transactions|letters|review)\b/i.test(text) &&
       /\b\d{4}\b/.test(text) &&
       text.length < 120) ||

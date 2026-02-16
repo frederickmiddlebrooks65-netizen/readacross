@@ -80,8 +80,8 @@ export function shouldEndParagraphSimplified(
   // ------------------------------------
   if (parsingProfile === "arxiv") {
 
-    // Continuation takes priority over everything (including structural breaks)
-    // This prevents mid-sentence splits at page boundaries or misclassified lines
+    if (isStructuralBreak) return true;
+
     if (
       isSentenceContinuation(
         currentLine,
@@ -92,8 +92,6 @@ export function shouldEndParagraphSimplified(
     ) {
       return false;
     }
-
-    if (isStructuralBreak) return true;
 
     if (strongLayoutBreak) return true;
 
