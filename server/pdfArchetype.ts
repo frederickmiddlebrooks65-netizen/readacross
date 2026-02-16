@@ -488,6 +488,34 @@ export function postProcessBlocksStructural(
       continue;
     }
 
+    // === PROTECTION 5: Table/List Cluster Detection ===
+    // When multiple consecutive very short blocks appear, they're likely
+    // table cells or list items, not headings. Check surrounding blocks.
+    const nearbyShortCount = (() => {
+      let count = 0;
+      const windowSize = 4;
+      for (let j = Math.max(0, i - windowSize); j <= Math.min(blocks.length - 1, i + windowSize); j++) {
+        if (j === i) continue;
+        const neighbor = blocks[j];
+        const nText = neighbor.content.trim();
+        if (nText.length <= 60 && !/[.!?]\s*$/.test(nText)) {
+          count++;
+        }
+      }
+      return count;
+    })();
+
+    if (nearbyShortCount >= 3 && text.length <= 40) {
+      log(`[Structural_SKIP] table/list cluster (${nearbyShortCount} nearby short blocks): "${text.substring(0, 40)}"`);
+      continue;
+    }
+
+    // === PROTECTION 6: Single-word blocks (likely table cells) ===
+    if (text.split(/\s+/).length <= 1 && text.length <= 20) {
+      log(`[Structural_SKIP] single-word block (table cell candidate): "${text}"`);
+      continue;
+    }
+
     // === PROMOTION CRITERIA: Structural Context ===
     // Block qualifies for heading promotion if:
     // 1. It is visually isolated (standalone or surrounded by paragraphs)
