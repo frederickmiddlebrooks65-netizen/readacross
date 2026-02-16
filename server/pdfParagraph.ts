@@ -111,29 +111,16 @@ export function shouldEndParagraphSimplified(
       return false;
     }
 
-    // Visual paragraph boundary detection for same-page, non-continuation lines
-    const currentLineWidth = currentLine.xEnd - currentLine.xStart;
-    const shortLineRatio = stats.bodyMedianWidth > 0
-      ? currentLineWidth / stats.bodyMedianWidth
-      : 1;
+    // Visual paragraph boundary: sentence terminator + layout signal
     const endsWithTerminator = /[.?!)\]"'\u201D\u2019]\s*$/.test(currentText);
-    const nextIndent = nextLine.xStart - currentLine.xStart;
-    const indentThreshold = stats.medianBodyFont * 0.8;
-
-    if (endsWithTerminator && shortLineRatio < 0.78) {
-      return true;
-    }
-
-    if (endsWithTerminator && nextIndent >= indentThreshold) {
-      return true;
-    }
-
-    if (shortLineRatio < 0.60 && nextIndent >= indentThreshold) {
-      return true;
-    }
-
-    if (looksLikeHeading && endsWithTerminator) {
-      return true;
+    if (endsWithTerminator) {
+      const currentLineWidth = currentLine.xEnd - currentLine.xStart;
+      const shortLine = stats.bodyMedianWidth > 0 && currentLineWidth / stats.bodyMedianWidth < 0.78;
+      const nextIndent = nextLine.xStart - currentLine.xStart;
+      const hasIndent = nextIndent >= stats.medianBodyFont * 0.8;
+      if (shortLine || hasIndent) {
+        return true;
+      }
     }
 
     return false;
