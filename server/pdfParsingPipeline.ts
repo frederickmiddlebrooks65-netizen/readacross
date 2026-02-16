@@ -310,7 +310,7 @@ function shouldMergeHeadingContinuation(
       nextText.length <= 120 &&
       !/[.!?]["']?\s*$/.test(nextText) &&
       /^[A-Z]/.test(nextText);
-    const gapOk = gap > 0 && gap <= stats.medianLineHeight * 8;
+    const gapOk = gap >= 0 && gap <= stats.medianLineHeight * 8;
     return nextLooksHeadingText && gapOk;
   }
 
@@ -968,7 +968,11 @@ async function parsePDFToBlocksWithPyMuPDF(
         )
           break;
 
-        if (!shouldMergeHeadingContinuation(lines[j], nextCand, stats)) break;
+        const mergeResult = shouldMergeHeadingContinuation(lines[j], nextCand, stats);
+        if (!mergeResult) {
+          debugLog(`[HEADING_MERGE_FAIL] "${lines[j].text.trim().substring(0, 40)}" → "${nextCand.text.trim().substring(0, 40)}" merge=false, nextType="${nextCandType}", gap=${(nextCand.y - lines[j].y).toFixed(1)}, fontCur=${lines[j].fontHeight.toFixed(1)}, fontNext=${nextCand.fontHeight.toFixed(1)}, medianBody=${stats.medianBodyFont.toFixed(1)}, medianLH=${stats.medianLineHeight.toFixed(1)}`);
+          break;
+        }
 
         headingText = mergeLineTexts(headingText, nextCand.text.trim(), true);
         j++;
