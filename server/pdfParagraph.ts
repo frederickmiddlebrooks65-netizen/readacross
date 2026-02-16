@@ -76,6 +76,45 @@ export function shouldEndParagraphSimplified(
   }
 
   // ------------------------------------
+  // ARXIV PROFILE (hybrid: layout with page-boundary tolerance)
+  // ------------------------------------
+  if (parsingProfile === "arxiv") {
+
+    if (isStructuralBreak) return true;
+
+    if (currentLine.page !== nextLine.page) {
+      if (strongLayoutBreak) return true;
+      if (looksLikeHeading) return true;
+      if (
+        isSentenceContinuation(
+          currentLine,
+          nextLine,
+          currentClassification,
+          nextClassification,
+        )
+      ) {
+        return false;
+      }
+      return true;
+    }
+
+    if (strongLayoutBreak) return true;
+
+    if (
+      isSentenceContinuation(
+        currentLine,
+        nextLine,
+        currentClassification,
+        nextClassification,
+      )
+    ) {
+      return false;
+    }
+
+    return false;
+  }
+
+  // ------------------------------------
   // ESSAY_ACADEMIC PROFILE (grammar-first)
   // ------------------------------------
   if (parsingProfile === "essay_academic") {
