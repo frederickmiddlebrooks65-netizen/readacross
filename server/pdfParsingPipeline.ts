@@ -1112,7 +1112,85 @@ async function parsePDFToBlocksWithPyMuPDF(
       currentParaLines.push(line);
 
       if (shouldSplit && currentParaLines.length > 0) {
-        flushParagraph();
+        if (effective.skippedTable && lineIsIncomplete) {
+          let pullIdx = effective.index;
+          const tableCaptionPattern = /^(Table|Figure|Fig\.)\s+\d+/i;
+          const captionLines: TextLine[] = [];
+          let foundBodyContinuation = false;
+
+          while (pullIdx < lines.length) {
+            const pullLine = lines[pullIdx];
+            const pullType = classifiedTypes[pullIdx];
+
+            if (pullLine.isTable) {
+              pullIdx++;
+              continue;
+            }
+
+            if (
+              ["header", "footer", "footnote", "doi", "author", "journal", "affiliation"].includes(pullType)
+            ) {
+              pullIdx++;
+              continue;
+            }
+
+            const pullText = pullLine.text.trim();
+
+            if (tableCaptionPattern.test(pullText)) {
+              captionLines.push(pullLine);
+              processedIndices.add(pullIdx);
+              pullIdx++;
+              continue;
+            }
+
+            const startsLowercase = /^[a-z]/.test(pullText);
+            if (startsLowercase) {
+              foundBodyContinuation = true;
+              debugLog(
+                `[TABLE_PULL_FORWARD] Pulling post-table continuation: "${pullText.substring(0, 60)}..."`,
+              );
+              currentParaLines.push(pullLine);
+              processedIndices.add(pullIdx);
+
+              const pullComplete =
+                /[.!?]["'\u201D\u2019]?\s*$/.test(pullText) ||
+                /:\s*$/.test(pullText);
+              if (pullComplete) {
+                debugLog(
+                  `[TABLE_PULL_FORWARD] Sentence complete at "${pullText.substring(Math.max(0, pullText.length - 40))}"`,
+                );
+                break;
+              }
+              pullIdx++;
+              continue;
+            }
+
+            break;
+          }
+
+          flushParagraph();
+
+          for (const cap of captionLines) {
+            blocks.push(
+              createBlock(
+                "paragraph",
+                cap.text.trim(),
+                cap.page,
+                blocks.length,
+                cap.origin,
+                undefined,
+                deferSentenceSplitting,
+              ),
+            );
+            debugLog(`[TABLE_CAPTION] Emitted table caption: "${cap.text.trim().substring(0, 60)}..."`);
+          }
+
+          if (!foundBodyContinuation) {
+            debugLog(`[TABLE_PULL_FORWARD] No lowercase continuation found after table`);
+          }
+        } else {
+          flushParagraph();
+        }
       } else if (!shouldSplit) {
         if (lineIsIncomplete && nextLine && nextLine.page !== line.page) {
           let pullIdx = effective.index;
