@@ -453,6 +453,27 @@ async function parsePDFToBlocksWithPyMuPDF(
   let inReferencesSection = false;
   let referenceLines: TextLine[] = [];
 
+  // Buffer for table blocks encountered mid-paragraph
+  // Tables are floating elements in academic papers - they should not break paragraph flow
+  let pendingTableBlocks: { content: string; page: number; origin?: { page: number; bbox: [number, number, number, number] } }[] = [];
+
+  const flushPendingTables = () => {
+    for (const tb of pendingTableBlocks) {
+      blocks.push(
+        createNonSemanticBlock(
+          "table",
+          tb.content,
+          tb.page,
+          blocks.length,
+          tb.origin,
+          false,
+        ),
+      );
+      debugLog(`[TABLE_BLOCK] Flushed buffered table block on page ${tb.page}`);
+    }
+    pendingTableBlocks = [];
+  };
+
   const flushParagraph = () => {
     if (currentParaLines.length > 0) {
       const paraContent = joinLinesWithHyphenPreservation(currentParaLines);
@@ -472,6 +493,7 @@ async function parsePDFToBlocksWithPyMuPDF(
         );
       }
       currentParaLines = [];
+      flushPendingTables();
     }
   };
 
@@ -548,7 +570,7 @@ async function parsePDFToBlocksWithPyMuPDF(
       const classification = classifiedTypes[lookAhead];
       const candidateLine = lines[lookAhead];
 
-      if (skipTypes.includes(classification)) {
+      if (skipTypes.includes(classification) || candidateLine.isTable) {
         lookAhead++;
         continue;
       }
@@ -599,11 +621,9 @@ async function parsePDFToBlocksWithPyMuPDF(
       }
     }
 
-    // Table lines: group into non-semantic table blocks
+    // Table lines: buffer as pending table blocks without breaking paragraph flow
+    // Academic papers have floating tables - text paragraphs continue across them
     if (line.isTable) {
-      flushParagraph();
-      flushAbstractBody();
-      // Collect consecutive table lines into a single table block
       const tableLines: TextLine[] = [line];
       let j = i + 1;
       while (j < lines.length && lines[j].isTable) {
@@ -612,18 +632,12 @@ async function parsePDFToBlocksWithPyMuPDF(
         j++;
       }
       const tableContent = tableLines.map((l) => l.text).join("\n");
-      blocks.push(
-        createNonSemanticBlock(
-          "table",
-          tableContent,
-          line.page,
-          blocks.length,
-          line.origin,
-          false,
-        ),
-      );
-      debugLog(`[TABLE_BLOCK] Created table block on page ${line.page} with ${tableLines.length} lines`);
-      lastPage = line.page;
+      pendingTableBlocks.push({
+        content: tableContent,
+        page: line.page,
+        origin: line.origin,
+      });
+      debugLog(`[TABLE_BLOCK] Buffered table block on page ${line.page} with ${tableLines.length} lines (paragraph continues)`);
       continue;
     }
 
@@ -1128,6 +1142,7 @@ async function parsePDFToBlocksWithPyMuPDF(
   flushAbstractBody();
   flushReferenceBlock();
   flushParagraph();
+  flushPendingTables();
 
   const documentTitles = blocks.filter((b) => b.type === "document_title");
   const headings = blocks.filter((b) => b.type === "heading");
