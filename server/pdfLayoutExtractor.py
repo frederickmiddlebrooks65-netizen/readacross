@@ -9,6 +9,8 @@ Output: JSON array of TextLine objects
 
 import sys
 import json
+import os
+import io
 import fitz  # PyMuPDF
 
 def extract_lines_from_pdf(pdf_path: str) -> dict:
@@ -31,15 +33,20 @@ def extract_lines_from_pdf(pdf_path: str) -> dict:
         page_rect = page.rect
         page_heights[page_number] = page_rect.height
         
-        # Detect tables on this page
+        # Detect tables on this page (suppress PyMuPDF stdout warnings)
         try:
-            tables = page.find_tables()
-            for table in tables.tables:
-                tb = table.bbox
-                table_bboxes.append({
-                    "page": page_number,
-                    "bbox": [tb[0], tb[1], tb[2], tb[3]]
-                })
+            old_stdout = sys.stdout
+            sys.stdout = io.StringIO()
+            try:
+                tables = page.find_tables()
+                for table in tables.tables:
+                    tb = table.bbox
+                    table_bboxes.append({
+                        "page": page_number,
+                        "bbox": [tb[0], tb[1], tb[2], tb[3]]
+                    })
+            finally:
+                sys.stdout = old_stdout
         except Exception:
             pass
         
