@@ -579,6 +579,13 @@ export function postProcessBlocksStructural(
       continue;
     }
 
+    // === REFERENCE ENTRY PROTECTION ===
+    // Never promote reference entries (starting with [number]) or URLs/DOIs
+    if (/^\[\d+\]/.test(text) || /^(https?:\/\/|\/\/|doi:|doi\.)/.test(text)) {
+      log(`[Structural_SKIP] reference entry or URL, not promoting: "${text.substring(0, 60)}..."`);
+      continue;
+    }
+
     // === PROMOTE TO HEADING ===
     log(`[Structural_PROMOTE] noun-phrase heading: "${text}"`);
     (block as any).type = "heading";
