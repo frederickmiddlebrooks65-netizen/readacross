@@ -19,16 +19,29 @@ def extract_lines_from_pdf(pdf_path: str) -> dict:
     try:
         doc = fitz.open(pdf_path)
     except Exception as e:
-        return {"error": f"Failed to open PDF: {str(e)}", "lines": [], "pageHeights": {}}
+        return {"error": f"Failed to open PDF: {str(e)}", "lines": [], "pageHeights": {}, "tableBboxes": []}
     
     lines = []
     page_heights = {}
+    table_bboxes = []
     
     for page_num in range(len(doc)):
         page = doc[page_num]
         page_number = page_num + 1  # 1-based page numbering
         page_rect = page.rect
         page_heights[page_number] = page_rect.height
+        
+        # Detect tables on this page
+        try:
+            tables = page.find_tables()
+            for table in tables.tables:
+                tb = table.bbox
+                table_bboxes.append({
+                    "page": page_number,
+                    "bbox": [tb[0], tb[1], tb[2], tb[3]]
+                })
+        except Exception:
+            pass
         
         # Get text blocks with detailed position info
         # Using "dict" mode for comprehensive text extraction
@@ -79,6 +92,7 @@ def extract_lines_from_pdf(pdf_path: str) -> dict:
     return {
         "lines": lines,
         "pageHeights": page_heights,
+        "tableBboxes": table_bboxes,
         "extractorVersion": f"pymupdf-{fitz.version[0]}"
     }
 
