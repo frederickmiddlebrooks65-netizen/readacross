@@ -259,6 +259,8 @@ function shouldMergeHeadingContinuation(
   const curText = cur.text.trim();
   const nextText = next.text.trim();
 
+  const curIsSectionNumber = /^\d+(\.\d+)*$/.test(curText);
+
   const hyphenBreak = /-\s*$/.test(curText);
 
   if (/\bAbstract\b/i.test(nextText)) {
@@ -273,11 +275,11 @@ function shouldMergeHeadingContinuation(
     return false;
   }
 
-  if (nextText.length > 55) {
+  if (!curIsSectionNumber && nextText.length > 55) {
     return false;
   }
 
-  if (nextText.includes(",") && nextText.length > 30) {
+  if (!curIsSectionNumber && nextText.includes(",") && nextText.length > 30) {
     return false;
   }
 
@@ -302,6 +304,15 @@ function shouldMergeHeadingContinuation(
 
   const gap = next.y - cur.y;
   const notTooFar = gap > 0 && gap <= stats.medianLineHeight * 6;
+
+  if (curIsSectionNumber) {
+    const nextLooksHeadingText =
+      nextText.length <= 120 &&
+      !/[.!?]["']?\s*$/.test(nextText) &&
+      /^[A-Z]/.test(nextText);
+    const gapOk = gap > 0 && gap <= stats.medianLineHeight * 8;
+    return nextLooksHeadingText && gapOk;
+  }
 
   return (
     (hyphenBreak || (similarFont && similarIndent && nextLooksTitle)) &&
@@ -342,6 +353,8 @@ function looksLikeHyphenatedSlug(text: string): boolean {
 function isStandaloneParagraphCandidate(line: TextLine, stats: PDFStats): boolean {
   const text = line.text.trim();
   if (!text) return false;
+
+  if (/^\d+(\.\d+)*$/.test(text)) return false;
 
   if (looksLikeHyphenatedSlug(text)) {
     return false;
