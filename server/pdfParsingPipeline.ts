@@ -1868,7 +1868,7 @@ export async function parsePDFWithArchetype(
     log(`Step 3: Parsing profile decided: ${targetProfile}`);
     log(`Step 3 Signals: ${academicParsingResult.signals.join(", ")}`);
 
-    if (targetStrictness === "strict" || targetProfile === "essay_academic") {
+    if (targetStrictness === "strict" || targetProfile === "essay_academic" || targetProfile === "arxiv") {
       needsReparse = true;
       log(
         `Step 3: Re-parse needed for strictness=${targetStrictness}, profile=${targetProfile}`,
