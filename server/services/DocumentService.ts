@@ -819,43 +819,72 @@ export class DocumentService {
       }));
 
       // Attach anchors to structured blocks
-      const documentWithSentences = await storage.getDocumentWithParagraphs(
-        document.id,
-      );
-      if (documentWithSentences) {
-        const blocksWithAnchors = await attachAnchorsToStructuredContent(
-          structuredBlocks as any,
-          documentWithSentences,
+      // Wrapped in try-catch: anchor matching can be slow for large documents
+      // and Neon serverless DB connections may time out. Document must be saved
+      // regardless of anchor success.
+      try {
+        const documentWithSentences = await storage.getDocumentWithParagraphs(
+          document.id,
         );
+        if (documentWithSentences) {
+          const blocksWithAnchors = await attachAnchorsToStructuredContent(
+            structuredBlocks as any,
+            documentWithSentences,
+          );
 
-        await storage.updateDocument(document.id, {
-          structuredContent: JSON.stringify(blocksWithAnchors),
-          structuredVersion: 2,
-          contentSourceType: "pdf",
-          anchorSchemaVersion: 1,
-          processingState: "completed",
-        });
+          await storage.updateDocument(document.id, {
+            structuredContent: JSON.stringify(blocksWithAnchors),
+            structuredVersion: 2,
+            contentSourceType: "pdf",
+            anchorSchemaVersion: 1,
+            processingState: "completed",
+          });
 
-        const duration = Date.now() - startTime;
-        const anchoredCount = blocksWithAnchors.filter((b) => b.anchor).length;
+          const duration = Date.now() - startTime;
+          const anchoredCount = blocksWithAnchors.filter((b) => b.anchor).length;
 
-        console.log(
-          `[DocumentService DirectPass] ✅ Document ${document.id} completed:`,
+          console.log(
+            `[DocumentService DirectPass] ✅ Document ${document.id} completed:`,
+          );
+          console.log(
+            `  - Blocks: ${params.blocks.length} input, ${blocksWithAnchors.length} stored`,
+          );
+          console.log(
+            `  - Anchored: ${anchoredCount}/${blocksWithAnchors.length}`,
+          );
+          console.log(`  - Processing time: ${duration}ms`);
+        } else {
+          await storage.updateDocument(document.id, {
+            structuredContent: JSON.stringify(structuredBlocks),
+            structuredVersion: 2,
+            contentSourceType: "pdf",
+            processingState: "completed",
+          });
+        }
+      } catch (anchorError) {
+        console.error(
+          `[DocumentService DirectPass] ⚠️ Anchor attachment failed for document ${document.id}, saving without anchors:`,
+          anchorError instanceof Error ? anchorError.message : anchorError,
         );
-        console.log(
-          `  - Blocks: ${params.blocks.length} input, ${blocksWithAnchors.length} stored`,
-        );
-        console.log(
-          `  - Anchored: ${anchoredCount}/${blocksWithAnchors.length}`,
-        );
-        console.log(`  - Processing time: ${duration}ms`);
-      } else {
-        await storage.updateDocument(document.id, {
-          structuredContent: JSON.stringify(structuredBlocks),
-          structuredVersion: 2,
-          contentSourceType: "pdf",
-          processingState: "completed",
-        });
+        try {
+          await storage.updateDocument(document.id, {
+            structuredContent: JSON.stringify(structuredBlocks),
+            structuredVersion: 2,
+            contentSourceType: "pdf",
+            processingState: "completed",
+          });
+          console.log(
+            `[DocumentService DirectPass] ✅ Document ${document.id} saved without anchors (fallback)`,
+          );
+        } catch (fallbackError) {
+          console.error(
+            `[DocumentService DirectPass] ⛔ Fallback save also failed for document ${document.id}:`,
+            fallbackError instanceof Error ? fallbackError.message : fallbackError,
+          );
+          await storage.updateDocument(document.id, {
+            processingState: "completed",
+          });
+        }
       }
 
       return document;
