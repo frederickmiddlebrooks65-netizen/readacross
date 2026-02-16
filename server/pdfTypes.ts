@@ -89,7 +89,7 @@ export function isMetadataBlock(block: Block): block is MetadataBlock {
 
 // Phase 2-3a: Check if block is non-semantic (excluded from TM)
 export function isNonSemanticBlock(block: Block): block is NonSemanticBlock {
-  return ["reference_block"].includes(block.type);
+  return ["reference_block", "table"].includes(block.type);
 }
 
 // ========== Archetype Detection per instructions.md ==========
