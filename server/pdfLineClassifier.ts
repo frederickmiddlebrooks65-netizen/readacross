@@ -585,6 +585,19 @@ export function classifyLineSimplified(
   }
 
   // === Heading Detection: Profile-Specific Rules ===
+
+  // For arxiv profile, check standalone section numbers BEFORE page number filter
+  // because PyMuPDF may split "4 Provocations..." into separate lines where "4" alone
+  // would otherwise be caught by the isPurePageNumber rule.
+  // Safety: require font size >= median body font to distinguish from page numbers
+  // (page numbers typically use smaller font, e.g., 8pt vs 10pt body)
+  if (parsingProfile === "arxiv") {
+    const isStandaloneSectionNumber = /^\d+(\.\d+)*$/.test(text);
+    if (isStandaloneSectionNumber && line.fontHeight >= stats.medianBodyFont * 0.95) {
+      return "heading";
+    }
+  }
+
   // CRITICAL: Pure page numbers (1-3 digit standalone) should NEVER be headings
   // These slip through H/F zone detection when yRatio is between 0.10 and 0.90
   const isPurePageNumber = /^\d{1,3}$/.test(text);
@@ -615,13 +628,6 @@ export function classifyLineSimplified(
     const endsWithPeriod = /[.!?]["']?\s*$/.test(text);
 
     if (hasNumberedSection && isShortLine && !endsWithPeriod) {
-      return "heading";
-    }
-
-    // Standalone section number extracted separately from heading text
-    // e.g., "4", "4.1", "3.2" when PDF separates number from title
-    const isStandaloneSectionNumber = /^\d+(\.\d+)*$/.test(text);
-    if (isStandaloneSectionNumber) {
       return "heading";
     }
 

@@ -392,12 +392,34 @@ export function detectParsingStrictness(
 export function postProcessBlocksStructural(
   blocks: Block[],
   log: (msg: string) => void,
+  runningHeaderTexts?: Set<string>,
 ): Block[] {
   if (blocks.length === 0) return blocks;
 
   log(
     `[PostProcess_Structural] Starting block-level structural analysis. Input blocks: ${blocks.length}`,
   );
+
+  // Auto-detect running header candidates if not provided externally:
+  // same normalized text on 3+ distinct pages → likely running header
+  if (!runningHeaderTexts) {
+    runningHeaderTexts = new Set<string>();
+    const textPageMap = new Map<string, Set<number>>();
+    for (const block of blocks) {
+      if (block.type !== "paragraph") continue;
+      const norm = block.content.trim().toLowerCase();
+      if (norm.length >= 20 && norm.length <= 120) {
+        if (!textPageMap.has(norm)) textPageMap.set(norm, new Set());
+        textPageMap.get(norm)!.add(block.page);
+      }
+    }
+    for (const [text, pages] of Array.from(textPageMap.entries())) {
+      if (pages.size >= 3) {
+        runningHeaderTexts.add(text);
+        log(`[PostProcess_Structural] Auto-detected running header candidate (${pages.size} pages): "${text.substring(0, 60)}..."`);
+      }
+    }
+  }
 
   let promotedCount = 0;
 
@@ -547,6 +569,13 @@ export function postProcessBlocksStructural(
     // Second defense for metadata protection
     if (looksLikeAuthorBlock(block)) {
       log(`[Structural_SKIP] author/affiliation (redundant check): "${text.substring(0, 60)}..."`);
+      continue;
+    }
+
+    // === RUNNING HEADER PROTECTION ===
+    // Never promote text that matches a known running header pattern
+    if (runningHeaderTexts && runningHeaderTexts.has(text.trim().toLowerCase())) {
+      log(`[Structural_SKIP] running header text, not promoting: "${text.substring(0, 60)}..."`);
       continue;
     }
 
