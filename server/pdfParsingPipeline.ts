@@ -1154,7 +1154,7 @@ async function parsePDFToBlocksWithPyMuPDF(
       if (shouldSplit && currentParaLines.length > 0) {
         flushParagraph();
       } else if (!shouldSplit) {
-        if (lineIsIncomplete && nextLine && nextLine.page !== line.page) {
+        if (lineIsIncomplete && nextLine && nextLine.page !== line.page && !effective.skippedTable) {
           let pullIdx = effective.index;
           while (pullIdx < lines.length && pullIdx >= 0) {
             const pullLine = lines[pullIdx];
