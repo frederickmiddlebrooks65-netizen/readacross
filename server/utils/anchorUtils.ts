@@ -314,6 +314,43 @@ function calculateJaccardSimilarity(text1: string, text2: string): number {
 }
 
 /**
+ * Lightweight similarity: Jaccard + token overlap only (no Levenshtein).
+ * ~100x faster than calculateAdvancedSimilarity for typical sentences.
+ */
+function calculateLightSimilarity(text1: string, text2: string): number {
+  if (!text1 || !text2) return 0;
+  if (text1 === text2) return 1;
+  
+  const tokens1 = text1.split(/\s+/).filter(t => t.length > 0);
+  const tokens2 = text2.split(/\s+/).filter(t => t.length > 0);
+  
+  if (tokens1.length === 0 && tokens2.length === 0) return 1;
+  if (tokens1.length === 0 || tokens2.length === 0) return 0;
+  
+  const set1 = new Set(tokens1);
+  const set2 = new Set(tokens2);
+  
+  let intersectionCount = 0;
+  set1.forEach(t => {
+    if (set2.has(t)) intersectionCount++;
+  });
+  
+  const jaccard = intersectionCount / (set1.size + set2.size - intersectionCount);
+  
+  let orderedMatches = 0;
+  let j = 0;
+  for (let i = 0; i < tokens1.length && j < tokens2.length; i++) {
+    if (tokens1[i] === tokens2[j]) {
+      orderedMatches++;
+      j++;
+    }
+  }
+  const lcsRatio = orderedMatches / Math.max(tokens1.length, tokens2.length);
+  
+  return Math.max(jaccard, jaccard * 0.6 + lcsRatio * 0.4);
+}
+
+/**
  * Fuzzy sequence matching for handling text variations
  */
 function calculateFuzzySequenceMatch(text1: string, text2: string): number {
@@ -559,39 +596,62 @@ export async function attachAnchorsToStructuredContent(
   let attachedCount = 0;
   
   try {
-    // Create flat sentence list with DB IDs for mapping
     const allSentences = safeDocument.paragraphs
       .flatMap(p => p.sentences.map(s => ({
         id: s.id,
         paragraphId: p.id,
         order: s.order,
         source: s.source,
-        // STEP 2 FIX: Use stored hash if available, fallback to generating it
         hash: (s as any).sourceHash || generateSentenceHash(s.source)
       })))
-      .sort((a, b) => a.id - b.id); // Sort by DB ID for stable mapping
+      .sort((a, b) => a.id - b.id);
     
     console.log(`[AnchorUtils] Available sentences for matching: ${allSentences.length} (ID range: ${allSentences[0]?.id}-${allSentences[allSentences.length-1]?.id})`);
     
+    const hashMap = new Map<string, Array<typeof allSentences[0]>>();
+    for (const s of allSentences) {
+      const existing = hashMap.get(s.hash);
+      if (existing) existing.push(s);
+      else hashMap.set(s.hash, [s]);
+    }
+    
+    const normalizedCache = new Map<number, string>();
+    for (const s of allSentences) {
+      normalizedCache.set(s.id, normalizeTextForAnchorMatching(s.source));
+    }
+    
     const blocksWithAnchors: StructuredBlockWithAnchor[] = [];
-    const usedSentenceIds = new Set<number>(); // Track used IDs to prevent overlaps
+    const usedSentenceIds = new Set<number>();
+    
+    const TIME_BUDGET_MS = 30000;
+    let timeBudgetExceeded = false;
     
     for (const block of safeBlocks) {
       const blockWithAnchor: StructuredBlockWithAnchor = { ...block };
       
-      // STRUCTURAL FIX: Anchor eligibility determined by sentences[] presence only, not by block type
-      // Check for sentences[] first, then fall back to content-based check
+      if (timeBudgetExceeded) {
+        blocksWithAnchors.push(blockWithAnchor);
+        continue;
+      }
+      
+      const elapsed = Date.now() - startTime;
+      if (elapsed > TIME_BUDGET_MS) {
+        console.warn(`[AnchorUtils] Time budget exceeded (${elapsed}ms > ${TIME_BUDGET_MS}ms) at block ${block.order}/${safeBlocks.length}. Skipping remaining blocks.`);
+        timeBudgetExceeded = true;
+        blocksWithAnchors.push(blockWithAnchor);
+        continue;
+      }
+      
       const hasSentences = block.sentences && block.sentences.length > 0;
       const hasContent = block.content && block.content.length > 20;
       
       if (hasSentences || hasContent) {
         try {
-          const anchor = await generateAnchorForBlock(block, allSentences, usedSentenceIds);
+          const anchor = await generateAnchorForBlockOptimized(block, allSentences, usedSentenceIds, hashMap, normalizedCache);
           if (anchor) {
             blockWithAnchor.anchor = anchor;
             attachedCount++;
             
-            // Mark sentences as used to prevent overlaps
             for (let id = anchor.sentenceStartId; id <= anchor.sentenceEndId; id++) {
               usedSentenceIds.add(id);
             }
@@ -644,10 +704,11 @@ export async function attachAnchorsToStructuredContent(
 }
 
 /**
- * Generate anchor for a single block using DB-committed sentence IDs with V2 improvements
- * Implements dynamic thresholds and unified normalization from instructions.md
+ * Optimized anchor generation with HashMap lookups and cached normalization.
+ * Avoids O(n²) full-scan similarity when hash matches exist.
+ * Uses lightweight similarity (Jaccard only) instead of full Levenshtein for fallback.
  */
-async function generateAnchorForBlock(
+async function generateAnchorForBlockOptimized(
   block: StructuredBlock,
   allSentences: Array<{
     id: number;
@@ -656,59 +717,42 @@ async function generateAnchorForBlock(
     source: string;
     hash: string;
   }>,
-  usedSentenceIds: Set<number>
+  usedSentenceIds: Set<number>,
+  hashMap: Map<string, Array<{ id: number; paragraphId: number; order: number; source: string; hash: string }>>,
+  normalizedCache: Map<number, string>
 ): Promise<Anchor | null> {
-  // STRUCTURAL FIX: Use block.sentences[] directly when available, otherwise fall back to content
   const blockSentences = block.sentences && block.sentences.length > 0
     ? block.sentences.map((s: any) => s.text)
     : (block.content ? splitIntoSentences(block.content) : []);
   
-  console.log(`[AnchorUtils] Block ${block.order}: ${blockSentences.length} sentences extracted from content`);
   if (blockSentences.length === 0) {
-    console.warn(`[AnchorUtils] No sentences found in block ${block.order}`);
     return null;
   }
   
   const matches: number[] = [];
   
-  // Find matching sentences using hash-based and enhanced similarity matching
   for (const blockSentence of blockSentences) {
     const blockSentenceHash = generateSentenceHash(blockSentence);
-    const dynamicThreshold = getDynamicSimilarityThreshold(blockSentence);
     
-    console.log(`[AnchorUtils] Matching sentence: "${blockSentence.substring(0, 60)}..." (threshold: ${(dynamicThreshold * 100).toFixed(0)}%)`);
+    const candidates = hashMap.get(blockSentenceHash);
+    let bestMatch = candidates?.find(s => !usedSentenceIds.has(s.id)) || null;
     
-    // Try exact hash match first (excluding already used sentences)
-    let bestMatch = allSentences.find(s => s.hash === blockSentenceHash && !usedSentenceIds.has(s.id));
-    
-    // Fallback to similarity matching if no exact match
     if (!bestMatch) {
       const normalizedBlockSentence = normalizeTextForAnchorMatching(blockSentence);
+      const dynamicThreshold = getDynamicSimilarityThreshold(blockSentence);
       let bestSimilarity = 0;
       
       for (const sentence of allSentences) {
-        // Skip already used sentences
-        if (usedSentenceIds.has(sentence.id)) {
-          continue;
-        }
+        if (usedSentenceIds.has(sentence.id)) continue;
         
-        const normalizedSentence = normalizeTextForAnchorMatching(sentence.source);
-        const similarity = calculateAdvancedSimilarity(normalizedBlockSentence, normalizedSentence);
+        const normalizedSentence = normalizedCache.get(sentence.id) || normalizeTextForAnchorMatching(sentence.source);
+        const similarity = calculateLightSimilarity(normalizedBlockSentence, normalizedSentence);
         
-        // Use dynamic threshold based on sentence characteristics
         if (similarity > bestSimilarity && similarity >= dynamicThreshold) {
           bestSimilarity = similarity;
           bestMatch = sentence;
         }
       }
-      
-      if (bestMatch) {
-        console.log(`[AnchorUtils] ✅ Similarity match found: ${(bestSimilarity * 100).toFixed(1)}% (req: ${(dynamicThreshold * 100).toFixed(0)}%) - sentence ID ${bestMatch.id}`);
-      } else {
-        console.log(`[AnchorUtils] ❌ No match found for sentence (below ${(dynamicThreshold * 100).toFixed(0)}% threshold or already used)`);
-      }
-    } else {
-      console.log(`[AnchorUtils] ✅ Hash match found - sentence ID ${bestMatch.id}`);
     }
     
     if (bestMatch) {
@@ -717,53 +761,39 @@ async function generateAnchorForBlock(
   }
   
   if (matches.length === 0) {
-    console.warn(`[AnchorUtils] No matches found for block ${block.order} - all ${blockSentences.length} sentences failed to match`);
-    
-    // 🔧 P0 CRITICAL FIX: 매칭 실패 시 더 관대한 방법으로 재시도
-    console.log(`[AnchorUtils] Attempting fallback matching with relaxed thresholds for block ${block.order}`);
-    
     for (const blockSentence of blockSentences) {
       const normalizedBlockSentence = normalizeTextForAnchorMatching(blockSentence);
       let bestSimilarity = 0;
       let bestMatch = null;
       
       for (const sentence of allSentences) {
-        if (usedSentenceIds.has(sentence.id)) {
-          continue;
-        }
+        if (usedSentenceIds.has(sentence.id)) continue;
         
-        const normalizedSentence = normalizeTextForAnchorMatching(sentence.source);
-        const similarity = calculateAdvancedSimilarity(normalizedBlockSentence, normalizedSentence);
+        const normalizedSentence = normalizedCache.get(sentence.id) || normalizeTextForAnchorMatching(sentence.source);
+        const similarity = calculateLightSimilarity(normalizedBlockSentence, normalizedSentence);
         
-        // 🔧 매우 관대한 임계값 적용 (30% 이상)
         if (similarity > bestSimilarity && similarity >= 0.30) {
           bestSimilarity = similarity;
           bestMatch = sentence;
         }
       }
       
-      if (bestMatch && bestSimilarity >= 0.30) {
-        console.log(`[AnchorUtils] ✅ Fallback match found: ${(bestSimilarity * 100).toFixed(1)}% - sentence ID ${bestMatch.id}`);
+      if (bestMatch) {
         matches.push(bestMatch.id);
       }
     }
     
-    // 여전히 매칭이 안되면 null 리턴
     if (matches.length === 0) {
-      console.warn(`[AnchorUtils] Even fallback matching failed for block ${block.order}`);
       return null;
     }
   }
   
-  // Ensure matches are consecutive for cleaner anchor ranges
   matches.sort((a, b) => a - b);
   const minId = Math.min(...matches);
   const maxId = Math.max(...matches);
   
-  // Validate that we're not creating overlapping anchors
   for (let id = minId; id <= maxId; id++) {
     if (usedSentenceIds.has(id)) {
-      console.warn(`[AnchorUtils] Overlap detected: sentence ${id} already used, skipping block ${block.order}`);
       return null;
     }
   }
