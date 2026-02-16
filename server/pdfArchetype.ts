@@ -402,11 +402,12 @@ export function postProcessBlocksStructural(
 
   // Auto-detect running header candidates if not provided externally:
   // same normalized text on 3+ distinct pages → likely running header
+  // Check both paragraph AND heading blocks (running headers may be misclassified as headings)
   if (!runningHeaderTexts) {
     runningHeaderTexts = new Set<string>();
     const textPageMap = new Map<string, Set<number>>();
     for (const block of blocks) {
-      if (block.type !== "paragraph") continue;
+      if (block.type !== "paragraph" && block.type !== "heading") continue;
       const norm = block.content.trim().toLowerCase();
       if (norm.length >= 20 && norm.length <= 120) {
         if (!textPageMap.has(norm)) textPageMap.set(norm, new Set());
@@ -683,17 +684,26 @@ export function postProcessBlocksAcademic(
   }
 
   // Pre-filter universal running headers before profile-specific logic
-  // IMPORTANT: Never remove heading blocks — they may share text with running headers
-  // (e.g., paper title used as both section heading and page running header)
+  // Heading blocks that match running headers: keep the FIRST occurrence (likely the real title)
+  // but remove subsequent occurrences in top zone (running header instances on later pages)
+  const seenRunningHeaderHeadings = new Set<string>();
   const preFilteredBlocks = universalRunningHeaders.size > 0
     ? blocks.filter((block) => {
-        if (block.type === "heading") return true;
         const normalizedText = block.content.trim().toLowerCase();
-        if (universalRunningHeaders.has(normalizedText)) {
-          log(`[Academic] Removing universal running header: "${block.content.substring(0, 60)}..."`);
+        if (!universalRunningHeaders.has(normalizedText)) return true;
+
+        if (block.type === "heading") {
+          if (!seenRunningHeaderHeadings.has(normalizedText)) {
+            seenRunningHeaderHeadings.add(normalizedText);
+            log(`[Academic] Keeping first heading occurrence of running header: "${block.content.substring(0, 60)}..."`);
+            return true;
+          }
+          log(`[Academic] Removing repeated heading matching running header: "${block.content.substring(0, 60)}..." (page ${block.page})`);
           return false;
         }
-        return true;
+
+        log(`[Academic] Removing universal running header: "${block.content.substring(0, 60)}..."`);
+        return false;
       })
     : blocks;
 
