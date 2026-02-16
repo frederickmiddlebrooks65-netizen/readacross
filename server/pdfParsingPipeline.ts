@@ -881,16 +881,25 @@ async function parsePDFToBlocksWithPyMuPDF(
       const headingText = line.text.trim();
       const nextHeadingText = nextLine?.text.trim() || "";
       const nextIsHeading = nextClassification === "heading";
-      const nextIsReferenceHeading =
-        nextIsHeading && isReferencesHeading(nextHeadingText);
+
+      // Only exit references for REAL section headings (Appendix, Endmatter, numbered sections like "A.1 ...")
+      // NOT for false headings caused by DOI fragments, URLs, or short text in references
+      const isRealSectionExit = (t: string) =>
+        isExplicitSectionHeading(t) ||
+        isReferencesHeading(t) ||
+        /^[A-Z](\.\d+)*\s+[A-Z]/.test(t) ||
+        /^\d+(\.\d+)*\s+[A-Z]/.test(t);
+
+      const nextIsRealSection = nextIsHeading && isRealSectionExit(nextHeadingText);
+      const nextIsReferenceHeading = nextIsHeading && isReferencesHeading(nextHeadingText);
       const yGapToNext = nextLine ? nextLine.y - line.y : 0;
       const hasHeadingGap = yGapToNext >= stats.medianLineHeight * 1.5;
       const pageBreakToHeading =
         nextLine && nextLine.page !== line.page && nextIsHeading;
 
       if (
-        (nextIsHeading && !nextIsReferenceHeading && hasHeadingGap) ||
-        (pageBreakToHeading && !nextIsReferenceHeading)
+        (nextIsRealSection && !nextIsReferenceHeading && hasHeadingGap) ||
+        (pageBreakToHeading && nextIsRealSection && !nextIsReferenceHeading)
       ) {
         referenceLines.push(line);
         flushReferenceBlock();
@@ -898,10 +907,7 @@ async function parsePDFToBlocksWithPyMuPDF(
         continue;
       }
 
-      if (isExplicitSectionHeading(headingText)) {
-        flushReferenceBlock();
-        inReferencesSection = false;
-      } else if (type === "heading" && !isReferencesHeading(headingText)) {
+      if (isExplicitSectionHeading(headingText) || (type === "heading" && isRealSectionExit(headingText) && !isReferencesHeading(headingText))) {
         flushReferenceBlock();
         inReferencesSection = false;
       } else {
