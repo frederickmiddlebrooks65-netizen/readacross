@@ -419,6 +419,17 @@ async function parsePDFToBlocksWithPyMuPDF(
   debugLog(
     `[PDF_EXTRACTOR] Pages: ${Object.keys(result.pageHeights).length}, Lines: ${lines.length}`,
   );
+  debugLog(`[PDF_EXTRACTOR] Table bboxes: ${tableBboxes.length}`);
+  for (const tb of tableBboxes) {
+    debugLog(`[PDF_EXTRACTOR] Table bbox: page=${tb.page}, bbox=[${tb.bbox.join(', ')}]`);
+  }
+  // Dump lines around "produce" and "concretely" for debugging
+  for (let dbgI = 0; dbgI < lines.length; dbgI++) {
+    const t = lines[dbgI].text.trim().toLowerCase();
+    if (t.includes('produce.') || t.includes('concretely') || t.includes('table 1.') || t.includes('systems, including')) {
+      debugLog(`[LINE_DUMP] i=${dbgI}, page=${lines[dbgI].page}, y=${lines[dbgI].y.toFixed(1)}, x=${lines[dbgI].xStart.toFixed(1)}-${lines[dbgI].xEnd.toFixed(1)}, isTable=${lines[dbgI].isTable || false}, text="${lines[dbgI].text.trim().substring(0, 80)}"`);
+    }
+  }
 
   const rawClassifiedTypes: LineClassification[] = lines.map((line, i) =>
     classifyLineSimplified(
@@ -958,6 +969,9 @@ async function parsePDFToBlocksWithPyMuPDF(
     const curTextDbg = line.text.trim().toLowerCase();
     const nextTextDbg = nextLine?.text.trim().toLowerCase() || "";
     if (
+      curTextDbg.includes("produce") ||
+      curTextDbg.includes("concretely") ||
+      curTextDbg.includes("systems, including") ||
       curTextDbg.includes("nuance") ||
       curTextDbg.includes("style and") ||
       nextTextDbg.includes("are preserved")
@@ -1025,12 +1039,15 @@ async function parsePDFToBlocksWithPyMuPDF(
     );
 
     if (
+      curTextDbg.includes("produce") ||
+      curTextDbg.includes("concretely") ||
+      curTextDbg.includes("systems, including") ||
       curTextDbg.includes("nuance") ||
       curTextDbg.includes("style and") ||
       nextTextDbg.includes("are preserved")
     ) {
       debugLog(
-        `[MAIN_LOOP_DEBUG] shouldSplit=${shouldSplit}, inReferencesSection=${inReferencesSection}, inAbstractBody=${inAbstractBody}`,
+        `[MAIN_LOOP_DEBUG] shouldSplit=${shouldSplit}, skippedTable=${effective.skippedTable}, inReferencesSection=${inReferencesSection}, inAbstractBody=${inAbstractBody}, yGap=${nextLine ? (nextLine.y - line.y).toFixed(1) : 'N/A'}, pageDiff=${nextLine ? nextLine.page - line.page : 'N/A'}`,
       );
     }
 
