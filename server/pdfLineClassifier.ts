@@ -435,6 +435,18 @@ export function classifyLineSimplified(
     // Footer zone uses fixed short text threshold
     const isShortHFText = isFooterZone ? text.length < 50 : text.length < 80;
 
+    // Extended header zone for short repeated text (e.g., "Klein et al.")
+    // Short text (<35 chars) repeated on 3+ pages in top 12% is almost certainly a running header
+    const isExtendedHeaderZone = yRatio < 0.12;
+    if (
+      isExtendedHeaderZone &&
+      stats.headerFooterPatterns.has(normalized) &&
+      text.length < 35 &&
+      isNotLargeFont
+    ) {
+      return "header";
+    }
+
     if (isHFZone) {
       // Count HF signals (need 2+ for forced removal without repetition)
       let hfSignals = 0;
