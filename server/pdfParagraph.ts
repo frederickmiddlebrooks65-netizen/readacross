@@ -80,26 +80,8 @@ export function shouldEndParagraphSimplified(
   // ------------------------------------
   if (parsingProfile === "arxiv") {
 
-    if (isStructuralBreak) return true;
-
-    if (currentLine.page !== nextLine.page) {
-      if (strongLayoutBreak) return true;
-      if (looksLikeHeading) return true;
-      if (
-        isSentenceContinuation(
-          currentLine,
-          nextLine,
-          currentClassification,
-          nextClassification,
-        )
-      ) {
-        return false;
-      }
-      return true;
-    }
-
-    if (strongLayoutBreak) return true;
-
+    // Continuation takes priority over everything (including structural breaks)
+    // This prevents mid-sentence splits at page boundaries or misclassified lines
     if (
       isSentenceContinuation(
         currentLine,
@@ -110,6 +92,10 @@ export function shouldEndParagraphSimplified(
     ) {
       return false;
     }
+
+    if (isStructuralBreak) return true;
+
+    if (strongLayoutBreak) return true;
 
     // Visual paragraph boundary: sentence terminator + layout signal
     const endsWithTerminator = /[.?!)\]"'\u201D\u2019]\s*$/.test(currentText);
