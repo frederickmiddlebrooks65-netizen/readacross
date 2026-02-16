@@ -31,6 +31,12 @@ Core architectural decisions include smart routing, a unified practice flow, and
 
 The PDF processing pipeline prioritizes stable position anchoring with a 2-track system (Layout Track for viewer, Translation Track for sentences). It uses a unified pipeline for both uploaded and arXiv PDFs. Header/footer detection is based on HF Zone, signal rules, and running header exceptions. Subheading detection relies on visual signals and keyword forcing. A safe hyphen joining policy is implemented. Archetype-aware sentence splitting (Academic, Literary, Essay, Generic modes) ensures specialized logic for different content types, including handling abbreviations, citations, fragments, and dialogue. A Sentence/Utterance Type System explicitly categorizes content for Translation Memory (TM) eligibility, preventing TM pollution from fragments while allowing user override.
 
+Recent PDF pipeline improvements (Feb 2026):
+- **Universal running header removal**: Detects and removes text repeated on 3+ pages in top 12% Y-zone (20-120 chars), applied across all academic profiles before profile-specific filtering.
+- **Stateful author/affiliation classification**: `fixupAuthorClassifications` post-pass in pdfLineClassifier.ts extends author zone detection beyond initial pattern matches until body-start markers (Abstract/Introduction/CCS) are found.
+- **Table/list cluster heading protection**: postProcessBlocksStructural now blocks heading promotion for single-word blocks and blocks surrounded by 3+ nearby short blocks (table cell / summary table patterns).
+- **arxiv profile paragraph segmentation**: Dedicated `arxiv` branch in shouldEndParagraphSimplified with page-boundary tolerance (allows sentence continuation across pages, unlike strict journal mode).
+
 ## External Dependencies
 - **Google Gemini API**: Used for document translation, text type detection, glossary generation, AI-powered language practice, AI coaching, OCR, and document summarization. Models include gemini-2.5-flash and gemini-2.0-flash-lite.
 - **arXiv API**: Integrated for fetching and processing academic papers.
