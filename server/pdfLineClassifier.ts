@@ -592,7 +592,9 @@ export function classifyLineSimplified(
   // Safety: require font size >= median body font to distinguish from page numbers
   // (page numbers typically use smaller font, e.g., 8pt vs 10pt body)
   if (parsingProfile === "arxiv") {
-    const isStandaloneSectionNumber = /^\d+(\.\d+)*$/.test(text);
+    // Standalone section numbers: "4", "4.1", "A.2" but NOT long DOI fragments like "3372832"
+    // Real section numbers are short (≤3 chars for pure digits, or dotted like "4.1")
+    const isStandaloneSectionNumber = /^\d+(\.\d+)*$/.test(text) && (text.includes('.') || text.length <= 2);
     if (isStandaloneSectionNumber && line.fontHeight >= stats.medianBodyFont * 0.95) {
       return "heading";
     }
