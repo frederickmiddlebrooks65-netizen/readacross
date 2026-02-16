@@ -439,8 +439,8 @@ async function parsePDFToBlocksWithPyMuPDF(
   // Dump lines around "produce" and "concretely" for debugging
   for (let dbgI = 0; dbgI < lines.length; dbgI++) {
     const t = lines[dbgI].text.trim().toLowerCase();
-    if (t.includes('produce.') || t.includes('concretely') || t.includes('table 1.') || t.includes('systems, including')) {
-      debugLog(`[LINE_DUMP] i=${dbgI}, page=${lines[dbgI].page}, y=${lines[dbgI].y.toFixed(1)}, x=${lines[dbgI].xStart.toFixed(1)}-${lines[dbgI].xEnd.toFixed(1)}, isTable=${lines[dbgI].isTable || false}, text="${lines[dbgI].text.trim().substring(0, 80)}"`);
+    if (t.includes('produce.') || t.includes('concretely') || t.includes('table 1.') || t.includes('systems, including') || t.includes('provocations') || /^\d+(\.\d+)*$/.test(t)) {
+      debugLog(`[LINE_DUMP] i=${dbgI}, page=${lines[dbgI].page}, y=${lines[dbgI].y.toFixed(1)}, x=${lines[dbgI].xStart.toFixed(1)}-${lines[dbgI].xEnd.toFixed(1)}, fH=${lines[dbgI].fontHeight.toFixed(1)}, isTable=${lines[dbgI].isTable || false}, text="${lines[dbgI].text.trim().substring(0, 80)}"`);
     }
   }
 
@@ -455,6 +455,14 @@ async function parsePDFToBlocksWithPyMuPDF(
   );
 
   const classifiedTypes = fixupAuthorClassifications(lines, rawClassifiedTypes, parsingProfile);
+
+  // Debug: log classification for standalone section numbers and provocations
+  for (let dbgI = 0; dbgI < lines.length; dbgI++) {
+    const t = lines[dbgI].text.trim().toLowerCase();
+    if (/^\d+(\.\d+)*$/.test(t) || t.includes('provocations')) {
+      debugLog(`[LINE_CLASSIFY] i=${dbgI}, text="${lines[dbgI].text.trim().substring(0, 80)}", rawType="${rawClassifiedTypes[dbgI]}", finalType="${classifiedTypes[dbgI]}"`);
+    }
+  }
 
   const definiteHeadings: boolean[] = lines.map((line, i) =>
     isDefiniteHeading(line, i > 0 ? lines[i - 1] : undefined),
