@@ -42,7 +42,7 @@ import {
 
 import { calculateStatsFromLines } from "./pdfLayout.js";
 import { mergeLineTexts, joinLinesWithHyphenPreservation } from "./pdfLayout.js";
-import { classifyLineSimplified, isDefiniteHeading } from "./pdfLineClassifier.js";
+import { classifyLineSimplified, isDefiniteHeading, fixupAuthorClassifications } from "./pdfLineClassifier.js";
 import { shouldEndParagraphSimplified } from "./pdfParagraph.js";
 import { isSentenceContinuation } from "./pdfGrammar.js";
 import {
@@ -400,7 +400,7 @@ async function parsePDFToBlocksWithPyMuPDF(
     `[PDF_EXTRACTOR] Pages: ${Object.keys(result.pageHeights).length}, Lines: ${lines.length}`,
   );
 
-  const classifiedTypes: LineClassification[] = lines.map((line, i) =>
+  const rawClassifiedTypes: LineClassification[] = lines.map((line, i) =>
     classifyLineSimplified(
       line,
       stats,
@@ -409,6 +409,8 @@ async function parsePDFToBlocksWithPyMuPDF(
       parsingProfile,
     ),
   );
+
+  const classifiedTypes = fixupAuthorClassifications(lines, rawClassifiedTypes, parsingProfile);
 
   const definiteHeadings: boolean[] = lines.map((line, i) =>
     isDefiniteHeading(line, i > 0 ? lines[i - 1] : undefined),

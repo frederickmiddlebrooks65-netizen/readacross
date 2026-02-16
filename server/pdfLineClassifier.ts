@@ -3,6 +3,81 @@ import type { TextLine } from "./pdfLayoutExtractor.js";
 import { isReferencesHeading } from "./pdfTypes.js";
 
 // ============================================================
+// STATEFUL AUTHOR/AFFILIATION FIXUP
+// ============================================================
+// Runs AFTER classifyLineSimplified to fix author lines that were
+// misclassified as heading/paragraph because the stateless classifier
+// only recognizes the first few author lines by pattern.
+//
+// Logic: On page 1, once the first "author" classification is found,
+// subsequent lines matching author/affiliation patterns are reclassified
+// as "author" or "affiliation" until a body-start marker is encountered
+// (Abstract, Introduction, CCS Concepts, etc.)
+// ============================================================
+export function fixupAuthorClassifications(
+  lines: TextLine[],
+  classifications: LineClassification[],
+  parsingProfile: AcademicParsingProfile = "journal",
+): LineClassification[] {
+  if (parsingProfile !== "arxiv" && parsingProfile !== "journal") return classifications;
+
+  const result = [...classifications];
+  let inAuthorZone = false;
+  let foundFirstAuthor = false;
+
+  const bodyStartMarkers = /^(abstract|introduction|ccs concepts|acm reference|keywords?|1\.?\s+introduction|overview|background|summary|preamble)/i;
+  const authorLikePattern = /^[A-Z][A-Za-zÀ-ÿ\-']+(\s+[A-Z][A-Za-zÀ-ÿ\-']+)+\s*[,*†‡§¶\d]*\s*(,|$)/;
+  const nameWithAffiliation = /,\s*(University|Institute|Department|College|School|Center|Centre|Laboratory|Lab|Georgia|Princeton|Emory|Cornell|Johns Hopkins|Stanford|MIT|Harvard|Oxford|Cambridge|Berkeley)\b/i;
+  const countryPattern = /\b(USA|UK|Germany|France|Japan|China|Canada|Australia|India|Brazil|Italy|Spain|Netherlands|Switzerland|Sweden|Norway|Denmark|Finland|Austria|Belgium|Israel|South Korea|Singapore|Taiwan|Hong Kong|New Zealand)\s*$/i;
+  const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+  const orcidPattern = /orcid|0000-000[0-3]-\d{4}-\d{3}[\dX]/i;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.page !== 1) break;
+
+    const text = line.text.trim();
+
+    if (bodyStartMarkers.test(text)) {
+      inAuthorZone = false;
+      break;
+    }
+
+    if (result[i] === "author") {
+      foundFirstAuthor = true;
+      inAuthorZone = true;
+      continue;
+    }
+
+    if (!foundFirstAuthor) continue;
+    if (!inAuthorZone) continue;
+
+    if (result[i] === "document_title" || result[i] === "doi" || result[i] === "abstract_label") continue;
+
+    const isAuthorLike =
+      authorLikePattern.test(text) ||
+      nameWithAffiliation.test(text) ||
+      countryPattern.test(text) ||
+      emailPattern.test(text) ||
+      orcidPattern.test(text);
+
+    const isAffiliationLike =
+      /\b(University|Institute|Department|College|School|Center|Centre|Laboratory|Lab)\b/i.test(text) ||
+      /^[1-9*†‡§¶]\s*[A-Z]/.test(text) && /\b(University|Institute|Department)\b/i.test(text);
+
+    if (isAffiliationLike) {
+      result[i] = "affiliation";
+    } else if (isAuthorLike) {
+      result[i] = "author";
+    } else if (text.length < 60 && !text.endsWith('.') && /^[A-Z]/.test(text) && /,/.test(text)) {
+      result[i] = "author";
+    }
+  }
+
+  return result;
+}
+
+// ============================================================
 // DEFINITE HEADING DETECTION
 // ============================================================
 // Runs BEFORE paragraph merge to identify standalone headings.
