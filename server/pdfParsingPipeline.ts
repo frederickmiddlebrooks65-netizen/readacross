@@ -548,6 +548,7 @@ async function parsePDFToBlocksWithPyMuPDF(
     line: TextLine | undefined;
     classification: LineClassification | undefined;
     index: number;
+    skippedTable: boolean;
   } => {
     const skipTypes = [
       "header",
@@ -566,11 +567,18 @@ async function parsePDFToBlocksWithPyMuPDF(
       : false;
 
     let lookAhead = startIndex;
+    let skippedTable = false;
     while (lookAhead < lines.length) {
       const classification = classifiedTypes[lookAhead];
       const candidateLine = lines[lookAhead];
 
-      if (skipTypes.includes(classification) || candidateLine.isTable) {
+      if (candidateLine.isTable) {
+        skippedTable = true;
+        lookAhead++;
+        continue;
+      }
+
+      if (skipTypes.includes(classification)) {
         lookAhead++;
         continue;
       }
@@ -583,9 +591,9 @@ async function parsePDFToBlocksWithPyMuPDF(
         continue;
       }
 
-      return { line: candidateLine, classification, index: lookAhead };
+      return { line: candidateLine, classification, index: lookAhead, skippedTable };
     }
-    return { line: undefined, classification: undefined, index: -1 };
+    return { line: undefined, classification: undefined, index: -1, skippedTable };
   };
 
   const processedIndices = new Set<number>();
@@ -993,9 +1001,22 @@ async function parsePDFToBlocksWithPyMuPDF(
       continue;
     }
 
+    // When table lines were skipped between current and next line,
+    // synthesize a virtual nextLine with adjusted position to prevent
+    // false paragraph breaks due to large Y-gap or page boundary
+    let effectiveNextLine = nextLine;
+    if (nextLine && effective.skippedTable) {
+      effectiveNextLine = {
+        ...nextLine,
+        page: line.page,
+        y: line.y + stats.medianLineHeight,
+      };
+      debugLog(`[TABLE_SKIP_BRIDGE] Bridging paragraph across table: "${line.text.trim().substring(0, 40)}..." → "${nextLine.text.trim().substring(0, 40)}..."`);
+    }
+
     const shouldSplit = shouldEndParagraphSimplified(
       line,
-      nextLine,
+      effectiveNextLine,
       type,
       nextClassification || "paragraph",
       stats,
