@@ -467,6 +467,7 @@ async function parsePDFToBlocksWithPyMuPDF(
   // Buffer for table blocks encountered mid-paragraph
   // Tables are floating elements in academic papers - they should not break paragraph flow
   let pendingTableBlocks: { content: string; page: number; origin?: { page: number; bbox: [number, number, number, number] } }[] = [];
+  let pendingTableCaptions: { text: string; page: number; origin?: { page: number; bbox: [number, number, number, number] } }[] = [];
 
   const flushPendingTables = () => {
     for (const tb of pendingTableBlocks) {
@@ -482,7 +483,22 @@ async function parsePDFToBlocksWithPyMuPDF(
       );
       debugLog(`[TABLE_BLOCK] Flushed buffered table block on page ${tb.page}`);
     }
+    for (const cap of pendingTableCaptions) {
+      blocks.push(
+        createBlock(
+          "paragraph",
+          cap.text,
+          cap.page,
+          blocks.length,
+          cap.origin,
+          undefined,
+          deferSentenceSplitting,
+        ),
+      );
+      debugLog(`[TABLE_CAPTION] Flushed table caption: "${cap.text.substring(0, 60)}..."`);
+    }
     pendingTableBlocks = [];
+    pendingTableCaptions = [];
   };
 
   const flushParagraph = () => {
@@ -560,6 +576,7 @@ async function parsePDFToBlocksWithPyMuPDF(
     classification: LineClassification | undefined;
     index: number;
     skippedTable: boolean;
+    skippedCaptionIndices: number[];
   } => {
     const skipTypes = [
       "header",
@@ -572,6 +589,8 @@ async function parsePDFToBlocksWithPyMuPDF(
       "abstract_label",
     ];
 
+    const tableCaptionPattern = /^(Table|Figure|Fig\.)\s+\d+/i;
+
     const currentIsIncomplete = currentLineText
       ? !/[.!?]["'\u201D\u2019]?\s*$/.test(currentLineText.trim()) &&
         !/:\s*$/.test(currentLineText.trim())
@@ -579,6 +598,7 @@ async function parsePDFToBlocksWithPyMuPDF(
 
     let lookAhead = startIndex;
     let skippedTable = false;
+    const skippedCaptionIndices: number[] = [];
     while (lookAhead < lines.length) {
       const classification = classifiedTypes[lookAhead];
       const candidateLine = lines[lookAhead];
@@ -594,6 +614,15 @@ async function parsePDFToBlocksWithPyMuPDF(
         continue;
       }
 
+      if (skippedTable && tableCaptionPattern.test(candidateLine.text.trim())) {
+        debugLog(
+          `[TABLE_CAPTION_SKIP] Skipping table caption in findEffectiveNextLine: "${candidateLine.text.trim().substring(0, 60)}..."`,
+        );
+        skippedCaptionIndices.push(lookAhead);
+        lookAhead++;
+        continue;
+      }
+
       if (currentIsIncomplete && classification === "heading") {
         debugLog(
           `[SKIP_HEADING_AFTER_INCOMPLETE] Skipping "${candidateLine.text.trim().substring(0, 40)}..." (current line incomplete, cannot be heading)`,
@@ -602,9 +631,9 @@ async function parsePDFToBlocksWithPyMuPDF(
         continue;
       }
 
-      return { line: candidateLine, classification, index: lookAhead, skippedTable };
+      return { line: candidateLine, classification, index: lookAhead, skippedTable, skippedCaptionIndices };
     }
-    return { line: undefined, classification: undefined, index: -1, skippedTable };
+    return { line: undefined, classification: undefined, index: -1, skippedTable, skippedCaptionIndices };
   };
 
   const processedIndices = new Set<number>();
@@ -1026,6 +1055,17 @@ async function parsePDFToBlocksWithPyMuPDF(
         y: line.y + stats.medianLineHeight,
       };
       debugLog(`[TABLE_SKIP_BRIDGE] Bridging paragraph across table: "${line.text.trim().substring(0, 40)}..." → "${nextLine.text.trim().substring(0, 40)}..."`);
+
+      for (const capIdx of effective.skippedCaptionIndices) {
+        const capLine = lines[capIdx];
+        processedIndices.add(capIdx);
+        pendingTableCaptions.push({
+          text: capLine.text.trim(),
+          page: capLine.page,
+          origin: capLine.origin,
+        });
+        debugLog(`[TABLE_CAPTION_BUFFER] Buffered caption at index ${capIdx}: "${capLine.text.trim().substring(0, 60)}..."`);
+      }
     }
 
     const shouldSplit = shouldEndParagraphSimplified(
@@ -1112,85 +1152,7 @@ async function parsePDFToBlocksWithPyMuPDF(
       currentParaLines.push(line);
 
       if (shouldSplit && currentParaLines.length > 0) {
-        if (effective.skippedTable && lineIsIncomplete) {
-          let pullIdx = effective.index;
-          const tableCaptionPattern = /^(Table|Figure|Fig\.)\s+\d+/i;
-          const captionLines: TextLine[] = [];
-          let foundBodyContinuation = false;
-
-          while (pullIdx < lines.length) {
-            const pullLine = lines[pullIdx];
-            const pullType = classifiedTypes[pullIdx];
-
-            if (pullLine.isTable) {
-              pullIdx++;
-              continue;
-            }
-
-            if (
-              ["header", "footer", "footnote", "doi", "author", "journal", "affiliation"].includes(pullType)
-            ) {
-              pullIdx++;
-              continue;
-            }
-
-            const pullText = pullLine.text.trim();
-
-            if (tableCaptionPattern.test(pullText)) {
-              captionLines.push(pullLine);
-              processedIndices.add(pullIdx);
-              pullIdx++;
-              continue;
-            }
-
-            const startsLowercase = /^[a-z]/.test(pullText);
-            if (startsLowercase) {
-              foundBodyContinuation = true;
-              debugLog(
-                `[TABLE_PULL_FORWARD] Pulling post-table continuation: "${pullText.substring(0, 60)}..."`,
-              );
-              currentParaLines.push(pullLine);
-              processedIndices.add(pullIdx);
-
-              const pullComplete =
-                /[.!?]["'\u201D\u2019]?\s*$/.test(pullText) ||
-                /:\s*$/.test(pullText);
-              if (pullComplete) {
-                debugLog(
-                  `[TABLE_PULL_FORWARD] Sentence complete at "${pullText.substring(Math.max(0, pullText.length - 40))}"`,
-                );
-                break;
-              }
-              pullIdx++;
-              continue;
-            }
-
-            break;
-          }
-
-          flushParagraph();
-
-          for (const cap of captionLines) {
-            blocks.push(
-              createBlock(
-                "paragraph",
-                cap.text.trim(),
-                cap.page,
-                blocks.length,
-                cap.origin,
-                undefined,
-                deferSentenceSplitting,
-              ),
-            );
-            debugLog(`[TABLE_CAPTION] Emitted table caption: "${cap.text.trim().substring(0, 60)}..."`);
-          }
-
-          if (!foundBodyContinuation) {
-            debugLog(`[TABLE_PULL_FORWARD] No lowercase continuation found after table`);
-          }
-        } else {
-          flushParagraph();
-        }
+        flushParagraph();
       } else if (!shouldSplit) {
         if (lineIsIncomplete && nextLine && nextLine.page !== line.page) {
           let pullIdx = effective.index;
