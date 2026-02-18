@@ -386,20 +386,11 @@ export default function Pricing() {
                   <Button 
                     className="w-full bg-brand hover:bg-brand-hover h-12 text-base rounded-xl"
                     onClick={handleSubscribePro}
-                    disabled={isProcessing || paymentCompleteMutation.isPending || !isSDKLoaded}
+                    disabled={true}
                     data-testid="button-subscribe-pro"
                   >
-                    {isProcessing || paymentCompleteMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {t('pricing.processing') || "처리 중..."}
-                      </>
-                    ) : (
-                      <>
-                        <Crown className="mr-2 h-4 w-4" />
-                        {t('pricing.upgradeToPro') || "Pro로 업그레이드"}
-                      </>
-                    )}
+                    <Crown className="mr-2 h-4 w-4" />
+                    {t('pricing.upgradeToPro') || "Pro로 업그레이드"}
                   </Button>
                   <div className="text-center" style={{ fontSize: '11px' }}>
                     <p className="text-muted-foreground">
