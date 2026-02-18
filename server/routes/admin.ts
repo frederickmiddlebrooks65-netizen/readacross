@@ -5,6 +5,9 @@ import { DocumentService } from "../services/DocumentService.js";
 import { TokenTrackingService } from "../services/TokenTrackingService.js";
 import { authenticateJWT, requireRole, type AuthenticatedRequest } from "../auth.js";
 import type { Request, Response } from "express";
+import { db } from "../db.js";
+import { users, tokenUsage } from "@shared/schema";
+import { eq, sql, desc, ilike, or, and } from "drizzle-orm";
 
 const router = Router();
 
@@ -333,6 +336,163 @@ router.get("/token-usage", authenticateJWT, requireRole(['admin']), async (req: 
   } catch (error) {
     console.error("Error fetching token usage:", error);
     res.status(500).json({ error: "Failed to fetch token usage data" });
+  }
+});
+
+// GET /users - Admin user management list
+router.get("/users", authenticateJWT, requireRole(['admin']), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const search = (req.query.search as string) || "";
+    const planFilter = req.query.plan as string;
+    const statusFilter = req.query.status as string;
+    const sortBy = (req.query.sortBy as string) || "createdAt";
+    const sortOrder = (req.query.sortOrder as string) || "desc";
+
+    const offset = (page - 1) * limit;
+
+    const conditions = [];
+    if (search) {
+      conditions.push(
+        or(
+          ilike(users.username, `%${search}%`),
+          ilike(users.email, `%${search}%`)
+        )
+      );
+    }
+    if (planFilter && planFilter !== "all") {
+      conditions.push(eq(users.plan, planFilter as any));
+    }
+    if (statusFilter && statusFilter !== "all") {
+      conditions.push(eq(users.status, statusFilter as any));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const sortColumn = sortBy === "username" ? users.username
+      : sortBy === "plan" ? users.plan
+      : sortBy === "status" ? users.status
+      : sortBy === "lastLoginAt" ? users.lastLoginAt
+      : users.createdAt;
+
+    const orderFn = sortOrder === "asc" ? sql`${sortColumn} ASC NULLS LAST` : sql`${sortColumn} DESC NULLS LAST`;
+
+    const [userRows, countResult] = await Promise.all([
+      db.select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+        plan: users.plan,
+        planType: users.planType,
+        planExpiresAt: users.planExpiresAt,
+        lastLoginAt: users.lastLoginAt,
+        createdAt: users.createdAt,
+        oauthProvider: users.oauthProvider,
+        documentsUploaded: users.documentsUploaded,
+      })
+        .from(users)
+        .where(whereClause)
+        .orderBy(orderFn)
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(whereClause),
+    ]);
+
+    const total = Number(countResult[0]?.count || 0);
+
+    res.json({
+      users: userRows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// PATCH /users/:id - Update user plan/status/role
+router.patch("/users/:id", authenticateJWT, requireRole(['admin']), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    const allowedFields = ["plan", "planType", "planExpiresAt", "status", "role"];
+    const updates: Record<string, any> = {};
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        if (field === "planExpiresAt") {
+          updates[field] = req.body[field] ? new Date(req.body[field]) : null;
+        } else {
+          updates[field] = req.body[field];
+        }
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    updates.updatedAt = new Date();
+
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, userId))
+      .returning({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+        plan: users.plan,
+        planType: users.planType,
+        planExpiresAt: users.planExpiresAt,
+      });
+
+    if (!updated) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+// GET /users/:id/token-usage - Get specific user's token usage
+router.get("/users/:id/token-usage", authenticateJWT, requireRole(['admin']), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const plan = (user.plan || "starter") as "starter" | "pro" | "admin" | "beta_pro";
+    const snapshot = await TokenTrackingService.getUsageSnapshot(userId, plan);
+
+    res.json(snapshot);
+  } catch (error) {
+    console.error("Error fetching user token usage:", error);
+    res.status(500).json({ error: "Failed to fetch user token usage" });
   }
 });
 
