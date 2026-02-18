@@ -125,6 +125,31 @@ interface SyncLog {
   durationMs?: number | null;
 }
 
+interface AdminUser {
+  id: number;
+  username: string;
+  email: string | null;
+  role: string;
+  status: string;
+  plan: string;
+  planType: string | null;
+  planExpiresAt: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+  oauthProvider: string | null;
+  documentsUploaded: number;
+}
+
+interface AdminUsersResponse {
+  users: AdminUser[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 // Main AdminNew Component
 export function AdminNew() {
   const [selectedRssFeeds, setSelectedRssFeeds] = useState<Set<number>>(new Set());
@@ -250,6 +275,9 @@ export function AdminNew() {
 
         {/* 3. 문서 관리 섹션 */}
         <DocumentManagement expiredDocuments={expiredDocuments} />
+
+        {/* 5. 사용자 관리 섹션 */}
+        <UserManagement />
 
         {/* 4. 동기화 로그 섹션 */}
         <SyncLogsSection />
@@ -2253,6 +2281,273 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
         onConfirm={handleCleanupConfirm}
         variant="default"
       />
+    </div>
+  );
+}
+
+// 5. User Management Section
+function UserManagement() {
+  const [search, setSearch] = useState("");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+  const [editPlan, setEditPlan] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [editRole, setEditRole] = useState("");
+  const { toast } = useToast();
+  const { timezone, language } = useTimezone();
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery<AdminUsersResponse>({
+    queryKey: ["/api/admin/users", { page, search, plan: planFilter, status: statusFilter }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", "20");
+      if (search) params.set("search", search);
+      if (planFilter !== "all") params.set("plan", planFilter);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      const res = await apiRequest(`/api/admin/users?${params.toString()}`);
+      return res as AdminUsersResponse;
+    },
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, updates }: { userId: number; updates: Record<string, string> }) => {
+      return await apiRequest(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        body: JSON.stringify(updates),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "사용자 정보가 업데이트되었습니다" });
+      setEditingUser(null);
+    },
+    onError: () => {
+      toast({ title: "오류", description: "사용자 정보 업데이트에 실패했습니다", variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = (user: AdminUser) => {
+    setEditingUser(user);
+    setEditPlan(user.plan);
+    setEditStatus(user.status);
+    setEditRole(user.role);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingUser) return;
+    updateUserMutation.mutate({
+      userId: editingUser.id,
+      updates: { plan: editPlan, status: editStatus, role: editRole },
+    });
+  };
+
+  const formatAdminDateTime = (dateString: string | null | undefined) => {
+    if (!dateString) return "-";
+    return formatDateTime(dateString, { timezone, language });
+  };
+
+  const getPlanBadge = (plan: string) => {
+    const variants: Record<string, string> = {
+      starter: "bg-gray-100 text-gray-700",
+      pro: "bg-blue-100 text-blue-700",
+      admin: "bg-red-100 text-red-700",
+      beta_pro: "bg-purple-100 text-purple-700",
+    };
+    return <Badge className={variants[plan] || "bg-gray-100 text-gray-700"}>{plan}</Badge>;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, string> = {
+      active: "bg-green-100 text-green-700",
+      locked: "bg-red-100 text-red-700",
+      pending: "bg-yellow-100 text-yellow-700",
+    };
+    return <Badge className={variants[status] || "bg-gray-100 text-gray-700"}>{status}</Badge>;
+  };
+
+  const users = data?.users || [];
+  const pagination = data?.pagination;
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            사용자 관리
+          </CardTitle>
+          <CardDescription>사용자 목록 및 플랜/상태 관리</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="사용자 검색 (이름, 이메일)"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                className="pl-9"
+              />
+            </div>
+            <Select value={planFilter} onValueChange={(v) => { setPlanFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="플랜" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체 플랜</SelectItem>
+                <SelectItem value="starter">Starter</SelectItem>
+                <SelectItem value="pro">Pro</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="beta_pro">Beta Pro</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="상태" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체 상태</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="locked">Locked</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+              <span>로딩 중...</span>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">사용자가 없습니다</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="py-2 px-2 font-medium">Username</th>
+                    <th className="py-2 px-2 font-medium">Email</th>
+                    <th className="py-2 px-2 font-medium">Plan</th>
+                    <th className="py-2 px-2 font-medium">Status</th>
+                    <th className="py-2 px-2 font-medium">Role</th>
+                    <th className="py-2 px-2 font-medium">OAuth</th>
+                    <th className="py-2 px-2 font-medium">Last Login</th>
+                    <th className="py-2 px-2 font-medium">Joined</th>
+                    <th className="py-2 px-2 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr key={user.id} className="border-b hover:bg-muted/50">
+                      <td className="py-2 px-2 font-medium">{user.username}</td>
+                      <td className="py-2 px-2 text-muted-foreground">{user.email || "-"}</td>
+                      <td className="py-2 px-2">{getPlanBadge(user.plan)}</td>
+                      <td className="py-2 px-2">{getStatusBadge(user.status)}</td>
+                      <td className="py-2 px-2">{user.role}</td>
+                      <td className="py-2 px-2">{user.oauthProvider || "-"}</td>
+                      <td className="py-2 px-2 text-xs">{formatAdminDateTime(user.lastLoginAt)}</td>
+                      <td className="py-2 px-2 text-xs">{formatAdminDateTime(user.createdAt)}</td>
+                      <td className="py-2 px-2">
+                        <Button size="sm" variant="ghost" onClick={() => openEditDialog(user)}>
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {pagination && pagination.totalPages > 0 && (
+            <div className="flex items-center justify-between pt-4">
+              <span className="text-sm text-muted-foreground">
+                Page {pagination.page} of {pagination.totalPages} ({pagination.total}명)
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={pagination.page <= 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                  disabled={pagination.page >= pagination.totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>사용자 수정 - {editingUser?.username}</DialogTitle>
+            <DialogDescription>플랜, 상태, 역할을 변경할 수 있습니다</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>플랜</Label>
+              <Select value={editPlan} onValueChange={setEditPlan}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="starter">Starter</SelectItem>
+                  <SelectItem value="pro">Pro</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="beta_pro">Beta Pro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>상태</Label>
+              <Select value={editStatus} onValueChange={setEditStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="locked">Locked</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>역할</Label>
+              <Select value={editRole} onValueChange={setEditRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="moderator">Moderator</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingUser(null)}>취소</Button>
+            <Button onClick={handleSaveEdit} disabled={updateUserMutation.isPending}>
+              {updateUserMutation.isPending ? "저장 중..." : "저장"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
