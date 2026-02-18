@@ -44,6 +44,11 @@ Performance optimizations (Feb 2026):
 - **Snippet denormalization**: `snippet` column added to `documents` table, pre-generated at document creation time, eliminating expensive sentences+paragraphs JOIN queries on every Explore page load.
 - **DB connection pool expanded**: `max` increased from 5 to 15 in server/db.ts for better concurrent request handling.
 
+Admin & Operations tooling (Feb 2026):
+- **Telegram notification service**: `server/services/NotificationService.ts` sends fire-and-forget alerts via Telegram Bot API. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` env vars. Triggers: new user signup, token 80% threshold, system errors. Uses per-month dedup for threshold alerts.
+- **Admin user management**: `GET/PATCH /api/admin/users` endpoints with search, plan/status filtering, pagination, and inline editing. Admin UI section in AdminNew.tsx with table view, edit dialog for plan/status/role changes.
+- **Token threshold notifications**: TokenTrackingService.recordTokens automatically checks 80% usage and sends Telegram alert (deduplicated per user per month).
+
 ## External Dependencies
 - **Google Gemini API**: Used for document translation, text type detection, glossary generation, AI-powered language practice, AI coaching, OCR, and document summarization. Models include gemini-2.5-flash and gemini-2.0-flash-lite.
 - **arXiv API**: Integrated for fetching and processing academic papers.
