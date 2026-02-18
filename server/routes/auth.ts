@@ -18,6 +18,10 @@ import {
   type AuthenticatedRequest
 } from '../auth';
 import { storage } from '../storage';
+import { NotificationService } from '../services/NotificationService.js';
+import { db } from '../db.js';
+import { users as usersTable } from '@shared/schema';
+import { sql } from 'drizzle-orm';
 import { 
   loginSchema, 
   signupSchema, 
@@ -186,6 +190,9 @@ router.post('/signup', signupLimiter, async (req, res) => {
     });
 
     await logSecurityEvent('signup_email', user.id, req.ip, req.get('User-Agent'));
+
+    const [{ count: totalUsers }] = await db.select({ count: sql<number>`count(*)` }).from(usersTable);
+    NotificationService.notifyNewUser(username, email, Number(totalUsers));
 
     res.status(201).json({
       message: 'Account created successfully. Please check your email to verify your account.',

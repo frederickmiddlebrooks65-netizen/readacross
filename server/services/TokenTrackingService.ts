@@ -1,8 +1,11 @@
 import { db } from "../db.js";
-import { tokenUsage, PLAN_LIMITS, type TokenUsage } from "@shared/schema";
+import { tokenUsage, users, PLAN_LIMITS, type TokenUsage } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { NotificationService } from "./NotificationService.js";
 
 export type PlanType = "starter" | "pro" | "admin" | "beta_pro";
+
+const notifiedThresholdUsers = new Set<string>();
 
 function getCurrentMonth(): string {
   const now = new Date();
@@ -97,6 +100,8 @@ export class TokenTrackingService {
       `[TokenTracking] User ${userId}: +${tokensUsed} tokens (premium: ${isPremiumModel}), ` +
       `total: ${updated.totalTokensUsed}, premium: ${updated.premiumTokensUsed}`
     );
+
+    this.checkAndNotifyThreshold(userId, updated.totalTokensUsed, month).catch(() => {});
 
     return updated;
   }
@@ -297,5 +302,35 @@ export class TokenTrackingService {
     if (plan === "admin") return false;
     const limits = PLAN_LIMITS[plan];
     return totalTokensUsed >= limits.monthlyTokenCap * 0.8;
+  }
+
+  private static async checkAndNotifyThreshold(
+    userId: number,
+    totalTokensUsed: number,
+    month: string
+  ): Promise<void> {
+    const dedupKey = `${userId}-${month}`;
+    if (notifiedThresholdUsers.has(dedupKey)) return;
+
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) return;
+
+    const plan = (user.plan || "starter") as PlanType;
+    if (!this.isNearing80Percent(totalTokensUsed, plan)) return;
+
+    notifiedThresholdUsers.add(dedupKey);
+    const limits = PLAN_LIMITS[plan];
+    const usagePercent = (totalTokensUsed / limits.monthlyTokenCap) * 100;
+    await NotificationService.notifyTokenThreshold(
+      user.username,
+      user.email,
+      plan,
+      usagePercent
+    );
   }
 }
