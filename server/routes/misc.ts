@@ -4,7 +4,8 @@ import { authenticateJWT, AuthenticatedRequest } from "../auth.js";
 import { db } from "../db.js";
 import { glossary, sentences, documents, notes, paragraphs } from "@shared/schema";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
-import { GeminiService } from "../services/GeminiService.js";
+import { GeminiService, type UserPlan } from "../services/GeminiService.js";
+import { TokenTrackingService } from "../services/TokenTrackingService.js";
 
 const router = Router();
 
@@ -166,7 +167,7 @@ router.get("/glossary", authenticateJWT, async (req: AuthenticatedRequest, res: 
   }
 });
 
-// Generate glossary definition using AI
+// Generate glossary definition using AI (optimized with gemini-2.0-flash-lite)
 router.post("/glossary/generate", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
@@ -178,6 +179,19 @@ router.post("/glossary/generate", authenticateJWT, async (req: AuthenticatedRequ
 
     if (!term) {
       return res.status(400).json({ error: "Term is required" });
+    }
+
+    const userId = req.userId!;
+
+    const user = await storage.getUser(userId);
+    const userPlan = ((user?.plan) || "starter") as UserPlan;
+
+    const tokenCheck = await TokenTrackingService.checkTokenLimit(userId, userPlan);
+    if (!tokenCheck.canProceed) {
+      return res.status(429).json({
+        error: tokenCheck.message || "이번 달 토큰 사용량을 초과했습니다.",
+        errorCode: tokenCheck.errorCode,
+      });
     }
 
     console.log("[GLOSSARY GENERATE] Generating for term:", term);
@@ -200,20 +214,19 @@ Guidelines:
 - Difficulty based on word complexity and usage frequency
 - Consider the context if provided`;
 
-    const userId = req.userId;
     const response = await GeminiService.generateText(prompt, 
       "You are a helpful language learning assistant. Provide educational glossary entries in valid JSON format only. Do not include markdown code blocks.",
       { 
         maxTokens: 500, 
         temperature: 0.3,
         jsonMode: true,
-        userId: userId || undefined,
+        userId,
+        model: "flash",
       }
     );
 
     let content = response || "{}";
     
-    // Remove markdown code blocks if present
     content = content
       .replace(/```json\n?/g, "")
       .replace(/```\n?/g, "")
@@ -221,7 +234,6 @@ Guidelines:
 
     let generatedData = JSON.parse(content);
     
-    // Handle array response - take first element
     if (Array.isArray(generatedData)) {
       generatedData = generatedData[0] || {};
     }

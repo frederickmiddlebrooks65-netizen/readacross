@@ -7,7 +7,8 @@ import { authenticateJWT, AuthenticatedRequest } from "../auth.js";
 import { Response } from "express";
 import { db } from "../db.js";
 import { eq, and, sql } from "drizzle-orm";
-import { GeminiService } from "../services/GeminiService.js";
+import { GeminiService, type UserPlan } from "../services/GeminiService.js";
+import { TokenTrackingService } from "../services/TokenTrackingService.js";
 
 const router = Router();
 
@@ -280,39 +281,53 @@ router.post("/:id/coach", authenticateJWT, async (req: AuthenticatedRequest, res
       return res.status(400).json({ error: "Invalid sentence ID" });
     }
 
-    // Get the sentence
     const sentence = await storage.getSentence(sentenceId);
     if (!sentence) {
       return res.status(404).json({ error: "Sentence not found" });
     }
 
-    // Check user tier for premium feature (optional - can be removed if free for all)
     const user = await storage.getUser(userId);
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
 
-    const prompt = `You are a Korean language learning coach. Analyze the following sentence and provide helpful coaching for a language learner.
+    const userPlan = (user.plan || "starter") as UserPlan;
+
+    const tokenCheck = await TokenTrackingService.checkTokenLimit(userId, userPlan);
+    if (!tokenCheck.canProceed) {
+      return res.status(429).json({
+        error: tokenCheck.message || "이번 달 토큰 사용량을 초과했습니다.",
+        errorCode: tokenCheck.errorCode,
+      });
+    }
+
+    const prompt = `You are a warm, intellectually curious mentor and language coach — like a trusted academic advisor who genuinely enjoys helping learners discover new insights.
+
+Analyze the following sentence and provide thoughtful, encouraging coaching:
 
 Original (Korean): ${sentence.source}
 User's Translation (English): ${sentence.target || "Not yet translated"}
 
 Please provide:
-1. A polished, natural English translation of the Korean sentence
-2. Key grammar insights that would help a learner understand the sentence structure
-3. Nuance tips about cultural context, formality levels, or common usage patterns
+1. "polishedTranslation": A polished, natural English translation that captures the nuance and tone of the original Korean.
+2. "grammarInsight": A clear, concise explanation of the key grammar patterns in this sentence. Highlight what makes them interesting or tricky, and offer a small 'aha moment' — something the learner might not have noticed. Avoid overly technical jargon; explain as a friendly mentor would.
+3. "nuanceTips": Share cultural context, register/formality insights, or common usage patterns. Connect this to real-world usage so the learner sees how native speakers would use this in daily life.
 
-Respond in JSON format:
+Keep your tone supportive and intellectually engaging — like a mentor who says "Great question! Here's something fascinating about that..."
+
+Respond ONLY in valid JSON format:
 {
   "polishedTranslation": "...",
   "grammarInsight": "...",
   "nuanceTips": "..."
 }`;
 
+    const systemPrompt = `You are ReadAcross's AI Precision Coach — a friendly, knowledgeable mentor who combines warmth with intellectual depth. You help language learners build genuine understanding, not just memorization. Your responses should feel like a conversation with a brilliant, approachable professor who truly cares about your progress. Always respond in valid JSON format only.`;
+
     const content = await GeminiService.generateText(
       prompt,
-      "You are a helpful Korean language tutor. Respond only in valid JSON format.",
-      { maxTokens: 1000, plan: "starter", jsonMode: true, userId }
+      systemPrompt,
+      { maxTokens: 1200, plan: userPlan, jsonMode: true, userId }
     );
 
     if (!content) {
@@ -325,7 +340,8 @@ Respond in JSON format:
       polishedTranslation: coaching.polishedTranslation || "",
       grammarInsight: coaching.grammarInsight || "",
       nuanceTips: coaching.nuanceTips || "",
-      cached: false
+      cached: false,
+      modelUsed: GeminiService.getModelForPlan(userPlan),
     });
   } catch (error) {
     console.error("Error generating AI coaching:", error);
