@@ -37,6 +37,13 @@ Recent PDF pipeline improvements (Feb 2026):
 - **Table/list cluster heading protection**: postProcessBlocksStructural now blocks heading promotion for single-word blocks and blocks surrounded by 3+ nearby short blocks (table cell / summary table patterns).
 - **arxiv profile paragraph segmentation**: Dedicated `arxiv` branch in shouldEndParagraphSimplified with page-boundary tolerance (allows sentence continuation across pages, unlike strict journal mode).
 
+Performance optimizations (Feb 2026):
+- **Legacy thumbnail queue disabled**: Removed `thumbnailQueue.addJob()` calls from rssCrawler.ts and arxivCrawler.ts to eliminate unnecessary CPU/storage usage from background image processing.
+- **Image proxy bypass**: `getProxiedImageUrl` in SegmentViewer.tsx now returns original URLs directly, bypassing the server-side image proxy for faster CDN-direct loading.
+- **Explore page pagination**: Server-side pagination (`?page=N&limit=N`) with lightweight DTO (excludes `content`, `structuredContent`, `rawContent`) for the `/api/library/explore` endpoint.
+- **Snippet denormalization**: `snippet` column added to `documents` table, pre-generated at document creation time, eliminating expensive sentences+paragraphs JOIN queries on every Explore page load.
+- **DB connection pool expanded**: `max` increased from 5 to 15 in server/db.ts for better concurrent request handling.
+
 ## External Dependencies
 - **Google Gemini API**: Used for document translation, text type detection, glossary generation, AI-powered language practice, AI coaching, OCR, and document summarization. Models include gemini-2.5-flash and gemini-2.0-flash-lite.
 - **arXiv API**: Integrated for fetching and processing academic papers.
