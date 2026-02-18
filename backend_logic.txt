@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""
+PDF Layout Extractor using PyMuPDF (fitz)
+
+Usage:
+    python3 pdfLayoutExtractor.py <pdf_path>
+
+Output:
+    JSON array of TextLine objects to stdout
+    Errors to stderr
+
+Schema:
+    [
+      {
+        "page": 1,
+        "y": 123.45,
+        "xStart": 56.7,
+        "xEnd": 400.1,
+        "fontHeight": 11.0,
+        "text": "..."
+      },
+      ...
+    ]
+"""
+
+import sys
+import json
+import fitz  # PyMuPDF
+
+
+def extract_text_lines(pdf_path: str) -> list:
+    """
+    Extract text lines from PDF with layout information.
+    
+    Returns:
+        List of TextLine dicts, sorted by (page, y, xStart)
+    """
+    lines = []
+    
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception as e:
+        print(f"Error opening PDF: {e}", file=sys.stderr)
+        return []
+    
+    try:
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            
+            # Get text with dictionary (includes layout info)
+            text_dict = page.get_text("dict")
+            
+            if not text_dict or "blocks" not in text_dict:
+                continue
+            
+            for block in text_dict["blocks"]:
+                # Skip non-text blocks
+                if block["type"] != 0:  # 0 = text block
+                    continue
+                
+                if "lines" not in block:
+                    continue
+                
+                for line in block["lines"]:
+                    if "spans" not in line or not line["spans"]:
+                        continue
+                    
+                    # Skip if all spans are empty
+                    spans_text = [span.get("text", "").strip() for span in line["spans"]]
+                    if not any(spans_text):
+                        continue
+                    
+                    # Collect font heights from all spans
+                    font_heights = [
+                        span.get("size", 12.0) for span in line["spans"]
+                        if "size" in span
+                    ]
+                    if not font_heights:
+                        font_heights = [12.0]
+                    
+                    # Calculate median font height
+                    font_heights.sort()
+                    median_font_height = font_heights[len(font_heights) // 2]
+                    
+                    # Get line bounding box
+                    line_bbox = line.get("bbox", [0, 0, 0, 0])
+                    x_start = line_bbox[0]
+                    y = line_bbox[1]
+                    x_end = line_bbox[2]
+                    
+                    # Join spans into text (x-ordered, with spaces)
+                    sorted_spans = sorted(line["spans"], key=lambda s: s.get("bbox", [0, 0, 0, 0])[0])
+                    text_parts = []
+                    for span in sorted_spans:
+                        text = span.get("text", "").strip()
+                        if text:
+                            text_parts.append(text)
+                    
+                    if not text_parts:
+                        continue
+                    
+                    text = " ".join(text_parts)
+                    
+                    # Create TextLine entry
+                    text_line = {
+                        "page": page_num + 1,  # 1-indexed
+                        "y": round(y, 2),
+                        "xStart": round(x_start, 2),
+                        "xEnd": round(x_end, 2),
+                        "fontHeight": round(median_font_height, 2),
+                        "text": text,
+                    }
+                    
+                    lines.append(text_line)
+        
+        doc.close()
+    
+    except Exception as e:
+        print(f"Error extracting text: {e}", file=sys.stderr)
+        return []
+    
+    # Sort by page, y, xStart
+    lines.sort(key=lambda l: (l["page"], l["y"], l["xStart"]))
+    
+    return lines
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 pdfLayoutExtractor.py <pdf_path>", file=sys.stderr)
+        sys.exit(1)
+    
+    pdf_path = sys.argv[1]
+    
+    lines = extract_text_lines(pdf_path)
+    
+    # Output JSON to stdout only
+    print(json.dumps(lines, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
+#!/usr/bin/env python3
+"""
+PDF Layout Extractor using PyMuPDF (fitz)
+Extracts text lines with position information for layout-first processing
+
+Output: JSON array of TextLine objects
+{ page: int, y: float, xStart: float, xEnd: float, text: string, fontHeight: float }
+"""
+
+import sys
+import json
+import os
+import io
+import fitz  # PyMuPDF
+
+def extract_lines_from_pdf(pdf_path: str) -> dict:
+    """
+    Extract text lines from PDF with position information.
+    Returns dict with 'lines' array and 'pageHeights' dict.
+    """
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception as e:
+        return {"error": f"Failed to open PDF: {str(e)}", "lines": [], "pageHeights": {}, "tableBboxes": []}
+    
+    lines = []
+    page_heights = {}
+    table_bboxes = []
+    
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        page_number = page_num + 1  # 1-based page numbering
+        page_rect = page.rect
+        page_heights[page_number] = page_rect.height
+        
+        # Detect tables on this page (suppress PyMuPDF stdout warnings)
+        try:
+            old_stdout = sys.stdout
+            sys.stdout = io.StringIO()
+            try:
+                tables = page.find_tables()
+                for table in tables.tables:
+                    tb = table.bbox
+                    table_bboxes.append({
+                        "page": page_number,
+                        "bbox": [tb[0], tb[1], tb[2], tb[3]]
+                    })
+            finally:
+                sys.stdout = old_stdout
+        except Exception:
+            pass
+        
+        # Get text blocks with detailed position info
+        # Using "dict" mode for comprehensive text extraction
+        blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+        
+        for block in blocks.get("blocks", []):
+            if block.get("type") != 0:  # Skip non-text blocks (images, etc.)
+                continue
+            
+            for line_data in block.get("lines", []):
+                bbox = line_data.get("bbox", [0, 0, 0, 0])
+                spans = line_data.get("spans", [])
+                
+                if not spans:
+                    continue
+                
+                # Aggregate text from all spans in the line
+                line_text = ""
+                font_heights = []
+                
+                for span in spans:
+                    text = span.get("text", "")
+                    if text.strip():
+                        line_text += text
+                        font_heights.append(span.get("size", 12))
+                
+                if not line_text.strip():
+                    continue
+                
+                # Calculate median font height for the line
+                font_heights.sort()
+                median_font = font_heights[len(font_heights) // 2] if font_heights else 12
+                
+                lines.append({
+                    "page": page_number,
+                    "y": bbox[1],  # top of line (yMin)
+                    "xStart": bbox[0],  # left edge
+                    "xEnd": bbox[2],  # right edge
+                    "text": line_text.strip(),
+                    "fontHeight": median_font
+                })
+    
+    doc.close()
+    
+    # Sort lines by page, then by y position, then by x position
+    lines.sort(key=lambda l: (l["page"], l["y"], l["xStart"]))
+    
+    return {
+        "lines": lines,
+        "pageHeights": page_heights,
+        "tableBboxes": table_bboxes,
+        "extractorVersion": f"pymupdf-{fitz.version[0]}"
+    }
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(json.dumps({"error": "No PDF path provided", "lines": [], "pageHeights": {}}))
+        sys.exit(1)
+    
+    pdf_path = sys.argv[1]
+    result = extract_lines_from_pdf(pdf_path)
+    
+    # Output as JSON to stdout
+    print(json.dumps(result, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
+def main():
+    print("Hello from repl-nix-workspace!")
+
+
+if __name__ == "__main__":
+    main()
