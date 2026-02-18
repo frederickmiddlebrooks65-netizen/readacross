@@ -726,10 +726,12 @@ ${text}`;
       plan?: UserPlan;
       jsonMode?: boolean;
       userId?: number;
+      model?: "pro" | "flash";
     },
   ): Promise<string> {
-    const plan = options?.plan || "starter";
-    const modelName = this.getModelForPlan(plan, false);
+    const modelName = options?.model
+      ? MODEL_CONFIG[options.model]
+      : this.getModelForPlan(options?.plan || "starter", false);
 
     try {
       const model = genAI.getGenerativeModel({

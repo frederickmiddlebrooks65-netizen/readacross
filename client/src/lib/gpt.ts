@@ -1,7 +1,7 @@
 import { Sentence } from "./types";
 
 /**
- * Translate text using OpenAI's GPT API
+ * Translate text using Gemini AI API
  * @param text Text to translate
  * @param sourceLanguage Source language code (e.g., 'en', 'ko')
  * @param targetLanguage Target language code
