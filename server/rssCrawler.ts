@@ -5,7 +5,6 @@ import crypto from "crypto";
 import { storage } from "./storage";
 import { DocumentService } from "./services/DocumentService";
 import type { RssFeed, RssArticle } from "@shared/schema";
-import { thumbnailQueue } from "./thumbnailQueue";
 // estimateDifficulty import removed (Guardian crawler no longer used)
 // STEP 4 FIX: Use unified sentence splitting from textUtils
 import { splitIntoSentences } from "./utils/textUtils";
@@ -426,26 +425,6 @@ export async function convertRSSItemToDocument(
 
     // ✅ V2 성공 시 즉시 반환 - 레거시 경로 완전 차단
     if (document && document.id) {
-      // 썸네일 추출 작업을 큐에 추가
-      try {
-        const sourceData = {
-          ...item,
-          extractedContent: finalContent,
-          fallbackUrl: item.link,
-        };
-
-        await thumbnailQueue.addJob({
-          documentId: document.id,
-          sourceType: "rss",
-          sourceData: sourceData,
-          priority: "normal",
-        });
-
-        console.log(`Added thumbnail extraction job for RSS document ${document.id}`);
-      } catch (error) {
-        console.error(`Failed to queue thumbnail extraction for RSS document ${document.id}:`, error);
-      }
-
       return document.id;
     }
 
@@ -498,44 +477,6 @@ export async function convertRSSArticleToDocument(
 
     // ✅ V2 성공 시 즉시 반환 - 레거시 경로 완전 차단
     if (document && document.id) {
-      // Add thumbnail extraction to queue
-      try {
-        // Get feed URL from feed data if available
-        const feedData = await storage.getRSSFeedById(feed.feedId);
-        if (!feedData) {
-          throw new Error("Feed data not found");
-        }
-        const rssData = await fetchRSSFeed(feedData.canonicalUrl);
-        const rssItem = rssData.items.find(
-          (item: any) => item.guid === article.guid,
-        );
-
-        if (rssItem) {
-          await thumbnailQueue.addJob({
-            documentId: document.id,
-            sourceType: "rss",
-            sourceData: {
-              ...rssItem,
-              fallbackUrl: article.link,
-              extractedContent: content,
-            },
-            priority: "normal",
-          });
-        } else if (article.link) {
-          await thumbnailQueue.addJob({
-            documentId: document.id,
-            sourceType: "url",
-            sourceData: { url: article.link },
-            priority: "normal",
-          });
-        }
-      } catch (error) {
-        console.error(
-          `Failed to queue thumbnail extraction for RSS document ${document.id}:`,
-          error,
-        );
-      }
-
       console.log(
         `Converted RSS article ${articleId} to document ${document.id}`,
       );
@@ -699,18 +640,6 @@ export async function convertRSSItemToDocumentEnhanced(
       // Add tags separately after document creation
       await storage.updateDocument(document.id, {
         tags: JSON.stringify(tags),
-      });
-      
-      // Add thumbnail extraction job
-      await thumbnailQueue.addJob({
-        documentId: document.id,
-        sourceType: "rss",
-        sourceData: {
-          ...item,
-          extractedContent: content,
-          fallbackUrl: item.link,
-        },
-        priority: "normal",
       });
       
       console.log(`[RSS_ENHANCED] Created document ${document.id}: ${item.title}`);

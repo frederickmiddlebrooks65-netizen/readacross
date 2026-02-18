@@ -1,6 +1,5 @@
 import { storage } from './storage.js';
 import { parsePDF } from './pdfUtils.js';
-import { thumbnailQueue } from './thumbnailQueue';
 import { generateStructuredBlocks } from './utils/structuredUtils.js';
 
 /**
@@ -549,14 +548,6 @@ export async function seedArxivPapers(): Promise<void> {
         archetype: "academic",
         archetypeConfidence: 1.0,
         archetypeSource: "source"
-      });
-
-      // Add thumbnail extraction job for arXiv paper
-      await thumbnailQueue.addJob({
-        documentId: document.id,
-        sourceType: 'url',
-        sourceData: { url: paper.arxivUrl },
-        priority: 'low' // Lower priority for batch imports
       });
 
       console.log(`Successfully added: ${paper.title} (${paragraphs.length} sections, ${paragraphs.reduce((total, p) => total + p.sentences.length, 0)} sentences)`);

@@ -1221,35 +1221,7 @@ function StructuredBlockRenderer({
 
 // Utility function to create proxy URL for external images
 function getProxiedImageUrl(originalUrl: string, options?: { width?: number; height?: number; quality?: number }): string {
-  // Only proxy external URLs (not relative or local URLs)
-  if (!originalUrl.startsWith('http://') && !originalUrl.startsWith('https://')) {
-    return originalUrl;
-  }
-
-  // Check if it's a local/Replit URL that doesn't need proxying
-  if (originalUrl.includes('replit.app') || originalUrl.includes('replit.com') || originalUrl.includes('localhost')) {
-    return originalUrl;
-  }
-
-  const proxyUrl = new URL('/api/image-proxy', window.location.origin);
-  proxyUrl.searchParams.set('url', originalUrl);
-
-  if (options?.width) {
-    proxyUrl.searchParams.set('width', options.width.toString());
-  }
-  if (options?.height) {
-    proxyUrl.searchParams.set('height', options.height.toString());
-  }
-  if (options?.quality) {
-    proxyUrl.searchParams.set('quality', options.quality.toString());
-  }
-
-  // Set device pixel ratio for retina displays
-  if (window.devicePixelRatio > 1) {
-    proxyUrl.searchParams.set('dpr', window.devicePixelRatio.toString());
-  }
-
-  return proxyUrl.toString();
+  return originalUrl;
 }
 
 // LazyImage component with loading states and error handling
