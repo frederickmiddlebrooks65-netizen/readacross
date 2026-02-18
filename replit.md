@@ -21,7 +21,7 @@ The system is built using TypeScript, with React for the frontend and Express.js
 - **Document & Sentence Management**: Includes sorting, filtering, real-time searching within notebooks, a favorites system, enhanced status filters, bulk operations, and editable category dropdowns for documents.
 - **AI Coaching**: Provides AI-powered sentence coaching (polished translation, grammar insights, nuance tips) in comprehension and composition modes, with tier-based access.
 - **Context-Aware AI Assistant**: Leverages full document context for intelligent Q&A for Pro users.
-- **Monetization**: Implements subscription tiers (Free/Pro/Admin) with differentiated AI model access (gemini-1.5-flash for Free, gemini-1.5-pro for Pro) and integrates the PortOne payment gateway.
+- **Monetization**: Implements subscription tiers (Free/Pro/Admin) with differentiated AI model access (gemini-2.0-flash-lite for Free, gemini-2.5-flash for Pro) and integrates the PortOne payment gateway. All AI features route through TokenTrackingService for accurate per-user usage tracking in the token_usage table.
 - **Core Enhancements**: Incorporates Gemini-based language detection, a language-agnostic schema for multi-language pair support, and a `translations` table for storing multiple language pair translations.
 - **User Authentication**: Utilizes secure session-based Google OAuth, email verification, and password reset.
 - **Document Processing**: Provides AI-generated document summaries with caching and a robust document upload process including automatic source language detection.
