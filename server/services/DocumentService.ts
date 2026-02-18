@@ -1562,6 +1562,7 @@ export class DocumentService {
         tokenizerVersion: SENTENCE_TOKENIZER_VERSION,
         processingState: "structure_only", // New state for lightweight docs
         rawContent: params.content, // Store raw content for later processing
+        snippet: this.generateSnippet(params.content),
       });
 
       const duration = Date.now() - startTime;
@@ -1577,6 +1578,19 @@ export class DocumentService {
       );
       throw error;
     }
+  }
+
+  static generateSnippet(content: string, maxLength: number = 500): string {
+    if (!content) return '';
+    const stripped = content
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&[a-zA-Z]+;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (stripped.length <= maxLength) return stripped;
+    const cut = stripped.substring(0, maxLength);
+    const lastSpace = cut.lastIndexOf(' ');
+    return (lastSpace > maxLength * 0.7 ? cut.substring(0, lastSpace) : cut) + '…';
   }
 
   /**

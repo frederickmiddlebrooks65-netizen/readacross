@@ -230,6 +230,7 @@ export const documents = pgTable("documents", {
   archetype: text("archetype", { enum: ["academic", "literary", "essay", "generic"] }).default("generic"), // Structural interpretation strategy
   archetypeConfidence: real("archetype_confidence").default(0), // 0-1 confidence score
   archetypeSource: text("archetype_source", { enum: ["source", "auto", "user"] }).default("auto"), // How archetype was determined
+  snippet: text("snippet"),
 });
 
 export const paragraphs = pgTable("paragraphs", {
