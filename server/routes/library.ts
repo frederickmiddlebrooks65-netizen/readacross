@@ -36,9 +36,11 @@ router.get("/documents", async (_req: any, res: any) => {
 // API Routes - Public Library
 router.get("/library/explore", async (req: any, res: any) => {
   try {
-    const { category, difficulty, sortBy = "latest" } = req.query;
+    const { category, difficulty, sortBy = "latest", page = "1", limit = "24" } = req.query;
 
-    console.log("Library explore request:", { category, difficulty, sortBy });
+    const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 24));
+    const offset = (pageNum - 1) * limitNum;
 
     if (category && category !== "all") {
       console.log(`[CATEGORY_DEBUG] Filtering by category: ${category}`);
@@ -48,39 +50,32 @@ router.get("/library/explore", async (req: any, res: any) => {
       category: category as string,
       difficulty: difficulty as string,
       sortBy: sortBy as string,
+      limit: limitNum,
+      offset,
     });
 
-    console.log(`Found ${publicDocuments.length} public documents`);
-
-    const documentIds = publicDocuments.map((doc: any) => doc.id);
-    
-    const snippetData = await db
-      .select({
-        documentId: paragraphs.documentId,
-        source: sentences.source,
-        paragraphOrder: paragraphs.order,
-        sentenceOrder: sentences.order,
-      })
-      .from(sentences)
-      .innerJoin(paragraphs, eq(sentences.paragraphId, paragraphs.id))
-      .where(inArray(paragraphs.documentId, documentIds.length > 0 ? documentIds : [0]))
-      .orderBy(asc(paragraphs.documentId), asc(paragraphs.order), asc(sentences.order));
-
-    const snippetMap = new Map<number, string>();
-    for (const row of snippetData) {
-      const existing = snippetMap.get(row.documentId) || '';
-      const currentSentences = existing.split('. ').filter(s => s.length > 0);
-      if (currentSentences.length < 25) {
-        snippetMap.set(row.documentId, existing + (existing ? ' ' : '') + row.source);
-      }
-    }
-
-    const enrichedDocuments = publicDocuments.map((doc: any) => ({
-      ...doc,
-      snippetContent: snippetMap.get(doc.id) || doc.rawContent || '',
+    const lightweightDocs = publicDocuments.map((doc: any) => ({
+      id: doc.id,
+      title: doc.title,
+      source: doc.source,
+      author: doc.author,
+      category: doc.category,
+      difficulty: doc.difficulty,
+      tags: doc.tags,
+      originalUrl: doc.originalUrl,
+      thumbnailUrl: doc.thumbnailUrl,
+      originalImageUrl: doc.originalImageUrl,
+      dominantColor: doc.dominantColor,
+      blurhash: doc.blurhash,
+      isPublic: doc.isPublic,
+      createdAt: doc.createdAt,
+      publishedAt: doc.publishedAt,
+      sourceLanguage: doc.sourceLanguage,
+      feedId: doc.feedId,
+      snippetContent: doc.snippet || doc.rawContent?.substring(0, 500) || '',
     }));
 
-    res.json(enrichedDocuments);
+    res.json(lightweightDocs);
   } catch (error) {
     console.error("Error fetching public library documents:", error);
     res.status(500).json({ message: "Failed to fetch library documents" });
@@ -1014,41 +1009,6 @@ router.post("/library/save", authenticateJWT, async (req: AuthenticatedRequest, 
   }
 });
 
-// Get explore content (RSS + system sources)
-router.get("/library/explore", async (req: Request, res: Response) => {
-  console.log("[EXPLORE] Get explore content request received");
-
-  const { category, sortBy } = req.query;
-
-  // Using the imported storage instance
-
-  try {
-    // Get RSS documents as explore content
-    const rssOptions: any = {
-      category:
-        category && category !== "all" ? (category as string) : undefined,
-      sortBy: (sortBy as string) || undefined,
-      search: undefined,
-      feedId: undefined,
-    };
-
-    const rssDocuments = await storage.getUserRSSDocuments(rssOptions);
-
-    // For now, we're using RSS documents as explore content
-    // In the future, this could include system-curated content
-    const exploreContent = rssDocuments.map((doc) => ({
-      ...doc,
-      isExploreContent: true,
-      canSaveToLibrary: true,
-    }));
-
-    console.log(`[EXPLORE] Returning ${exploreContent.length} explore items`);
-    res.json(exploreContent);
-  } catch (error) {
-    console.error("[EXPLORE] Error fetching explore content:", error);
-    res.status(500).json({ error: "Failed to fetch explore content" });
-  }
-});
 
 // Thumbnail API routes
 router.get("/thumbnails/:filename", async (req: Request, res: Response) => {
