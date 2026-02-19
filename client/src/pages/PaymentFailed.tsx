@@ -40,7 +40,7 @@ export default function PaymentFailed() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
-                onClick={() => setLocation("/pricing")}
+                onClick={() => setLocation("/")}
                 className="bg-primary"
                 data-testid="button-try-again"
               >
