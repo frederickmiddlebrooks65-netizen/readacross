@@ -341,25 +341,15 @@ export default function AISideDrawer({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Crown className="h-5 w-5 text-forest dark:text-slate-400" />
-              이번 달 토큰 사용량을 초과했습니다
+              서비스 점검 안내
             </DialogTitle>
             <DialogDescription>
-              Starter 플랜의 월간 토큰 한도에 도달했습니다. 
-              Pro로 업그레이드하여 더 많은 AI 코칭을 받아보세요.
+              현재 ReadAcross는 서비스 고도화 및 시스템 점검 기간입니다. 점검 완료 후 더 멋진 기능으로 찾아뵙겠습니다. (2026년 2월 중 정식 오픈 예정)
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col gap-2 sm:flex-row">
             <Button variant="outline" onClick={() => setShowLimitModal(false)}>
-              닫기
-            </Button>
-            <Button 
-              onClick={() => {
-                setShowLimitModal(false);
-                setLocation('/pricing');
-              }}
-              className="bg-forest hover:bg-forest-hover"
-            >
-              Pro로 업그레이드
+              확인
             </Button>
           </DialogFooter>
         </DialogContent>

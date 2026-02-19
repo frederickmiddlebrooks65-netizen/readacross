@@ -108,39 +108,29 @@ export default function Footer() {
             <div className="w-full max-w-md border-t border-border/50 pt-4" />
 
             <div
-              className="space-y-1 text-xs text-muted-foreground"
+              className="space-y-1 text-gray-400"
               data-testid="footer-company-info"
               style={{ fontSize: "11px" }}
             >
+              <p>오픈아이디어랩 (Open Idea Lab)</p>
               <p>
-                {t("footer.company")}: {t("footer.companyName")} |{" "}
-                {t("footer.representative")}: {t("footer.representativeName")} |{" "}
-                {t("footer.businessLicense")}: {t("footer.licenseNumber")} |{" "}
-                {t("footer.hostingProvider")}: {t("footer.hostingProviderName")}{" "}
-                | {t("footer.mailOrderBusiness")}: {t("footer.mailOrderNumber")}
-              </p>
-              <p>
-                {t("footer.address")}: {t("footer.addressValue")} |{" "}
-                {t("footer.phone")}:{" "}
-                <a
-                  href="tel:+82-10-2989-9934"
-                  className="hover:text-foreground transition-colors"
-                >+82-10-9891-0931</a>{" "}
-                | {t("footer.email")}:{" "}
+                이메일:{" "}
                 <a
                   href="mailto:hello@readacross.io"
-                  className="hover:text-foreground transition-colors"
+                  className="hover:text-gray-300 transition-colors"
                 >
                   hello@readacross.io
                 </a>
               </p>
+              <p className="pt-1">현재 서비스 점검 및 사업자 정보 업데이트 중입니다.</p>
             </div>
 
             <p
-              className="text-xs text-muted-foreground pt-2"
+              className="text-gray-400 pt-2"
               data-testid="footer-copyright"
+              style={{ fontSize: "11px" }}
             >
-              © {currentYear} {t("footer.companyName")}.{" "}
+              © {currentYear} 오픈아이디어랩 (Open Idea Lab).{" "}
               {t("footer.allRightsReserved")}
             </p>
           </div>

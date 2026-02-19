@@ -631,14 +631,7 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* View Plan Details Button */}
-              <div className="pt-2">
-                <Link href="/pricing">
-                  <Button variant="default" className="w-full sm:w-auto">
-                    {userPlan === 'starter' ? t("settings.upgradeToPro") : t("settings.viewPlanDetails")}
-                  </Button>
-                </Link>
-              </div>
+              {/* View Plan Details Button - Temporarily hidden during service maintenance */}
 
               {/* Non-auto-renewal Note */}
               <p className="text-xs text-muted-foreground pt-2 border-t">

@@ -58,7 +58,7 @@ function Router() {
       <Route path="/profile">{() => <Redirect to="/settings" />}</Route>
       <Route path="/settings" component={Settings} />
       <Route path="/admin" component={AdminNew} />
-      <Route path="/pricing" component={Pricing} />
+      <Route path="/pricing">{() => <Redirect to="/" />}</Route>
       <Route path="/payment-success" component={PaymentSuccess} />
       <Route path="/payment-failed" component={PaymentFailed} />
       <Route path="/faq" component={FAQ} />

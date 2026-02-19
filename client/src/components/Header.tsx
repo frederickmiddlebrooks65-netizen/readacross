@@ -119,47 +119,7 @@ export default function Header({ className }: HeaderProps) {
 
         {/* User menu and dark mode toggle */}
         <div className="flex items-center gap-2">
-          {/* Pricing/Plan Button - Different states based on auth and plan */}
-          {!isAuthenticated ? (
-            // Not logged in: Show "View Plans" button
-            <Link href="/pricing">
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden sm:flex items-center gap-1 border-brand text-brand hover:bg-brand-subtle dark:hover:bg-brand/10"
-                data-testid="button-view-pricing"
-              >
-                <Crown className="h-4 w-4" />
-                {t('pricing.viewPlans') || '요금제 보기'}
-              </Button>
-            </Link>
-          ) : isPro ? (
-            // Logged in + Pro plan: Show "Using Pro Plan" button
-            <Link href="/pricing">
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden sm:flex items-center gap-1 border-brand text-brand hover:bg-brand-subtle dark:hover:bg-brand/10"
-                data-testid="button-pro-active"
-              >
-                <Crown className="h-4 w-4" />
-                {t('pricing.proPlanActive') || 'Pro 플랜 이용 중'}
-              </Button>
-            </Link>
-          ) : (
-            // Logged in + Starter/Free plan: Show "Upgrade to Pro" button
-            <Link href="/pricing">
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden sm:flex items-center gap-1 border-brand text-brand hover:bg-brand-subtle dark:hover:bg-brand/10"
-                data-testid="button-upgrade-pro"
-              >
-                <Crown className="h-4 w-4" />
-                {t('pricing.upgradeToPro') || 'Pro로 업그레이드'}
-              </Button>
-            </Link>
-          )}
+          {/* Pricing/Plan Button - Temporarily hidden during service maintenance */}
           
           {/* Language Switcher */}
           <LanguageSwitcher />

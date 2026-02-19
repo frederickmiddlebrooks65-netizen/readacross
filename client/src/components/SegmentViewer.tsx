@@ -784,20 +784,11 @@ function StructuredBlockRenderer({
                                   <Crown className="h-5 w-5 text-brand flex-shrink-0 mt-0.5" />
                                   <div className="flex-1">
                                     <p className="text-sm font-medium text-brand dark:text-brand">
-                                      {t('viewer.proFeature') || 'Pro Feature'}
+                                      서비스 점검 안내
                                     </p>
                                     <p className="text-xs text-brand/80 dark:text-brand/70 mt-1">
-                                      {t('viewer.upgradePromptDesc') || 'Detailed grammar & nuance coaching is a Pro feature. Upgrade now to get your own AI language tutor!'}
+                                      현재 ReadAcross는 서비스 고도화 및 시스템 점검 기간입니다. 점검 완료 후 더 멋진 기능으로 찾아뵙겠습니다. (2026년 2월 중 정식 오픈 예정)
                                     </p>
-                                    <Button
-                                      size="sm"
-                                      variant="default"
-                                      onClick={() => setLocation?.('/pricing')}
-                                      className="mt-2 h-7 text-xs bg-brand hover:bg-brand-hover"
-                                    >
-                                      {t('viewer.upgradeToPro') || 'Upgrade to Pro'}
-                                      <ArrowRight className="ml-1 h-3 w-3" />
-                                    </Button>
                                   </div>
                                 </div>
                               </div>

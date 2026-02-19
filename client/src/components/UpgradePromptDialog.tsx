@@ -34,25 +34,15 @@ export default function UpgradePromptDialog({ isOpen, onClose, type }: UpgradePr
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-yellow-500" />
-            {title}
+            서비스 점검 안내
           </DialogTitle>
           <DialogDescription className="pt-2">
-            {description}
+            현재 ReadAcross는 서비스 고도화 및 시스템 점검 기간입니다. 점검 완료 후 더 멋진 기능으로 찾아뵙겠습니다. (2026년 2월 중 정식 오픈 예정)
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 pt-4">
-          <Button
-            onClick={() => {
-              onClose();
-              setLocation("/pricing");
-            }}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-          >
-            <Crown className="h-4 w-4 mr-2" />
-            {t("upgrade.viewPlans")}
-          </Button>
           <Button variant="outline" onClick={onClose} className="w-full">
-            {t("upgrade.later")}
+            확인
           </Button>
         </div>
       </DialogContent>
