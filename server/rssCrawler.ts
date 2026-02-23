@@ -552,7 +552,7 @@ export async function initializeNewSources(): Promise<void> {
       category: "Science",
     },
     {
-      url: "https://learningenglish.voanews.com/api/z-_mq_z$yo",
+      url: "https://feeds.npr.org/1001/rss.xml",
       title: "VOA Learning English",
       description: "News and feature stories in clear, simple English.",
       category: "News",
