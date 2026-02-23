@@ -551,31 +551,37 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
               </p>
             </div>
 
-            {/* BOTTOM SECTION: Activity data right-aligned */}
-            <div className="mt-3 flex items-center gap-2 justify-end flex-wrap">
-              {!isPublic && !isExploreMode && translateProgress > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-blue-500 dark:bg-blue-400"
-                      style={{ width: `${Math.max(translateProgress, 3)}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground tabular-nums">
-                    {translateProgress}%
-                  </span>
+            {/* BOTTOM SECTION: Activity data right-aligned, 2 rows */}
+            <div className="mt-3 space-y-1">
+              {!isPublic && !isExploreMode && (translateProgress > 0 || (docStats && docStats.notesCount > 0)) && (
+                <div className="flex items-center gap-2 justify-end">
+                  {translateProgress > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-blue-500 dark:bg-blue-400"
+                          style={{ width: `${Math.max(translateProgress, 3)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        {translateProgress}%
+                      </span>
+                    </div>
+                  )}
+                  {docStats && docStats.notesCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                      <BookmarkPlus className="h-2.5 w-2.5" />
+                      {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
+                    </span>
+                  )}
                 </div>
               )}
-              {!isPublic && !isExploreMode && docStats && docStats.notesCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                  <BookmarkPlus className="h-2.5 w-2.5" />
-                  {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
+              <div className="flex items-center justify-end">
+                <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+                  <Clock className="h-3 w-3" />
+                  {getRelativeTime()}
                 </span>
-              )}
-              <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
-                <Clock className="h-3 w-3" />
-                {getRelativeTime()}
-              </span>
+              </div>
             </div>
           </article>
         </div>
