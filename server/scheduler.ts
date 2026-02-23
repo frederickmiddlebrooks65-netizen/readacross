@@ -58,8 +58,12 @@ class CrawlerScheduler {
       this.state.jobs.delete(jobName);
     }
 
-    // 월-금 오전 9시 (0-4 = 일-목 이지만, cron에서는 1-5 = 월-금)
     const task = cron.schedule('0 9 * * 1-5', async () => {
+      const policy = await storage.getRSSPolicy();
+      if (policy && policy.arxivEnabled === false) {
+        console.log('[SCHEDULER] arXiv source is disabled by admin, skipping');
+        return;
+      }
       console.log('[SCHEDULER] Starting daily arXiv fetch (cs.AI, cs.CL)...');
       this.state.lastRun = new Date();
       
@@ -93,8 +97,12 @@ class CrawlerScheduler {
       this.state.jobs.delete(jobName);
     }
 
-    // 매주 월요일 오전 6시
     const task = cron.schedule('0 6 * * 1', async () => {
+      const policy = await storage.getRSSPolicy();
+      if (policy && policy.gutenbergEnabled === false) {
+        console.log('[SCHEDULER] Gutenberg source is disabled by admin, skipping');
+        return;
+      }
       console.log('[SCHEDULER] Starting weekly Gutenberg Top 100 fetch...');
       this.state.lastRun = new Date();
       
@@ -255,6 +263,7 @@ class CrawlerScheduler {
   // 수동 동기화 트리거
   async triggerManualSync(sourceType: 'rss' | 'arxiv' | 'gutenberg' | 'all' | 'system' = 'all') {
     console.log(`[SCHEDULER] Manual sync triggered for: ${sourceType}`);
+    const policy = await storage.getRSSPolicy();
     
     try {
       if (sourceType === 'rss' || sourceType === 'all') {
@@ -262,15 +271,23 @@ class CrawlerScheduler {
       }
       
       if (sourceType === 'arxiv' || sourceType === 'system' || sourceType === 'all') {
-        console.log('[SCHEDULER] Starting arXiv sync...');
-        const result = await fetchDailyArxivPapers();
-        console.log(`[SCHEDULER] arXiv sync completed: ${result.papersAdded} papers added`);
+        if (policy && policy.arxivEnabled === false) {
+          console.log('[SCHEDULER] arXiv source is disabled by admin, skipping');
+        } else {
+          console.log('[SCHEDULER] Starting arXiv sync...');
+          const result = await fetchDailyArxivPapers();
+          console.log(`[SCHEDULER] arXiv sync completed: ${result.papersAdded} papers added`);
+        }
       }
       
       if (sourceType === 'gutenberg' || sourceType === 'system' || sourceType === 'all') {
-        console.log('[SCHEDULER] Starting Gutenberg sync...');
-        const result = await fetchWeeklyTopBook();
-        console.log(`[SCHEDULER] Gutenberg sync completed: ${result.success ? result.bookTitle : result.error}`);
+        if (policy && policy.gutenbergEnabled === false) {
+          console.log('[SCHEDULER] Gutenberg source is disabled by admin, skipping');
+        } else {
+          console.log('[SCHEDULER] Starting Gutenberg sync...');
+          const result = await fetchWeeklyTopBook();
+          console.log(`[SCHEDULER] Gutenberg sync completed: ${result.success ? result.bookTitle : result.error}`);
+        }
       }
       
       // 문서 제한 강제

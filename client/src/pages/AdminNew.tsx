@@ -95,6 +95,8 @@ interface RssPolicy {
   allowedDomains: string[] | null;
   blockedDomains: string[] | null;
   requireApproval: boolean;
+  arxivEnabled: boolean;
+  gutenbergEnabled: boolean;
 }
 
 // Document interface for management
@@ -181,7 +183,7 @@ export function AdminNew() {
   });
 
   const { data: rssPolicy } = useQuery<RssPolicy>({
-    queryKey: ["/api/admin/policy/rss"],
+    queryKey: ["/api/admin/rss-policy"],
   });
 
   const { data: expiredDocuments } = useQuery<any[]>({
@@ -214,13 +216,13 @@ export function AdminNew() {
 
   const updateRssPolicyMutation = useMutation({
     mutationFn: async (updates: Partial<RssPolicy>) => {
-      return await apiRequest("/api/admin/policy/rss", {
+      return await apiRequest("/api/admin/rss-policy", {
         method: "PATCH",
-        body: JSON.stringify(updates),
+        json: updates,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/policy/rss"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-policy"] });
       toast({ title: "RSS 정책이 업데이트되었습니다" });
     },
     onError: () => {
@@ -656,26 +658,42 @@ function DocumentSourceManagement({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-brand-subtle rounded-lg border border-brand">
+            <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+              rssPolicy?.arxivEnabled !== false ? "bg-brand-subtle border-brand" : "bg-muted/50 border-border"
+            }`}>
               <div className="flex items-center gap-2">
-                <Cog className="h-4 w-4 text-brand" />
+                <Cog className={`h-4 w-4 ${rssPolicy?.arxivEnabled !== false ? "text-brand" : "text-muted-foreground"}`} />
                 <div>
-                  <p className="font-medium text-brand">arXiv 학술 논문</p>
-                  <p className="text-xs text-brand">안정적 기본 소스</p>
+                  <p className={`font-medium ${rssPolicy?.arxivEnabled !== false ? "text-brand" : "text-muted-foreground"}`}>arXiv 학술 논문</p>
+                  <p className={`text-xs ${rssPolicy?.arxivEnabled !== false ? "text-brand" : "text-muted-foreground"}`}>학술 논문 크롤러</p>
                 </div>
               </div>
-              <Switch checked={true} disabled />
+              <Switch
+                checked={rssPolicy?.arxivEnabled !== false}
+                onCheckedChange={(checked) => {
+                  updateRssPolicyMutation.mutate({ arxivEnabled: checked });
+                }}
+                disabled={updateRssPolicyMutation.isPending}
+              />
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-brand-subtle rounded-lg border border-brand">
+            <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+              rssPolicy?.gutenbergEnabled !== false ? "bg-brand-subtle border-brand" : "bg-muted/50 border-border"
+            }`}>
               <div className="flex items-center gap-2">
-                <Cog className="h-4 w-4 text-brand" />
+                <Cog className={`h-4 w-4 ${rssPolicy?.gutenbergEnabled !== false ? "text-brand" : "text-muted-foreground"}`} />
                 <div>
-                  <p className="font-medium text-brand">Project Gutenberg</p>
-                  <p className="text-xs text-brand">고전 문학</p>
+                  <p className={`font-medium ${rssPolicy?.gutenbergEnabled !== false ? "text-brand" : "text-muted-foreground"}`}>Project Gutenberg</p>
+                  <p className={`text-xs ${rssPolicy?.gutenbergEnabled !== false ? "text-brand" : "text-muted-foreground"}`}>고전 문학 크롤러</p>
                 </div>
               </div>
-              <Switch checked={true} disabled />
+              <Switch
+                checked={rssPolicy?.gutenbergEnabled !== false}
+                onCheckedChange={(checked) => {
+                  updateRssPolicyMutation.mutate({ gutenbergEnabled: checked });
+                }}
+                disabled={updateRssPolicyMutation.isPending}
+              />
             </div>
 
             {systemFeeds.map((feed) => (
@@ -711,7 +729,7 @@ function DocumentSourceManagement({
 
           <div className="pt-3 border-t">
             <div className="text-sm text-muted-foreground">
-              활성 {2 + systemFeeds.filter(f => !f.isBlocked).length}개 / 전체 {2 + systemFeeds.length}개
+              활성 {(rssPolicy?.arxivEnabled !== false ? 1 : 0) + (rssPolicy?.gutenbergEnabled !== false ? 1 : 0) + systemFeeds.filter(f => !f.isBlocked).length}개 / 전체 {2 + systemFeeds.length}개
             </div>
           </div>
         </CardContent>

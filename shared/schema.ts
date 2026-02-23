@@ -516,7 +516,9 @@ export const rssPolicy = pgTable("rss_policy", {
   dailyFetchLimit: integer("daily_fetch_limit").default(1000), // 일일 fetch 제한
   allowedDomains: text("allowed_domains"), // JSON 배열: 허용 도메인
   blockedDomains: text("blocked_domains"), // JSON 배열: 차단 도메인
-  requireApproval: boolean("require_approval").default(false), // 신규 피드 승인 필요 여부
+  requireApproval: boolean("require_approval").default(false),
+  arxivEnabled: boolean("arxiv_enabled").default(true),
+  gutenbergEnabled: boolean("gutenberg_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -908,6 +910,8 @@ export const insertRssPolicySchema = createInsertSchema(rssPolicy).pick({
   allowedDomains: true,
   blockedDomains: true,
   requireApproval: true,
+  arxivEnabled: true,
+  gutenbergEnabled: true,
 });
 
 // Legacy RSS feed schema for backward compatibility
