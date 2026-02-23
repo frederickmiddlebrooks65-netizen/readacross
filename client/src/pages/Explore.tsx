@@ -541,6 +541,8 @@ function ExploreDocumentCard({
               className="h-6 w-6 p-0 hover:bg-[hsl(var(--sage-subtle))] dark:hover:bg-slate-800/50"
               onClick={handleAddToLibrary}
               disabled={isAdding}
+              title={t('library.addToLibrary')}
+              aria-label={t('library.addToLibrary')}
             >
               {isAdding ? (
                 <div className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />

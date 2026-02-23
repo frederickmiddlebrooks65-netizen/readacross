@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNowWithTimezone, formatShortDate } from "@/lib/dateUtils";
 import { useTimezone } from "@/hooks/useTimezone";
@@ -433,43 +434,6 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
         willChange: isHovered ? 'transform' : 'auto'
       }}
     >
-      {/* Add to Library Button - Only for public or explore documents */}
-      {isHovered && onAddToLibrary && (isPublic || isExploreMode) && (
-        <div className="absolute inset-2 flex items-center justify-center z-30 bg-black/15 backdrop-blur-[2px] rounded-lg pointer-events-none">
-          <div className="pointer-events-auto">
-            {isAlreadyInLibrary ? (
-              <Button
-                variant="default"
-                size="sm"
-                className="h-8 px-4 rounded-full shadow-lg cursor-default text-xs opacity-75"
-                disabled
-              >
-                {t('library.alreadyInLibrary')}
-              </Button>
-            ) : (
-              <Button
-                variant="default"
-                size="sm"
-                className="h-8 px-4 rounded-full shadow-lg hover:scale-105 transition-transform text-xs"
-                disabled={isAdding}
-                onClick={handleAddToLibrary}
-              >
-                {isAdding ? (
-                  <>
-                    <div className="h-3 w-3 mr-1.5 animate-spin rounded-full border border-current border-t-transparent" />
-                    {t('library.addingToLibrary')}
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-3 w-3 mr-1.5" />
-                    {t('library.addToMyLibrary')}
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
       {/* Card with Typography-centered Design */}
       <Card
         className={cn(
@@ -492,12 +456,36 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
           <article 
             className="p-4 flex flex-col h-full rounded-lg"
           >
-            {/* TOP SECTION: Archive Button (hover only) */}
+            {/* TOP SECTION: Action Button - top-right (hover only) */}
             <div className={cn(
               "flex items-start justify-end mb-2 transition-opacity duration-300",
               isHovered ? "opacity-100" : "opacity-0"
             )}>
-              {/* Archive Button - Right (hover only for user documents) */}
+              {onAddToLibrary && (isPublic || isExploreMode) && (
+                <div>
+                  {isAlreadyInLibrary ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {t('library.inLibrary')}
+                    </Badge>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-[hsl(var(--sage-subtle))] dark:hover:bg-slate-800/50"
+                      onClick={handleAddToLibrary}
+                      disabled={isAdding}
+                      title={t('library.addToLibrary')}
+                      aria-label={t('library.addToLibrary')}
+                    >
+                      {isAdding ? (
+                        <div className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+                      ) : (
+                        <Plus className="h-3.5 w-3.5 text-forest dark:text-slate-400" />
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
               {!isPublic && !isExploreMode && (
                 <div>
                   {document.isArchived ? (
