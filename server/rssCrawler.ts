@@ -411,12 +411,13 @@ export async function convertRSSItemToDocument(
       title: item.title || "Untitled RSS Article",
       sourceLanguage: "en" as const,
       content: finalContent,
-      contentType: "html", // 🔧 CRITICAL FIX: Use html to match ParserMode.HTML in DocumentService
+      contentType: "html",
       source: feed.title || feed.alias || "RSS",
       author: item.creator || item.author || null,
       category: "News",
       originalUrl: item.link || null,
-      isPublic: true,
+      isPublic: feed.isSystemSource === true,
+      sourceType: feed.isSystemSource ? "explore" : "rss",
       feedId: feed.feedId || undefined,
       publishedAt: item.pubDate ? new Date(item.pubDate) : undefined,
     });
@@ -649,7 +650,8 @@ export async function convertRSSItemToDocumentEnhanced(
       author: item.creator || item.author || null,
       category: getCategoryBySource(feed.title),
       originalUrl: item.link || null,
-      isPublic: true,
+      isPublic: feed.isSystemSource === true,
+      sourceType: feed.isSystemSource ? "explore" : "rss",
       feedId: feed.id,
       publishedAt: item.pubDate ? new Date(item.pubDate) : undefined,
     });

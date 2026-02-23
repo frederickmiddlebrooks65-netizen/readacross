@@ -1111,12 +1111,33 @@ router.get("/rss-feeds", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/rss-feeds", async (req: Request, res: Response) => {
+router.post("/rss-feeds", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userId = req.userId!;
     const { feedUrl, category, alias, language, syncInterval, isActive } = req.body;
 
     if (!feedUrl) {
       return res.status(400).json({ message: "feedUrl is required" });
+    }
+
+    const policy = await storage.getRSSPolicy();
+
+    if (policy?.blockedDomains) {
+      try {
+        const blockedDomains: string[] = JSON.parse(policy.blockedDomains);
+        const feedDomain = new URL(feedUrl).hostname.toLowerCase();
+        if (blockedDomains.some(domain => feedDomain === domain || feedDomain.endsWith(`.${domain}`))) {
+          return res.status(400).json({ message: "This domain is not allowed" });
+        }
+      } catch (e) {
+        console.warn("[RSS_CREATE] Failed to parse blockedDomains:", e);
+      }
+    }
+
+    const userSubscriptions = await storage.getRSSSubscriptions(userId);
+    const maxFeeds = policy?.maxFeedsPerUser ?? 10;
+    if (userSubscriptions.length >= maxFeeds) {
+      return res.status(403).json({ message: `Feed limit reached. You can add up to ${maxFeeds} feeds.` });
     }
 
     // Validate RSS feed
@@ -1140,6 +1161,8 @@ router.post("/rss-feeds", async (req: Request, res: Response) => {
       console.warn(`[RSS_CREATE] Failed to fetch feed metadata, using fallback title: ${feedTitle}`);
     }
 
+    const shouldBlock = policy?.requireApproval === true;
+
     // Create RSS feed using storage
     const crypto = await import('crypto');
     const newFeed = await storage.createNewRSSFeed({
@@ -1153,21 +1176,38 @@ router.post("/rss-feeds", async (req: Request, res: Response) => {
       lastModified: null,
       healthScore: 100,
       lastRunAt: null,
-      lastStatus: "pending",
+      lastStatus: shouldBlock ? "pending" : "pending",
       errorCount: 0,
       lastError: null,
-      isBlocked: false,
+      isBlocked: shouldBlock,
       isSystemSource: false
     });
 
-    // Trigger immediate RSS crawling after feed creation
     try {
-      console.log(`[RSS_CREATE] Starting immediate crawling for new feed: ${newFeed.id}`);
-      await processRSSArticles(newFeed.id);
-      console.log(`[RSS_CREATE] Completed crawling for feed: ${newFeed.id}`);
-    } catch (crawlingError) {
-      console.error(`[RSS_CREATE] Failed to crawl new feed ${newFeed.id}:`, crawlingError);
-      // Don't fail the feed creation if crawling fails - it can be retried later
+      await storage.createRSSSubscription({
+        feedId: newFeed.id,
+        userId: userId,
+        alias: feedTitle,
+        visibility: "private",
+        enabled: true,
+        userTags: null,
+        notifyPolicy: "none",
+        syncInterval: syncInterval || 12,
+      });
+    } catch (subError) {
+      console.warn(`[RSS_CREATE] Failed to create subscription for user ${userId}:`, subError);
+    }
+
+    if (!shouldBlock) {
+      try {
+        console.log(`[RSS_CREATE] Starting immediate crawling for new feed: ${newFeed.id}`);
+        await processRSSArticles(newFeed.id);
+        console.log(`[RSS_CREATE] Completed crawling for feed: ${newFeed.id}`);
+      } catch (crawlingError) {
+        console.error(`[RSS_CREATE] Failed to crawl new feed ${newFeed.id}:`, crawlingError);
+      }
+    } else {
+      console.log(`[RSS_CREATE] Feed ${newFeed.id} requires approval, skipping immediate crawling`);
     }
 
     res.status(201).json(newFeed);

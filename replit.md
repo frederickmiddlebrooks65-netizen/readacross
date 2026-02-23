@@ -51,6 +51,13 @@ Admin & Operations tooling (Feb 2026):
 - **Admin user management**: `GET/PATCH /api/admin/users` endpoints with search, plan/status filtering, pagination, and inline editing. Admin UI section in AdminNew.tsx with table view, edit dialog for plan/status/role changes.
 - **Token threshold notifications**: TokenTrackingService.recordTokens automatically checks 80% usage and sends Telegram alert (deduplicated per user per month).
 
+RSS Security & Policy (Feb 2026):
+- **Public/Private feed isolation**: User-added RSS feeds create documents with `isPublic: false` and `sourceType: "rss"`, preventing Explore page exposure. System sources (arXiv, Gutenberg, etc.) remain `isPublic: true` + `sourceType: "explore"`.
+- **JWT authentication on feed creation**: `POST /api/rss-feeds` requires `authenticateJWT`, blocking unauthenticated feed submissions.
+- **Policy enforcement**: `rss_policy` table settings (`requireApproval`, `maxFeedsPerUser`, `blockedDomains`) are now actively enforced at the API route level. Approval-required feeds are created with `isBlocked: true` and skip immediate crawling.
+- **Quota enforcement**: Per-user feed count checked via `rss_subscriptions` table against `policy.maxFeedsPerUser`.
+- **Admin feed approval UI**: AdminNew.tsx feed list shows pending (user-added blocked) feeds with orange badges and inline approve/block toggle buttons.
+
 ## External Dependencies
 - **Google Gemini API**: Used for document translation, text type detection, glossary generation, AI-powered language practice, AI coaching, OCR, and document summarization. Models include gemini-2.5-flash and gemini-2.0-flash-lite.
 - **arXiv API**: Integrated for fetching and processing academic papers.

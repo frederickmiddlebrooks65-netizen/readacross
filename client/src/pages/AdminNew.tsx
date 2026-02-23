@@ -971,6 +971,14 @@ function RSSSourceSection({
                   <Badge variant="secondary">
                     총 {feedsData?.length || 0}개
                   </Badge>
+                  {(() => {
+                    const pendingCount = feedsData?.filter(f => f.isBlocked && !f.isSystemSource).length || 0;
+                    return pendingCount > 0 ? (
+                      <Badge className="bg-orange-100 text-orange-700 border-orange-300">
+                        승인 대기 {pendingCount}개
+                      </Badge>
+                    ) : null;
+                  })()}
                   {errorFeedsCount > 0 && (
                     <Badge variant="destructive">
                       문제 {errorFeedsCount}개
@@ -983,8 +991,8 @@ function RSSSourceSection({
               {feedsData && feedsData.length > 0 ? (
                 <div className="max-h-96 overflow-y-auto space-y-2">
                   {feedsData.map((feed) => {
-                    // 상태 판정 (정상/경고/실패 3단계)
                     const getStatus = () => {
+                      if (feed.isBlocked && !feed.isSystemSource) return 'pending';
                       if (feed.isBlocked || feed.errorCount > 3) return 'failed';
                       if (feed.errorCount > 0) return 'warning';
                       return 'normal';
@@ -994,7 +1002,8 @@ function RSSSourceSection({
                     const statusConfig = {
                       normal: { color: 'text-green-600', bg: 'bg-green-50', label: '정상' },
                       warning: { color: 'text-yellow-600', bg: 'bg-yellow-50', label: '경고' },
-                      failed: { color: 'text-red-600', bg: 'bg-red-50', label: '실패' }
+                      failed: { color: 'text-red-600', bg: 'bg-red-50', label: '실패' },
+                      pending: { color: 'text-orange-600', bg: 'bg-orange-50', label: '승인 대기' }
                     };
 
                     // 상대 시간 계산
@@ -1010,7 +1019,11 @@ function RSSSourceSection({
                     };
 
                     return (
-                      <div key={feed.id} className="p-3 bg-white rounded-lg border hover:border-blue-300 transition-colors">
+                      <div key={feed.id} className={`p-3 rounded-lg border transition-colors ${
+                        status === 'pending' 
+                          ? 'bg-orange-50/50 border-orange-200 hover:border-orange-400' 
+                          : 'bg-white hover:border-blue-300'
+                      }`}>
                         <div className="flex items-center justify-between">
                           {/* 기본 정보 */}
                           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1053,6 +1066,21 @@ function RSSSourceSection({
                             
                             {/* 액션 버튼들 */}
                             <div className="flex items-center gap-1">
+                              {!feed.isSystemSource && (
+                                <button
+                                  className={`p-1 transition-colors disabled:opacity-50 ${
+                                    feed.isBlocked
+                                      ? 'text-orange-500 hover:text-green-600'
+                                      : 'text-green-500 hover:text-red-600'
+                                  }`}
+                                  title={feed.isBlocked ? '승인 (크롤링 허용)' : '차단'}
+                                  data-testid={`button-toggle-${feed.id}`}
+                                  onClick={() => toggleSystemSourceMutation.mutate({ feedId: feed.id, isBlocked: !feed.isBlocked })}
+                                  disabled={toggleSystemSourceMutation.isPending}
+                                >
+                                  {feed.isBlocked ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                                </button>
+                              )}
                               <button
                                 className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                                 title="상세 보기"

@@ -419,6 +419,7 @@ export class DocumentService {
     source?: string;
     contentType?: "html" | "text" | "pdf" | "auto" | "rss_html";
     isPublic?: boolean;
+    sourceType?: string;
     category?: string;
     author?: string;
     originalUrl?: string;
@@ -511,7 +512,7 @@ export class DocumentService {
         sourceLanguage: params.sourceLanguage,
         userId: params.userId || null,
         fileType: contentType === "pdf" ? "pdf" : "text",
-        sourceType: params.isPublic ? "explore" : "uploaded",
+        sourceType: params.sourceType || (params.isPublic ? "explore" : "uploaded"),
         source: params.source || "Upload",
         author: params.author,
         category: params.category || "Other",
