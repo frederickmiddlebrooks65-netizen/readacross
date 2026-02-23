@@ -303,16 +303,16 @@ export default function Library() {
     return breakdown;
   }, [allDocuments]);
 
-  const continueReadingDocs = useMemo(() => {
-    if (!allDocuments || !Array.isArray(allDocuments)) return [];
-    return allDocuments
-      .filter((doc: any) => !doc.isArchived && (doc.progress > 0 || doc.lastActivityAt))
+  const resumeDoc = useMemo(() => {
+    if (!allDocuments || !Array.isArray(allDocuments)) return null;
+    const candidates = allDocuments
+      .filter((doc: any) => !doc.isArchived)
       .sort((a: any, b: any) => {
         const aTime = new Date(a.lastActivityAt || a.createdAt).getTime();
         const bTime = new Date(b.lastActivityAt || b.createdAt).getTime();
         return bTime - aTime;
-      })
-      .slice(0, 3);
+      });
+    return candidates.length > 0 ? candidates[0] : null;
   }, [allDocuments]);
 
   const filteredDocuments = useMemo(() => {
@@ -754,50 +754,22 @@ export default function Library() {
           <HeroSection />
         </div>
 
-        {/* C. Continue Reading section */}
-        {continueReadingDocs.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-              {t('library.continueReading')}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {continueReadingDocs.map((doc: any) => {
-                const progress = doc.progress || 0;
-                const stats = docStats?.[doc.id];
-                return (
-                  <Card
-                    key={`continue-${doc.id}`}
-                    className="p-4 cursor-pointer hover:shadow-md hover:border-border/80 transition-all duration-200 group"
-                    onClick={() => setLocation(`/viewer/${doc.id}`)}
-                  >
-                    <div className="space-y-2.5">
-                      <h3 className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-[hsl(var(--brand))] transition-colors leading-snug">
-                        {doc.title}
-                      </h3>
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
-                        <div
-                          className="h-1.5 rounded-full bg-[hsl(var(--brand))] transition-all duration-300"
-                          style={{ width: `${Math.max(progress, 2)}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] text-muted-foreground">
-                            {t('library.continueReadingProgress').replace('{percent}', String(progress))}
-                          </span>
-                          {stats && stats.notesCount > 0 && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                              {t('library.notesCountBadge').replace('{count}', String(stats.notesCount))}
-                            </Badge>
-                          )}
-                        </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
+        {/* Resume Banner */}
+        {resumeDoc && (
+          <div
+            className="mb-6 flex items-center justify-between px-4 py-3 border border-border shadow-sm rounded-xl cursor-pointer transition-all duration-200 hover:border-[hsl(var(--brand))]/40 hover:shadow-md hover:-translate-y-0.5 group"
+            onClick={() => setLocation(`/viewer/${resumeDoc.id}`)}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <BookOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm text-muted-foreground flex-shrink-0">{t('library.continueReading')}</span>
+              <span className="text-sm font-medium text-foreground truncate">{resumeDoc.title}</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+              {(resumeDoc.progress || 0) > 0 && (
+                <span className="text-[11px] text-muted-foreground tabular-nums">📖 {resumeDoc.progress}%</span>
+              )}
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
             </div>
           </div>
         )}
