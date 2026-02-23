@@ -38,7 +38,7 @@ import {
   Trash2,
   X,
   AlertTriangle,
-  Lightbulb,
+  Sparkles,
   ChevronRight,
   BookOpen,
   Languages,
@@ -748,17 +748,17 @@ export default function Library() {
           </div>
         </div>
 
-        {/* A. Non-intrusive review nudge bar */}
+        {/* A. Non-intrusive review nudge bar — Modern Zen style */}
         {(reviewDueCount?.total ?? 0) > 0 && (
-          <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-            <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-            <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">
+          <div className="mb-6 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-muted/50 border border-border">
+            <Sparkles className="h-4 w-4 text-foreground/60 shrink-0" />
+            <p className="text-sm text-foreground/70 flex-1">
               {t('library.nudgeReview').replace('{count}', String(reviewDueCount?.total || 0))}
             </p>
             <Button
               size="sm"
-              variant="outline"
-              className="shrink-0 rounded-lg border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-xs h-8"
+              variant="ghost"
+              className="shrink-0 rounded-full text-xs h-7 px-3 text-foreground/70 hover:text-foreground hover:bg-muted"
               onClick={() => setLocation('/practice')}
             >
               {t('library.nudgeReviewButton')}
