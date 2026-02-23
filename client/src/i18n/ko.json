@@ -864,7 +864,11 @@
     "badgeBeginnerFriendly": "초급 친화",
     "forYou": "맞춤 추천",
     "items": "항목",
-    "rssUrlPlaceholder": "RSS 피드 URL 입력..."
+    "rssUrlPlaceholder": "RSS 피드 URL 입력...",
+    "allDifficulties": "전체 난이도",
+    "beginner": "초급 (Beginner)",
+    "intermediate": "중급 (Intermediate)",
+    "advanced": "고급 (Advanced)"
   },
   "toast": {
     "documentCreated": "문서가 성공적으로 생성되었습니다",

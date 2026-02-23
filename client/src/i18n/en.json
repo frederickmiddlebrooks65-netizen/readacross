@@ -864,7 +864,11 @@
     "badgeBeginnerFriendly": "Beginner Friendly",
     "forYou": "For You",
     "items": "items",
-    "rssUrlPlaceholder": "Enter RSS feed URL..."
+    "rssUrlPlaceholder": "Enter RSS feed URL...",
+    "allDifficulties": "All Levels",
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "advanced": "Advanced"
   },
   "toast": {
     "documentCreated": "Document created successfully",

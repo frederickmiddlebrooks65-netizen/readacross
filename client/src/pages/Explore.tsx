@@ -1088,10 +1088,10 @@ export default function Explore() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t('explore.allDifficulties', '전체 난이도')}</SelectItem>
-                <SelectItem value="beginner">{t('explore.beginner', '초급 (Beginner)')}</SelectItem>
-                <SelectItem value="intermediate">{t('explore.intermediate', '중급 (Intermediate)')}</SelectItem>
-                <SelectItem value="advanced">{t('explore.advanced', '고급 (Advanced)')}</SelectItem>
+                <SelectItem value="all">{t('explore.allDifficulties')}</SelectItem>
+                <SelectItem value="beginner">{t('explore.beginner')}</SelectItem>
+                <SelectItem value="intermediate">{t('explore.intermediate')}</SelectItem>
+                <SelectItem value="advanced">{t('explore.advanced')}</SelectItem>
               </SelectContent>
             </Select>
 
