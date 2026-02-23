@@ -546,6 +546,11 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             <div className="mt-2 space-y-1">
               {!isPublic && !isExploreMode && (readProgress > 0 || (docStats && docStats.notesCount > 0)) && (
                 <div className="flex items-center gap-2 justify-end">
+                  {docStats && docStats.notesCount > 0 && (
+                    <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                      {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
+                    </span>
+                  )}
                   {readProgress > 0 && (
                     <div className="flex items-center gap-1.5">
                       <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
@@ -558,11 +563,6 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
                         {readProgress}%
                       </span>
                     </div>
-                  )}
-                  {docStats && docStats.notesCount > 0 && (
-                    <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                      {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
-                    </span>
                   )}
                 </div>
               )}
