@@ -797,7 +797,7 @@ function RSSSourceSection({
     mutationFn: async ({ id, data }: { id: number, data: { title: string, url: string } }) => {
       return await apiRequest(`/api/admin/feeds/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(data),
+        json: data,
       });
     },
     onSuccess: () => {
@@ -828,7 +828,7 @@ function RSSSourceSection({
     mutationFn: async ({ feedId, isBlocked }: { feedId: number; isBlocked: boolean }) => {
       return await apiRequest(`/api/admin/feeds/${feedId}`, {
         method: "PATCH",
-        body: JSON.stringify({ isBlocked }),
+        json: { isBlocked },
       });
     },
     onSuccess: () => {
