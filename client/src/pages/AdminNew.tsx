@@ -78,6 +78,7 @@ interface RssFeed {
   category: string;
   healthScore: number;
   isBlocked: boolean;
+  isSystemSource: boolean;
   lastRunAt: string | null;
   lastSuccessAt: string | null;
   errorCount: number;
@@ -617,6 +618,29 @@ function DocumentSourceManagement({
   updateRssPolicyMutation,
   triggerSyncMutation
 }: DocumentSourceManagementProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const systemFeeds = useMemo(() => feedsData?.filter(f => f.isSystemSource) || [], [feedsData]);
+  const userFeeds = useMemo(() => feedsData?.filter(f => !f.isSystemSource) || [], [feedsData]);
+
+  const toggleSystemSourceMutation = useMutation({
+    mutationFn: async ({ feedId, isBlocked }: { feedId: number; isBlocked: boolean }) => {
+      return await apiRequest(`/api/admin/feeds/${feedId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isBlocked }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/feeds"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/feeds/health"] });
+      toast({ title: "소스 상태가 변경되었습니다" });
+    },
+    onError: () => {
+      toast({ title: "오류", description: "소스 상태 변경에 실패했습니다", variant: "destructive" });
+    },
+  });
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* 시스템 소스 카드 */}
@@ -627,37 +651,49 @@ function DocumentSourceManagement({
             시스템 소스
           </CardTitle>
           <CardDescription>
-            안정적인 내장 소스 관리
+            내장 소스 관리 — 토글로 활성/비활성 제어
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-brand-subtle rounded-lg border border-brand">
-              <div className="flex items-center gap-2">
-                <Cog className="h-4 w-4 text-brand" />
-                <div>
-                  <p className="font-medium text-brand">arXiv 학술 논문</p>
-                  <p className="text-xs text-brand">안정적 기본 소스</p>
+            {systemFeeds.length > 0 ? systemFeeds.map((feed) => (
+              <div
+                key={feed.id}
+                className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                  feed.isBlocked
+                    ? "bg-muted/50 border-border"
+                    : "bg-brand-subtle border-brand"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Cog className={`h-4 w-4 flex-shrink-0 ${feed.isBlocked ? "text-muted-foreground" : "text-brand"}`} />
+                  <div className="min-w-0">
+                    <p className={`font-medium truncate ${feed.isBlocked ? "text-muted-foreground" : "text-brand"}`}>
+                      {feed.title}
+                    </p>
+                    <p className={`text-xs truncate ${feed.isBlocked ? "text-muted-foreground" : "text-brand"}`}>
+                      {feed.category || '일반'}
+                    </p>
+                  </div>
                 </div>
+                <Switch
+                  checked={!feed.isBlocked}
+                  onCheckedChange={(checked) => {
+                    toggleSystemSourceMutation.mutate({ feedId: feed.id, isBlocked: !checked });
+                  }}
+                  disabled={toggleSystemSourceMutation.isPending}
+                />
               </div>
-              <Switch checked={true} disabled />
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-brand-subtle rounded-lg border border-brand">
-              <div className="flex items-center gap-2">
-                <Cog className="h-4 w-4 text-brand" />
-                <div>
-                  <p className="font-medium text-brand">Project Gutenberg</p>
-                  <p className="text-xs text-brand">고전 문학</p>
-                </div>
+            )) : (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                등록된 시스템 소스가 없습니다
               </div>
-              <Switch checked={true} disabled />
-            </div>
+            )}
           </div>
 
           <div className="pt-3 border-t">
             <div className="text-sm text-muted-foreground">
-              시스템 소스는 항상 활성화되며 관리자가 제어합니다.
+              활성 {systemFeeds.filter(f => !f.isBlocked).length}개 / 전체 {systemFeeds.length}개
             </div>
           </div>
         </CardContent>
@@ -676,7 +712,7 @@ function DocumentSourceManagement({
         </CardHeader>
         <CardContent>
           <RSSSourceSection 
-            feedsData={feedsData}
+            feedsData={userFeeds}
             rssPolicy={rssPolicy}
             selectedRssFeeds={selectedRssFeeds}
             setSelectedRssFeeds={setSelectedRssFeeds}
