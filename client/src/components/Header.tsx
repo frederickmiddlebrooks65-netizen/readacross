@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
   Library,
@@ -47,7 +47,23 @@ export default function Header({ className }: HeaderProps) {
   });
   
   const isPro = user?.plan === "pro" || user?.plan === "admin" || user?.plan === "beta_pro";
-  
+
+  const { data: reviewDueCount } = useQuery<{ total: number }>({
+    queryKey: ["/api/practice/due-count"],
+    enabled: isAuthenticated,
+    queryFn: async () => {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch("/api/practice/due-count", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return { total: 0 };
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const hasReviewDue = (reviewDueCount?.total ?? 0) > 0;
+
   const navItems = [
     { icon: Compass, text: t('navigation.explore'), path: "/explore" },
     { icon: Library, text: t('navigation.library'), path: "/library" },
@@ -105,12 +121,17 @@ export default function Header({ className }: HeaderProps) {
                     : "text-muted-foreground hover:bg-muted",
                 )}
               >
-                <item.icon
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    location === item.path ? "text-[hsl(var(--brand))]" : "text-muted-foreground",
+                <span className="relative">
+                  <item.icon
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      location === item.path ? "text-[hsl(var(--brand))]" : "text-muted-foreground",
+                    )}
+                  />
+                  {item.path === "/practice" && hasReviewDue && (
+                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500" />
                   )}
-                />
+                </span>
                 {item.text}
               </Link>
             ))}

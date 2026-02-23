@@ -754,25 +754,6 @@ export default function Library() {
           <HeroSection />
         </div>
 
-        {/* A. Non-intrusive review nudge bar — Modern Zen style */}
-        {(reviewDueCount?.total ?? 0) > 0 && (
-          <div className="mb-6 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-muted/50 border border-border">
-            <Sparkles className="h-4 w-4 text-foreground/60 shrink-0" />
-            <p className="text-sm text-foreground/70 flex-1">
-              {t('library.nudgeReview').replace('{count}', String(reviewDueCount?.total || 0))}
-            </p>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="shrink-0 rounded-full text-xs h-7 px-3 text-foreground/70 hover:text-foreground hover:bg-muted"
-              onClick={() => setLocation('/practice')}
-            >
-              {t('library.nudgeReviewButton')}
-              <ChevronRight className="h-3 w-3 ml-1" />
-            </Button>
-          </div>
-        )}
-
         {/* C. Continue Reading section */}
         {continueReadingDocs.length > 0 && (
           <div className="mb-8">
