@@ -628,7 +628,7 @@ function DocumentSourceManagement({
     mutationFn: async ({ feedId, isBlocked }: { feedId: number; isBlocked: boolean }) => {
       return await apiRequest(`/api/admin/feeds/${feedId}`, {
         method: "PATCH",
-        body: JSON.stringify({ isBlocked }),
+        json: { isBlocked },
       });
     },
     onSuccess: () => {
@@ -656,7 +656,29 @@ function DocumentSourceManagement({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
-            {systemFeeds.length > 0 ? systemFeeds.map((feed) => (
+            <div className="flex items-center justify-between p-3 bg-brand-subtle rounded-lg border border-brand">
+              <div className="flex items-center gap-2">
+                <Cog className="h-4 w-4 text-brand" />
+                <div>
+                  <p className="font-medium text-brand">arXiv 학술 논문</p>
+                  <p className="text-xs text-brand">안정적 기본 소스</p>
+                </div>
+              </div>
+              <Switch checked={true} disabled />
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-brand-subtle rounded-lg border border-brand">
+              <div className="flex items-center gap-2">
+                <Cog className="h-4 w-4 text-brand" />
+                <div>
+                  <p className="font-medium text-brand">Project Gutenberg</p>
+                  <p className="text-xs text-brand">고전 문학</p>
+                </div>
+              </div>
+              <Switch checked={true} disabled />
+            </div>
+
+            {systemFeeds.map((feed) => (
               <div
                 key={feed.id}
                 className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
@@ -684,16 +706,12 @@ function DocumentSourceManagement({
                   disabled={toggleSystemSourceMutation.isPending}
                 />
               </div>
-            )) : (
-              <div className="text-sm text-muted-foreground text-center py-4">
-                등록된 시스템 소스가 없습니다
-              </div>
-            )}
+            ))}
           </div>
 
           <div className="pt-3 border-t">
             <div className="text-sm text-muted-foreground">
-              활성 {systemFeeds.filter(f => !f.isBlocked).length}개 / 전체 {systemFeeds.length}개
+              활성 {2 + systemFeeds.filter(f => !f.isBlocked).length}개 / 전체 {2 + systemFeeds.length}개
             </div>
           </div>
         </CardContent>
