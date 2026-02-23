@@ -97,7 +97,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
   };
 
   const lastReadText = formatDistanceToNowWithTimezone(new Date(document.createdAt), { timezone, language: uiLanguage, addSuffix: true });
-  const translateProgress = document.progress || 0;
+  const translateProgress = document.translationProgress || 0;
 
   // Check if this is an RSS feed document
   const isRSSDocument = 'feedId' in document && document.feedId;
