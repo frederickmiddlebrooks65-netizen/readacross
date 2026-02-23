@@ -465,30 +465,29 @@ function ExploreDocumentCard({
         onMouseLeave={handleMouseLeave}
       >
         <div className="flex-1 min-w-0">
-          <h3
-            className="card-title font-sans font-semibold text-[15px] text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-200 line-clamp-2"
-            style={{ lineHeight: '1.4' }}
-            title={document.title}
-          >
-            {document.title}
-          </h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3
+              className="card-title font-sans font-semibold text-[15px] text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-200 line-clamp-2"
+              style={{ lineHeight: '1.4' }}
+              title={document.title}
+            >
+              {document.title}
+            </h3>
+            <LearningBadges document={document} t={t} compact />
+          </div>
 
           <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
             <span>{getSourceLabel()}</span>
           </div>
-
-          <div className="mt-1.5">
-            <LearningBadges document={document} t={t} compact />
-          </div>
         </div>
         
-        <div className="flex-shrink-0 ml-4 flex flex-col items-end gap-2">
-          <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+        <div className="flex-shrink-0 ml-4 flex items-center gap-3">
+          <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 flex-shrink-0">
             <Clock className="h-3 w-3" />
             {getRelativeTime()}
           </span>
           <div className={cn(
-            "transition-opacity duration-200",
+            "transition-opacity duration-200 flex-shrink-0",
             "opacity-0 group-hover:opacity-100"
           )}>
             {isAlreadyInLibrary ? (
@@ -565,12 +564,12 @@ function ExploreDocumentCard({
           </p>
         </div>
         
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 flex items-end justify-between">
           <LearningBadges document={document} t={t} compact />
-          <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+          <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 flex-shrink-0">
             <Clock className="h-3 w-3" />
-            <span>{getRelativeTime()}</span>
-          </div>
+            {getRelativeTime()}
+          </span>
         </div>
       </div>
     </Card>
