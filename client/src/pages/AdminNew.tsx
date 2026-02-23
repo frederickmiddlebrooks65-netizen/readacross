@@ -824,6 +824,23 @@ function RSSSourceSection({
     });
   };
 
+  const toggleFeedBlockMutation = useMutation({
+    mutationFn: async ({ feedId, isBlocked }: { feedId: number; isBlocked: boolean }) => {
+      return await apiRequest(`/api/admin/feeds/${feedId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isBlocked }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/feeds"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/feeds/health"] });
+      toast({ title: "피드 상태가 변경되었습니다" });
+    },
+    onError: () => {
+      toast({ title: "오류", description: "피드 상태 변경에 실패했습니다", variant: "destructive" });
+    },
+  });
+
   // 피드 삭제
   const deleteFeedMutation = useMutation({
     mutationFn: async (feedId: number) => {
@@ -1075,8 +1092,8 @@ function RSSSourceSection({
                                   }`}
                                   title={feed.isBlocked ? '승인 (크롤링 허용)' : '차단'}
                                   data-testid={`button-toggle-${feed.id}`}
-                                  onClick={() => toggleSystemSourceMutation.mutate({ feedId: feed.id, isBlocked: !feed.isBlocked })}
-                                  disabled={toggleSystemSourceMutation.isPending}
+                                  onClick={() => toggleFeedBlockMutation.mutate({ feedId: feed.id, isBlocked: !feed.isBlocked })}
+                                  disabled={toggleFeedBlockMutation.isPending}
                                 >
                                   {feed.isBlocked ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
                                 </button>
