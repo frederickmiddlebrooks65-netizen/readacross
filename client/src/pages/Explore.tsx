@@ -458,63 +458,65 @@ function ExploreDocumentCard({
     return (
       <div
         className={cn(
-          "group cursor-pointer p-4 rounded-lg border border-transparent",
-          "transition-all duration-300 ease-in-out",
+          "group cursor-pointer flex items-center justify-between py-3 px-4 rounded-lg border border-transparent",
+          "transition-colors duration-200",
           "hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700"
         )}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <h3 className="card-title font-sans font-semibold text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-300 line-clamp-1" style={{ lineHeight: '1.5' }}>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3
+              className="card-title font-sans font-semibold text-[15px] text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-200 line-clamp-2"
+              style={{ lineHeight: '1.4' }}
+              title={document.title}
+            >
               {document.title}
             </h3>
-            <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
-              <span>{getSourceLabel()}</span>
-              <span>·</span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {getRelativeTime()}
-              </span>
-            </div>
-            <div className="mt-2">
-              <LearningBadges document={document} t={t} compact />
-            </div>
-            <p className={cn(
-              "mt-2 text-sm text-slate-500 dark:text-slate-400 line-clamp-2",
-              "transition-all duration-300 ease-in-out",
-              isHovered ? "opacity-100 max-h-20" : "opacity-0 max-h-0 overflow-hidden"
-            )}>
+            <LearningBadges document={document} t={t} compact />
+          </div>
+
+          {snippet && (
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-1">
               {snippet}
             </p>
+          )}
+
+          <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <span>{getSourceLabel()}</span>
+            <span className="text-slate-300 dark:text-slate-600">·</span>
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {getRelativeTime()}
+            </span>
           </div>
-          
-          <div className={cn(
-            "flex-shrink-0 transition-opacity duration-300",
-            isHovered ? "opacity-100" : "opacity-0"
-          )}>
-            {isAlreadyInLibrary ? (
-              <Badge variant="secondary" className="text-xs">
-                {t('library.inLibrary')}
-              </Badge>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={handleAddToLibrary}
-                disabled={isAdding}
-              >
-                {isAdding ? (
-                  <div className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-                ) : (
-                  <Plus className="h-3 w-3" />
-                )}
-              </Button>
-            )}
-          </div>
+        </div>
+        
+        <div className={cn(
+          "flex-shrink-0 ml-4 transition-opacity duration-200",
+          "opacity-0 group-hover:opacity-100"
+        )}>
+          {isAlreadyInLibrary ? (
+            <Badge variant="secondary" className="text-xs">
+              {t('library.inLibrary')}
+            </Badge>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={handleAddToLibrary}
+              disabled={isAdding}
+            >
+              {isAdding ? (
+                <div className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+              ) : (
+                <Plus className="h-3 w-3" />
+              )}
+            </Button>
+          )}
         </div>
       </div>
     );
