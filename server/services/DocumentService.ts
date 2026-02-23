@@ -1541,7 +1541,7 @@ export class DocumentService {
         author: params.author || null,
         source: params.source || "RSS",
         category: params.category || "RSS Feed",
-        difficulty: null,
+        difficulty: this.computeDifficulty({ category: params.category, source: params.source, content: params.content }),
         tags: null,
         originalUrl: params.originalUrl || null,
         licenseType: null,
@@ -1554,15 +1554,15 @@ export class DocumentService {
         thumbnailStatus: "pending",
         dominantColor: null,
         blurhash: null,
-        // Structure-only metadata
-        structuredContent: structuredBlocks as any, // No anchors
+        structuredContent: structuredBlocks as any,
         structuredVersion: 2,
         contentSourceType: contentType,
         anchorSchemaVersion: 1,
         tokenizerVersion: SENTENCE_TOKENIZER_VERSION,
-        processingState: "structure_only", // New state for lightweight docs
-        rawContent: params.content, // Store raw content for later processing
+        processingState: "structure_only",
+        rawContent: params.content,
         snippet: this.generateSnippet(params.content),
+        wordCount: this.computeWordCount(params.content),
       });
 
       const duration = Date.now() - startTime;
@@ -1591,6 +1591,25 @@ export class DocumentService {
     const cut = stripped.substring(0, maxLength);
     const lastSpace = cut.lastIndexOf(' ');
     return (lastSpace > maxLength * 0.7 ? cut.substring(0, lastSpace) : cut) + '…';
+  }
+
+  static computeWordCount(content: string): number {
+    if (!content) return 0;
+    const stripped = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return stripped.split(/\s+/).filter(w => w.length > 0).length;
+  }
+
+  static computeDifficulty(params: { category?: string; source?: string; content?: string }): string {
+    if (params.category === 'Academic' || params.source === 'arXiv') return 'advanced';
+    if (params.category === 'Literature' || params.source === 'Project Gutenberg') return 'intermediate';
+    if (params.category === 'News' || params.category === 'Essays') return 'beginner';
+    if (params.content) {
+      const words = params.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().split(/\s+/);
+      const avgLen = params.content.replace(/<[^>]+>/g, '').replace(/\s+/g, '').length / Math.max(1, words.length);
+      if (avgLen > 6) return 'advanced';
+      if (avgLen > 4.5) return 'intermediate';
+    }
+    return 'intermediate';
   }
 
   /**

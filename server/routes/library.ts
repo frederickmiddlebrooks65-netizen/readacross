@@ -73,6 +73,7 @@ router.get("/library/explore", async (req: any, res: any) => {
       sourceLanguage: doc.sourceLanguage,
       feedId: doc.feedId,
       snippetContent: doc.snippet || doc.rawContent?.substring(0, 500) || '',
+      wordCount: doc.wordCount || null,
     }));
 
     res.json(lightweightDocs);

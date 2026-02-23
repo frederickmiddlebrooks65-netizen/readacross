@@ -874,6 +874,7 @@ export class DatabaseStorage implements IStorage {
         totalCount: document.totalCount ?? 0,
         translationUpdatedAt: document.translationUpdatedAt ?? null,
         translationError: document.translationError ?? null,
+        wordCount: document.wordCount ?? null,
       })
       .returning();
 
