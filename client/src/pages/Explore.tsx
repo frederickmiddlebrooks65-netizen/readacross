@@ -70,23 +70,30 @@ function getCategoryLabel(category: string | undefined, t: any): string {
 import Pagination from "@/components/common/Pagination";
 
 function estimateReadTime(doc: any): number {
+  if (doc.wordCount) {
+    return Math.max(1, Math.round(doc.wordCount / 200));
+  }
   const content = doc.snippetContent || doc.content || doc.rawContent || '';
   const wordCount = content.split(/\s+/).length;
   return Math.max(1, Math.round(wordCount / 200));
 }
 
 function estimateDifficulty(doc: any): 'high' | 'mid' | 'low' {
+  if (doc.difficulty) {
+    if (doc.difficulty === 'advanced') return 'high';
+    if (doc.difficulty === 'intermediate') return 'mid';
+    if (doc.difficulty === 'beginner') return 'low';
+  }
   if (doc.category === 'Academic' || doc.source === 'arXiv') return 'high';
   if (doc.category === 'Literature' || doc.source === 'Project Gutenberg') return 'mid';
   if (doc.category === 'Opinion' || doc.category === 'News') return 'low';
-  const content = doc.snippetContent || doc.content || '';
-  const avgWordLen = content.length / Math.max(1, content.split(/\s+/).length);
-  if (avgWordLen > 6) return 'high';
-  if (avgWordLen > 4.5) return 'mid';
-  return 'low';
+  return 'mid';
 }
 
 function estimateVocabLevel(doc: any): 'advanced' | 'intermediate' | 'beginner' {
+  if (doc.difficulty && ['advanced', 'intermediate', 'beginner'].includes(doc.difficulty)) {
+    return doc.difficulty;
+  }
   const diff = estimateDifficulty(doc);
   if (diff === 'high') return 'advanced';
   if (diff === 'mid') return 'intermediate';
