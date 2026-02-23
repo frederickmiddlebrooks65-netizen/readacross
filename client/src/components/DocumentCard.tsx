@@ -271,14 +271,9 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
       >
         <div className="flex-1 min-w-0">
           <h3 className={cn(
-            "card-title font-sans font-semibold text-brand-ink group-hover:text-brand-amber transition-colors truncate",
+            "card-title font-sans font-semibold text-[15px] leading-[1.4] text-brand-ink group-hover:text-brand-amber transition-colors truncate",
             document.isArchived && "opacity-60"
-          )}
-          style={{
-            fontSize: '15px',
-            fontWeight: '600',
-            lineHeight: '1.4',
-          }}>
+          )}>
             {document.title}
           </h3>
           <span className="truncate text-[12px] text-muted-foreground mt-0.5 block">
@@ -308,7 +303,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             </div>
           )}
 
-          <span className="flex items-center gap-1 flex-shrink-0 text-[12px] text-muted-foreground">
+          <span className="flex items-center gap-1 flex-shrink-0 text-[12px] text-slate-400 font-light">
             <Clock className="h-3 w-3" />
             {getRelativeTime()}
           </span>
@@ -535,10 +530,9 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             <div className="flex-1 flex flex-col justify-center text-left">
               <h3 
                 className={cn(
-                  "card-title font-sans font-semibold text-lg text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-300 line-clamp-3",
+                  "card-title font-sans font-semibold text-lg text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-300 line-clamp-3 leading-[1.4]",
                   document.isArchived && "opacity-60"
                 )}
-                style={{ lineHeight: '1.5' }}
                 dir="auto"
                 title={document.title}
               >
@@ -552,7 +546,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             </div>
 
             {/* BOTTOM SECTION: Activity data right-aligned, 2 rows */}
-            <div className="mt-3 space-y-1">
+            <div className="mt-2 space-y-1">
               {!isPublic && !isExploreMode && (translateProgress > 0 || (docStats && docStats.notesCount > 0)) && (
                 <div className="flex items-center gap-2 justify-end">
                   {translateProgress > 0 && (
@@ -577,7 +571,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
                 </div>
               )}
               <div className="flex items-center justify-end">
-                <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+                <span className="flex items-center gap-1 text-[12px] text-slate-400 dark:text-slate-500 font-light">
                   <Clock className="h-3 w-3" />
                   {getRelativeTime()}
                 </span>

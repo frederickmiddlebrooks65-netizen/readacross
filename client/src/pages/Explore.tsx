@@ -118,9 +118,9 @@ function LearningBadges({ document: doc, t, compact = false }: { document: any; 
 
   const diffLabel = difficulty === 'high' ? t('explore.badgeDifficultyHigh') :
     difficulty === 'mid' ? t('explore.badgeDifficultyMid') : t('explore.badgeDifficultyLow');
-  const diffColor = difficulty === 'high' ? 'text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-950/30' :
-    difficulty === 'mid' ? 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/30' :
-    'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/30';
+  const diffColor = difficulty === 'high' ? 'text-rose-600 bg-rose-500/10 border border-rose-500/20 dark:text-rose-400 dark:bg-rose-500/10 dark:border-rose-400/20' :
+    difficulty === 'mid' ? 'text-amber-600 bg-amber-500/10 border border-amber-500/20 dark:text-amber-400 dark:bg-amber-500/10 dark:border-amber-400/20' :
+    'text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 dark:text-emerald-400 dark:bg-emerald-500/10 dark:border-emerald-400/20';
 
   const vocabLabel = vocab === 'advanced' ? t('explore.badgeAdvancedVocab') :
     vocab === 'intermediate' ? t('explore.badgeIntermediateVocab') : t('explore.badgeBeginnerFriendly');
@@ -344,7 +344,7 @@ function FeaturedCard({
         )}
       </div>
 
-      <h3 className="font-semibold text-brand-ink dark:text-slate-100 line-clamp-2 mb-2 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors text-[15px]" style={{ lineHeight: '1.5' }}>
+      <h3 className="font-semibold text-brand-ink dark:text-slate-100 line-clamp-2 mb-2 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors text-[15px] leading-[1.4]">
         {doc.title}
       </h3>
 
@@ -467,8 +467,7 @@ function ExploreDocumentCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3
-              className="card-title font-sans font-semibold text-[15px] text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-200 line-clamp-2"
-              style={{ lineHeight: '1.4' }}
+              className="card-title font-sans font-semibold text-[15px] text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-200 line-clamp-2 leading-[1.4]"
               title={document.title}
             >
               {document.title}
@@ -476,13 +475,13 @@ function ExploreDocumentCard({
             <LearningBadges document={document} t={t} compact />
           </div>
 
-          <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
             <span>{getSourceLabel()}</span>
           </div>
         </div>
         
         <div className="flex-shrink-0 ml-4 flex items-center gap-3">
-          <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 flex-shrink-0">
+          <span className="flex items-center gap-1 text-[12px] text-slate-400 dark:text-slate-500 font-light flex-shrink-0">
             <Clock className="h-3 w-3" />
             {getRelativeTime()}
           </span>
@@ -555,8 +554,7 @@ function ExploreDocumentCard({
         
         <div className="flex-1 flex flex-col justify-center">
           <h3
-            className="card-title font-sans font-semibold text-lg text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-300 line-clamp-3"
-            style={{ lineHeight: '1.5' }}
+            className="card-title font-sans font-semibold text-lg text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-300 line-clamp-3 leading-[1.4]"
             title={document.title}
           >
             {document.title}
@@ -566,12 +564,12 @@ function ExploreDocumentCard({
           </p>
         </div>
         
-        <div className="mt-3 space-y-1">
+        <div className="mt-2 space-y-1">
           <div className="flex items-center justify-start">
             <LearningBadges document={document} t={t} compact />
           </div>
           <div className="flex items-center justify-end">
-            <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+            <span className="flex items-center gap-1 text-[12px] text-slate-400 dark:text-slate-500 font-light">
               <Clock className="h-3 w-3" />
               {getRelativeTime()}
             </span>
