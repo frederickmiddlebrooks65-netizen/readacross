@@ -572,10 +572,34 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
               </p>
             </div>
 
-            {/* BOTTOM SECTION: Time pinned to bottom */}
-            <div className="flex items-center gap-1 mt-3 text-xs text-slate-400 dark:text-slate-500">
-              <Clock className="h-3 w-3" />
-              <span>{getRelativeTime()}</span>
+            {/* BOTTOM SECTION: Badges + Time pinned to bottom */}
+            <div className="mt-3 space-y-1.5">
+              {!isPublic && !isExploreMode && (translateProgress > 0 || docStats) && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {translateProgress > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                      <FileText className="h-2.5 w-2.5" />
+                      {t('library.translationRate').replace('{percent}', String(translateProgress))}
+                    </span>
+                  )}
+                  {docStats && docStats.notesCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                      <BookmarkPlus className="h-2.5 w-2.5" />
+                      {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
+                    </span>
+                  )}
+                  {docStats && docStats.glossaryCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                      <GraduationCap className="h-2.5 w-2.5" />
+                      {t('library.glossaryCountBadge').replace('{count}', String(docStats.glossaryCount))}
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                <Clock className="h-3 w-3" />
+                <span>{getRelativeTime()}</span>
+              </div>
             </div>
           </article>
         </div>
