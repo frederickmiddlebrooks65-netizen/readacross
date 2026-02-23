@@ -756,35 +756,28 @@ export default function Library() {
         {/* Resume Banner */}
         {resumeDoc && (
           <div
-            className="mb-6 flex items-center justify-between py-4 px-5 border border-border shadow-sm rounded-xl bg-card cursor-pointer transition-all duration-200 hover:border-[hsl(var(--brand))]/40 hover:shadow-md hover:-translate-y-0.5 group"
+            className="relative mb-6 flex items-center justify-between pt-4 pb-5 px-5 border border-border/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl overflow-hidden cursor-pointer transition-all duration-200 hover:border-[hsl(var(--brand))]/40 hover:shadow-md hover:-translate-y-0.5 group"
             onClick={() => setLocation(`/viewer/${resumeDoc.id}`)}
           >
-            <div className="min-w-0 flex-1 mr-4">
+            <div className="min-w-0 flex-1 mr-6">
               <span className="text-base font-semibold text-foreground truncate block">
                 {resumeDoc.title}
               </span>
-              <div className="flex items-center gap-3 mt-1.5">
-                <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                  {resumeDoc.source || t('source.upload')}
-                </span>
-                {(resumeDoc.progress || 0) > 0 && (
-                  <div className="flex items-center gap-1.5 flex-1 max-w-[180px]">
-                    <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-[hsl(var(--brand))] transition-all duration-300"
-                        style={{ width: `${Math.max(resumeDoc.progress, 3)}%` }}
-                      />
-                    </div>
-                    <span className="text-[11px] text-muted-foreground tabular-nums">
-                      {resumeDoc.progress}%
-                    </span>
-                  </div>
-                )}
-              </div>
+              <span className="text-[11px] text-muted-foreground mt-1 block">
+                {resumeDoc.source || t('source.upload')}
+              </span>
             </div>
-            <div className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--brand))] flex-shrink-0">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-[hsl(var(--brand))] flex-shrink-0">
               <span>{t('library.continueReading')}</span>
               <ChevronRight className="h-4 w-4" />
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/[0.04] dark:bg-white/[0.06]">
+              {(resumeDoc.progress || 0) > 0 && (
+                <div
+                  className="h-full bg-[hsl(var(--brand))] transition-all duration-300"
+                  style={{ width: `${resumeDoc.progress}%` }}
+                />
+              )}
             </div>
           </div>
         )}
