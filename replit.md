@@ -44,6 +44,8 @@ Performance optimizations (Feb 2026):
 - **Snippet denormalization**: `snippet` column added to `documents` table, pre-generated at document creation time, eliminating expensive sentences+paragraphs JOIN queries on every Explore page load.
 - **DB connection pool expanded**: `max` increased from 5 to 15 in server/db.ts for better concurrent request handling.
 
+- **Pre-computed document metrics**: `wordCount` and `difficulty` columns on `documents` table, computed at document creation time (in `DocumentService.ts`). Explore page reads these DB values for accurate read-time/difficulty badges instead of client-side text analysis. Backfilled for all existing documents.
+
 Admin & Operations tooling (Feb 2026):
 - **Telegram notification service**: `server/services/NotificationService.ts` sends fire-and-forget alerts via Telegram Bot API. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` env vars. Triggers: new user signup, token 80% threshold, system errors. Uses per-month dedup for threshold alerts.
 - **Admin user management**: `GET/PATCH /api/admin/users` endpoints with search, plan/status filtering, pagination, and inline editing. Admin UI section in AdminNew.tsx with table view, edit dialog for plan/status/role changes.
