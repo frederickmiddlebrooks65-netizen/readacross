@@ -97,7 +97,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
   };
 
   const lastReadText = formatDistanceToNowWithTimezone(new Date(document.createdAt), { timezone, language: uiLanguage, addSuffix: true });
-  const translateProgress = document.translationProgress || 0;
+  const readProgress = document.progress || 0;
 
   // Check if this is an RSS feed document
   const isRSSDocument = 'feedId' in document && document.feedId;
@@ -116,9 +116,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
   const isEssayOpinion = documentCategory === 'Essays' || documentCategory === 'Opinion';
   const isLiterature = documentCategory === 'Literature';
 
-  // Determine which progress to show (translation progress is what we have)
-  const progressToShow = translateProgress;
-  const progressLabel = translateProgress > 0 ? '번역' : null;
+  const progressToShow = readProgress;
 
   // Get source label for meta display
   const getSourceLabel = () => {
@@ -288,16 +286,16 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             </span>
           )}
 
-          {!isPublic && !isExploreMode && translateProgress > 0 && (
+          {!isPublic && !isExploreMode && readProgress > 0 && (
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <div className="w-16 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-blue-500 dark:bg-blue-400 transition-all"
-                  style={{ width: `${Math.max(translateProgress, 3)}%` }}
+                  className="h-full rounded-full bg-[hsl(var(--brand))] transition-all"
+                  style={{ width: `${Math.max(readProgress, 3)}%` }}
                 />
               </div>
               <span className="text-[11px] text-muted-foreground tabular-nums w-8 text-right">
-                {translateProgress}%
+                {readProgress}%
               </span>
             </div>
           )}
@@ -546,18 +544,18 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
 
             {/* BOTTOM SECTION: Activity data right-aligned, 2 rows */}
             <div className="mt-2 space-y-1">
-              {!isPublic && !isExploreMode && (translateProgress > 0 || (docStats && docStats.notesCount > 0)) && (
+              {!isPublic && !isExploreMode && (readProgress > 0 || (docStats && docStats.notesCount > 0)) && (
                 <div className="flex items-center gap-2 justify-end">
-                  {translateProgress > 0 && (
+                  {readProgress > 0 && (
                     <div className="flex items-center gap-1.5">
                       <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-blue-500 dark:bg-blue-400"
-                          style={{ width: `${Math.max(translateProgress, 3)}%` }}
+                          className="h-full rounded-full bg-[hsl(var(--brand))]"
+                          style={{ width: `${Math.max(readProgress, 3)}%` }}
                         />
                       </div>
                       <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {translateProgress}%
+                        {readProgress}%
                       </span>
                     </div>
                   )}

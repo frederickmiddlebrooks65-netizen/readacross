@@ -1361,4 +1361,41 @@ router.get("/stats/counts", authenticateJWT, async (req: AuthenticatedRequest, r
   }
 });
 
+router.patch("/:id/progress", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const documentId = parseInt(req.params.id);
+    const userId = req.userId!;
+
+    if (isNaN(documentId)) {
+      return res.status(400).json({ error: "Invalid document ID" });
+    }
+
+    const schema = z.object({
+      currentPage: z.number().int().min(1),
+      totalPages: z.number().int().min(1),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", details: parsed.error.errors });
+    }
+
+    const { currentPage, totalPages } = parsed.data;
+
+    const document = await storage.getDocument(documentId);
+    if (!document || document.userId !== userId) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    const progress = Math.round((currentPage / totalPages) * 100);
+    const clampedProgress = Math.min(progress, 100);
+
+    const updated = await storage.updateDocumentProgress(documentId, clampedProgress);
+    res.json({ progress: clampedProgress, currentPage, totalPages });
+  } catch (error) {
+    console.error("Error updating reading progress:", error);
+    res.status(500).json({ error: "Failed to update reading progress" });
+  }
+});
+
 export default router;

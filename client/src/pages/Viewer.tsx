@@ -89,6 +89,8 @@ export default function Viewer() {
   const [headerHasOpenMenu, setHeaderHasOpenMenu] = useState(false); // 헤더 메뉴 상태 추가
   const [currentPage, setCurrentPage] = useState(1);
   const [paragraphsPerPage, setParagraphsPerPage] = useState(5);
+  const hasRestoredPage = useRef(false);
+  const progressSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Page jump functionality
   const [showPageJump, setShowPageJump] = useState(false);
@@ -535,6 +537,49 @@ export default function Viewer() {
       scrollRef.current.focus();
     }
   }, [paginationInitialized]);
+
+  // Restore reading position from saved progress (once, after pagination is initialized)
+  useEffect(() => {
+    if (!paginationInitialized || hasRestoredPage.current || !document || totalPages <= 1) return;
+    hasRestoredPage.current = true;
+    const savedProgress = document.progress || 0;
+    if (savedProgress > 0) {
+      const restoredPage = Math.max(1, Math.min(Math.round((savedProgress / 100) * totalPages), totalPages));
+      if (restoredPage > 1) {
+        setCurrentPage(restoredPage);
+        setHookCurrentPage(restoredPage);
+      }
+    }
+  }, [paginationInitialized, document, totalPages, setHookCurrentPage]);
+
+  // Save reading progress to server (debounced)
+  useEffect(() => {
+    if (!isAuthenticated || !documentId || !paginationInitialized || totalPages <= 0) return;
+    if (!hasRestoredPage.current) return;
+
+    if (progressSaveTimerRef.current) {
+      clearTimeout(progressSaveTimerRef.current);
+    }
+
+    progressSaveTimerRef.current = setTimeout(() => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+      fetch(`/api/documents/${documentId}/progress`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPage, totalPages }),
+      }).catch(() => {});
+    }, 1000);
+
+    return () => {
+      if (progressSaveTimerRef.current) {
+        clearTimeout(progressSaveTimerRef.current);
+      }
+    };
+  }, [currentPage, totalPages, documentId, isAuthenticated, paginationInitialized]);
 
   // DEBUG: Window-level wheel event tracing to find where events go
   useEffect(() => {

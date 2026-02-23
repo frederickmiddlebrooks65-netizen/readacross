@@ -306,7 +306,7 @@ export default function Library() {
   const continueReadingDocs = useMemo(() => {
     if (!allDocuments || !Array.isArray(allDocuments)) return [];
     return allDocuments
-      .filter((doc: any) => !doc.isArchived && (doc.translationProgress > 0 || doc.lastActivityAt))
+      .filter((doc: any) => !doc.isArchived && (doc.progress > 0 || doc.lastActivityAt))
       .sort((a: any, b: any) => {
         const aTime = new Date(a.lastActivityAt || a.createdAt).getTime();
         const bTime = new Date(b.lastActivityAt || b.createdAt).getTime();
@@ -763,7 +763,7 @@ export default function Library() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {continueReadingDocs.map((doc: any) => {
-                const progress = doc.translationProgress || 0;
+                const progress = doc.progress || 0;
                 const stats = docStats?.[doc.id];
                 return (
                   <Card
