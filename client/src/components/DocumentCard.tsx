@@ -303,8 +303,8 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             </div>
           )}
 
-          <span className="flex items-center gap-1 flex-shrink-0 text-[12px] text-slate-400 font-light">
-            <Clock className="h-3 w-3" />
+          <span className="flex items-center gap-1 flex-shrink-0 text-[10px] text-slate-400 font-light">
+            <Clock className="h-2.5 w-2.5" />
             {getRelativeTime()}
           </span>
 
@@ -571,8 +571,8 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
                 </div>
               )}
               <div className="flex items-center justify-end">
-                <span className="flex items-center gap-1 text-[12px] text-slate-400 dark:text-slate-500 font-light">
-                  <Clock className="h-3 w-3" />
+                <span className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 font-light">
+                  <Clock className="h-2.5 w-2.5" />
                   {getRelativeTime()}
                 </span>
               </div>

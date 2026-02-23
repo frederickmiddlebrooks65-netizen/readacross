@@ -129,12 +129,10 @@ function LearningBadges({ document: doc, t, compact = false }: { document: any; 
   if (compact) {
     return (
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className={cn("inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full", diffColor)}>
-          <BarChart3 className="h-2.5 w-2.5" />
+        <span className={cn("inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full", diffColor)}>
           {diffLabel}
         </span>
-        <span className={cn("inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full", monoStyle)}>
-          <Timer className="h-2.5 w-2.5" />
+        <span className={cn("inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full", monoStyle)}>
           {readTimeLabel}
         </span>
       </div>
@@ -143,16 +141,13 @@ function LearningBadges({ document: doc, t, compact = false }: { document: any; 
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className={cn("inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full", diffColor)}>
-        <BarChart3 className="h-3 w-3" />
+      <span className={cn("inline-flex items-center text-xs px-2.5 py-1 rounded-full", diffColor)}>
         {diffLabel}
       </span>
-      <span className={cn("inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full", monoStyle)}>
-        <Timer className="h-3 w-3" />
+      <span className={cn("inline-flex items-center text-xs px-2.5 py-1 rounded-full", monoStyle)}>
         {readTimeLabel}
       </span>
-      <span className={cn("inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full", monoStyle)}>
-        <Brain className="h-3 w-3" />
+      <span className={cn("inline-flex items-center text-xs px-2.5 py-1 rounded-full", monoStyle)}>
         {vocabLabel}
       </span>
     </div>
@@ -481,8 +476,8 @@ function ExploreDocumentCard({
         </div>
         
         <div className="flex-shrink-0 ml-4 flex items-center gap-3">
-          <span className="flex items-center gap-1 text-[12px] text-slate-400 dark:text-slate-500 font-light flex-shrink-0">
-            <Clock className="h-3 w-3" />
+          <span className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 font-light flex-shrink-0">
+            <Clock className="h-2.5 w-2.5" />
             {getRelativeTime()}
           </span>
           <div className={cn(
@@ -565,12 +560,12 @@ function ExploreDocumentCard({
         </div>
         
         <div className="mt-2 space-y-1">
-          <div className="flex items-center justify-start">
+          <div className="flex items-center justify-end">
             <LearningBadges document={document} t={t} compact />
           </div>
           <div className="flex items-center justify-end">
-            <span className="flex items-center gap-1 text-[12px] text-slate-400 dark:text-slate-500 font-light">
-              <Clock className="h-3 w-3" />
+            <span className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 font-light">
+              <Clock className="h-2.5 w-2.5" />
               {getRelativeTime()}
             </span>
           </div>
