@@ -93,10 +93,21 @@ function estimateVocabLevel(doc: any): 'advanced' | 'intermediate' | 'beginner' 
   return 'beginner';
 }
 
+function formatReadTime(minutes: number, t: any): string {
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  }
+  return t('explore.badgeReadTime').replace('{min}', String(minutes));
+}
+
 function LearningBadges({ document: doc, t, compact = false }: { document: any; t: any; compact?: boolean }) {
   const readTime = estimateReadTime(doc);
   const difficulty = estimateDifficulty(doc);
   const vocab = estimateVocabLevel(doc);
+
+  const readTimeLabel = formatReadTime(readTime, t);
 
   const diffLabel = difficulty === 'high' ? t('explore.badgeDifficultyHigh') :
     difficulty === 'mid' ? t('explore.badgeDifficultyMid') : t('explore.badgeDifficultyLow');
@@ -115,7 +126,7 @@ function LearningBadges({ document: doc, t, compact = false }: { document: any; 
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
           <Timer className="h-2.5 w-2.5" />
-          {t('explore.badgeReadTime').replace('{min}', String(readTime))}
+          {readTimeLabel}
         </span>
         <span className={cn("inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full", diffColor)}>
           <BarChart3 className="h-2.5 w-2.5" />
@@ -129,7 +140,7 @@ function LearningBadges({ document: doc, t, compact = false }: { document: any; 
     <div className="flex items-center gap-2 flex-wrap">
       <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
         <Timer className="h-3 w-3" />
-        {t('explore.badgeReadTime').replace('{min}', String(readTime))}
+        {readTimeLabel}
       </span>
       <span className={cn("inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full", diffColor)}>
         <BarChart3 className="h-3 w-3" />
@@ -152,6 +163,7 @@ function ConversationalHero({
   onAddToLibrary,
   isDocInLibrary,
   loadingRecommendations,
+  searchSentinelRef,
   t,
 }: {
   searchTerm: string;
@@ -162,6 +174,7 @@ function ConversationalHero({
   onAddToLibrary: (doc: any) => void;
   isDocInLibrary: (doc: any) => boolean;
   loadingRecommendations: boolean;
+  searchSentinelRef: React.RefObject<HTMLDivElement>;
   t: any;
 }) {
   const [, setLocation] = useLocation();
@@ -192,7 +205,7 @@ function ConversationalHero({
           {t('explore.heroSubtitleNew')}
         </p>
 
-        <div className="relative max-w-xl mx-auto mb-6">
+        <div ref={searchSentinelRef} className="relative max-w-xl mx-auto mb-6">
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-forest dark:group-focus-within:text-slate-300 transition-colors" />
             <input
@@ -569,6 +582,24 @@ export default function Explore() {
   const [searchTerm, setSearchTerm] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [hoveredDoc, setHoveredDoc] = useState<any | null>(null);
+  const [showStickySearch, setShowStickySearch] = useState(false);
+  const searchSentinelRef = useRef<HTMLDivElement>(null);
+  const stickyInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const sentinel = searchSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickySearch(!entry.isIntersecting);
+      },
+      { threshold: 0, rootMargin: '-64px 0px 0px 0px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   const handleCategoryChange = (newCategory: string) => {
     setCategory(newCategory);
@@ -949,22 +980,45 @@ export default function Explore() {
             onAddToLibrary={handleSaveToLibrary}
             isDocInLibrary={isDocInLibrary}
             loadingRecommendations={loadingRecommendations}
+            searchSentinelRef={searchSentinelRef}
             t={t}
           />
         </div>
 
+        <div
+          className={cn(
+            "fixed top-16 left-0 right-0 z-20 transition-all duration-300 ease-in-out",
+            showStickySearch
+              ? "opacity-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 -translate-y-2 pointer-events-none"
+          )}
+        >
+          <div className="bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm">
+            <div className="mx-auto w-full max-w-[var(--page-max-width)] px-6 lg:px-8 py-2.5">
+              <div className="relative max-w-lg mx-auto">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  ref={stickyInputRef}
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }}
+                  placeholder={t('explore.searchPlaceholderNew')}
+                  className={cn(
+                    "w-full h-9 pl-9 pr-3 rounded-lg text-sm",
+                    "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700",
+                    "focus:border-forest dark:focus:border-slate-500 focus:ring-2 focus:ring-forest/10",
+                    "outline-none transition-all duration-200",
+                    "placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                  )}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="pt-8 pb-4 space-y-4">
           <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder={t('explore.searchPlaceholder')}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-              />
-            </div>
-
             <ToggleGroup
               type="single"
               value={viewMode}
