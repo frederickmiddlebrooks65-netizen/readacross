@@ -261,19 +261,71 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
     return (
       <div 
         className={cn(
-          "group cursor-pointer transform transition-all duration-200 hover:bg-muted/50 relative p-4 rounded-lg border border-transparent hover:border-border",
+          "group cursor-pointer flex items-center justify-between py-3 px-4 rounded-lg transition-all duration-200 hover:bg-muted/50 border border-transparent hover:border-border",
           document.isArchived && "opacity-70 grayscale"
         )}
         onClick={handleClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Action Buttons - Right side */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className={cn(
+              "card-title font-sans font-semibold text-brand-ink group-hover:text-brand-amber transition-colors truncate",
+              document.isArchived && "opacity-60"
+            )}
+            style={{
+              fontSize: '15px',
+              fontWeight: '600',
+              lineHeight: '1.4',
+            }}>
+              {document.title}
+            </h3>
+
+            {!isPublic && !isExploreMode && (translateProgress > 0 || docStats) && (
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {translateProgress > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                    <FileText className="h-2.5 w-2.5" />
+                    {t('library.translationRate').replace('{percent}', String(translateProgress))}
+                  </span>
+                )}
+                {docStats && docStats.notesCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    <BookmarkPlus className="h-2.5 w-2.5" />
+                    {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
+                  </span>
+                )}
+                {docStats && docStats.glossaryCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    <GraduationCap className="h-2.5 w-2.5" />
+                    {t('library.glossaryCountBadge').replace('{count}', String(docStats.glossaryCount))}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 mt-1">
+            <span 
+              className="truncate text-[12px] text-muted-foreground"
+            >
+              {getSourceLabel()}
+            </span>
+            <span className="text-muted-foreground/40 text-[12px]">·</span>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              <time className="text-[12px] text-muted-foreground">
+                {getRelativeTime()}
+              </time>
+            </div>
+          </div>
+        </div>
+
         <div className={cn(
-          "absolute top-2 right-2 z-10 flex gap-1 transition-opacity duration-200",
-          isHovered ? "opacity-100" : "opacity-0"
+          "flex-shrink-0 flex items-center gap-1 ml-4 transition-opacity duration-200",
+          "opacity-0 group-hover:opacity-100"
         )}>
-          {/* Save to Library Button - Only for public or explore documents */}
           {onAddToLibrary && (isPublic || isExploreMode) && (
             <>
               {isAlreadyInLibrary ? (
@@ -312,12 +364,10 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             </>
           )}
 
-          {/* Archive/Restore/Delete Buttons - Only for user documents */}
           {!isPublic && !isExploreMode && (
             <>
               {document.isArchived ? (
                 <>
-                  {/* Restore Button */}
                   {onRestore && (
                     <Button
                       variant="outline"
@@ -330,7 +380,6 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
                       <RotateCcw className="h-3.5 w-3.5" />
                     </Button>
                   )}
-                  {/* Delete Button - Only for archived documents */}
                   {onDelete && (
                     <Button
                       variant="outline"
@@ -345,82 +394,21 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
                   )}
                 </>
               ) : (
-                /* Archive Button - Only for active documents */
-                (onArchive && (<Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 w-7 p-0 rounded-md hover:scale-105 transition-all"
-                  onClick={handleArchive}
-                  title={t('library.archive')}
-                  aria-label={t('library.archive')}
-                >
-                  <Archive className="h-3.5 w-3.5" />
-                </Button>))
+                onArchive && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0 rounded-md hover:scale-105 transition-all"
+                    onClick={handleArchive}
+                    title={t('library.archive')}
+                    aria-label={t('library.archive')}
+                  >
+                    <Archive className="h-3.5 w-3.5" />
+                  </Button>
+                )
               )}
             </>
           )}
-        </div>
-        {/* List Card Layout */}
-        <div className="space-y-1.5 pr-24">
-          <h3 className={cn(
-            "card-title font-sans font-semibold leading-tight text-brand-ink group-hover:text-brand-amber transition-colors",
-            document.isArchived && "opacity-60"
-          )}
-          style={{
-            fontSize: '16px',
-            fontWeight: '600',
-            lineHeight: '1.5',
-            overflowWrap: 'break-word',
-            wordBreak: 'break-word'
-          }}>
-            {document.title}
-          </h3>
-          
-          <div className="flex items-center gap-2 flex-wrap">
-            <span 
-              className="truncate"
-              style={{
-                color: 'hsl(var(--muted-foreground))',
-                fontSize: '12px'
-              }}
-            >
-              {getSourceLabel()}
-            </span>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <Clock className="h-3 w-3" style={{ color: 'hsl(var(--muted-foreground))' }} />
-              <time 
-                style={{
-                  color: 'hsl(var(--muted-foreground))',
-                  fontSize: '12px'
-                }}
-              >
-                {getRelativeTime()}
-              </time>
-            </div>
-
-            {!isPublic && !isExploreMode && (translateProgress > 0 || docStats) && (
-              <div className="flex items-center gap-1.5 ml-auto">
-                {translateProgress > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
-                    <FileText className="h-2.5 w-2.5" />
-                    {t('library.translationRate').replace('{percent}', String(translateProgress))}
-                  </span>
-                )}
-                {docStats && docStats.notesCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                    <BookmarkPlus className="h-2.5 w-2.5" />
-                    {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
-                  </span>
-                )}
-                {docStats && docStats.glossaryCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                    <GraduationCap className="h-2.5 w-2.5" />
-                    {t('library.glossaryCountBadge').replace('{count}', String(docStats.glossaryCount))}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
         <ConfirmDialog
