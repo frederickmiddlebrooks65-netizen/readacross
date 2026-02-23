@@ -121,18 +121,18 @@ export default function Header({ className }: HeaderProps) {
                     : "text-muted-foreground hover:bg-muted",
                 )}
               >
+                <item.icon
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    location === item.path ? "text-[hsl(var(--brand))]" : "text-muted-foreground",
+                  )}
+                />
                 <span className="relative">
-                  <item.icon
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      location === item.path ? "text-[hsl(var(--brand))]" : "text-muted-foreground",
-                    )}
-                  />
+                  {item.text}
                   {item.path === "/practice" && hasReviewDue && (
-                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="absolute -top-1 -right-2 h-1.5 w-1.5 rounded-full bg-[hsl(var(--brand))]" />
                   )}
                 </span>
-                {item.text}
               </Link>
             ))}
           </nav>
