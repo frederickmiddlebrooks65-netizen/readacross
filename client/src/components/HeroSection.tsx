@@ -81,10 +81,16 @@ export default function HeroSection() {
 
   return (
     <section
-      className="relative w-full min-h-[25vh] overflow-hidden bg-[hsl(var(--brand-subtle))]"
+      className="relative w-full min-h-[30vh] overflow-hidden"
+      style={{
+        background: `
+          linear-gradient(135deg, hsl(var(--brand-subtle)) 0%, hsl(var(--brand-subtle) / 0.6) 50%, hsl(var(--brand-subtle) / 0.85) 100%),
+          url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E")
+        `,
+      }}
     >
 
-      <div className="relative z-10 container mx-auto px-6 py-8 flex flex-col items-center justify-center min-h-[25vh]">
+      <div className="relative z-10 container mx-auto px-6 py-12 flex flex-col items-center justify-center min-h-[30vh]">
         {variationType === 'contextual_insight' && (
           <div className="flex items-center gap-2 mb-4 text-brand-amber/80">
             <Sparkles className="h-4 w-4" />
@@ -96,7 +102,7 @@ export default function HeroSection() {
 
         <div 
           className={cn(
-            "max-w-3xl text-center cursor-pointer group transition-all duration-400",
+            "max-w-[70%] text-center cursor-pointer group transition-all duration-400",
             todaySentence && "hover:scale-[1.01]"
           )}
           onClick={handleSentenceClick}
@@ -107,6 +113,7 @@ export default function HeroSection() {
               "hero-quote text-xl md:text-2xl lg:text-3xl",
               "transition-all duration-400"
             )}
+            style={{ lineHeight: 1.7 }}
           >
             {displaySentence}
           </blockquote>
