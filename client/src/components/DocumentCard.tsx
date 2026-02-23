@@ -2,10 +2,10 @@ import React, { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDistanceToNowWithTimezone, formatShortDate } from "@/lib/dateUtils";
+import { formatShortDate } from "@/lib/dateUtils";
 import { useTimezone } from "@/hooks/useTimezone";
 import { useLocation } from "wouter";
-import { Clock, FileText, BookOpen, X, Plus, GraduationCap, Timer, Archive, RotateCcw, Trash2, Check, BookmarkPlus } from "lucide-react";
+import { Clock, X, Plus, Archive, RotateCcw, Trash2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
 import { getCardColors, determineCategory, isDarkMode, type Category } from "@/lib/colorUtils";
@@ -96,8 +96,9 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
     }
   };
 
-  const lastReadText = formatDistanceToNowWithTimezone(new Date(document.createdAt), { timezone, language: uiLanguage, addSuffix: true });
   const readProgress = document.progress || 0;
+  const translationStatus = document.translationStatus || 'idle';
+  const translationProgress = document.translationProgress || 0;
 
   // Check if this is an RSS feed document
   const isRSSDocument = 'feedId' in document && document.feedId;
@@ -116,7 +117,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
   const isEssayOpinion = documentCategory === 'Essays' || documentCategory === 'Opinion';
   const isLiterature = documentCategory === 'Literature';
 
-  const progressToShow = readProgress;
+  const showTranslationBar = translationStatus === 'running' || translationStatus === 'completed';
 
   // Get source label for meta display
   const getSourceLabel = () => {
@@ -280,24 +281,16 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
         </div>
 
         <div className="flex-shrink-0 ml-4 flex items-center gap-4 justify-end">
-          {!isPublic && !isExploreMode && docStats && docStats.notesCount > 0 && (
-            <span className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 flex-shrink-0">
-              {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
+          {!isPublic && !isExploreMode && readProgress > 0 && (
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 flex-shrink-0 tabular-nums">
+              📖 {readProgress}%
             </span>
           )}
 
-          {!isPublic && !isExploreMode && readProgress > 0 && (
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <div className="w-16 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-[hsl(var(--brand))] transition-all"
-                  style={{ width: `${Math.max(readProgress, 3)}%` }}
-                />
-              </div>
-              <span className="text-[11px] text-muted-foreground tabular-nums w-8 text-right">
-                {readProgress}%
-              </span>
-            </div>
+          {!isPublic && !isExploreMode && docStats && docStats.notesCount > 0 && (
+            <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 flex-shrink-0">
+              {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
+            </span>
           )}
 
           <span className="flex items-center gap-1 flex-shrink-0 text-[10px] text-slate-400 font-light">
@@ -434,12 +427,17 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
         )}
       >
         <div className="aspect-[3/4] relative flex flex-col bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900">
-          {/* Progress bar at top if available */}
-          {progressToShow > 0 && (
-            <div className="absolute top-0 left-0 right-0 h-0.5 bg-black/20 z-10">
+          {/* Translation status bar at top */}
+          {showTranslationBar && (
+            <div className="absolute top-0 left-0 right-0 h-1 bg-black/10 dark:bg-white/10 z-10">
               <div
-                className="h-full bg-current opacity-60 transition-all duration-300"
-                style={{ width: `${progressToShow}%` }}
+                className={cn(
+                  "h-full transition-all duration-300",
+                  translationStatus === 'running'
+                    ? "bg-[hsl(var(--brand))]"
+                    : "bg-emerald-500/20"
+                )}
+                style={{ width: translationStatus === 'completed' ? '100%' : `${translationProgress}%` }}
               />
             </div>
           )}
@@ -542,30 +540,32 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
               </p>
             </div>
 
-            {/* BOTTOM SECTION: Activity data right-aligned, 2 rows */}
+            {/* BOTTOM SECTION: Activity data, 2 rows */}
             <div className="mt-2 space-y-1">
-              {!isPublic && !isExploreMode && (readProgress > 0 || (docStats && docStats.notesCount > 0)) && (
-                <div className="flex items-center gap-2 justify-end">
-                  {docStats && docStats.notesCount > 0 && (
+              <div className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-1.5">
+                  {!isPublic && !isExploreMode && (
+                    <>
+                      {readProgress === 0 && (
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400">✨ New</span>
+                      )}
+                      {readProgress > 0 && readProgress < 100 && (
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">📖 {readProgress}%</span>
+                      )}
+                      {readProgress === 100 && (
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400">✓ Done</span>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {!isPublic && !isExploreMode && docStats && docStats.notesCount > 0 && (
                     <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
                     </span>
                   )}
-                  {readProgress > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-[hsl(var(--brand))]"
-                          style={{ width: `${Math.max(readProgress, 3)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {readProgress}%
-                      </span>
-                    </div>
-                  )}
                 </div>
-              )}
+              </div>
               <div className="flex items-center justify-end">
                 <span className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 font-light">
                   <Clock className="h-2.5 w-2.5" />
