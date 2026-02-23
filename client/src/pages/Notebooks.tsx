@@ -31,6 +31,7 @@ import { useTranslation, useLanguage } from "@/i18n";
 import { formatShortDate } from "@/lib/dateUtils";
 import { useTimezone } from "@/hooks/useTimezone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import HeroSection from "@/components/HeroSection";
 
 
 interface NotebookWithStats {
@@ -1573,6 +1574,10 @@ export default function Notebooks() {
           }
           controlsRight={null}
         />
+        
+        <div className="-mx-6 lg:-mx-8">
+          <HeroSection />
+        </div>
         
         <PageBody>
           <div className={`grid grid-cols-1 gap-6 pb-20 ${
