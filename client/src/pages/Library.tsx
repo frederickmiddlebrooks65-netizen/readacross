@@ -40,7 +40,6 @@ import {
   AlertTriangle,
   Sparkles,
   ChevronRight,
-  BookOpen,
   Languages,
   BookmarkPlus,
   FileText,
@@ -757,19 +756,18 @@ export default function Library() {
         {/* Resume Banner */}
         {resumeDoc && (
           <div
-            className="mb-6 flex items-center justify-between px-4 py-3 border border-border shadow-sm rounded-xl cursor-pointer transition-all duration-200 hover:border-[hsl(var(--brand))]/40 hover:shadow-md hover:-translate-y-0.5 group"
+            className="mb-6 flex items-center justify-between py-4 px-5 border border-border shadow-sm rounded-xl bg-card cursor-pointer transition-all duration-200 hover:border-[hsl(var(--brand))]/40 hover:shadow-md hover:-translate-y-0.5 group"
             onClick={() => setLocation(`/viewer/${resumeDoc.id}`)}
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <BookOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm text-muted-foreground flex-shrink-0">{t('library.continueReading')}</span>
-              <span className="text-sm font-medium text-foreground truncate">{resumeDoc.title}</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+            <span className="text-base font-semibold text-foreground truncate max-w-[60%]">
+              {resumeDoc.title}
+            </span>
+            <div className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--brand))] flex-shrink-0 ml-3">
               {(resumeDoc.progress || 0) > 0 && (
-                <span className="text-[11px] text-muted-foreground tabular-nums">📖 {resumeDoc.progress}%</span>
+                <span className="tabular-nums opacity-80">{resumeDoc.progress}%</span>
               )}
-              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span>{t('library.continueReading')}</span>
+              <ChevronRight className="h-4 w-4" />
             </div>
           </div>
         )}
