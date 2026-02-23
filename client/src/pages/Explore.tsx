@@ -176,7 +176,7 @@ function ConversationalHero({
   searchTerm: string;
   onSearchChange: (value: string) => void;
   onSearchSubmit: () => void;
-  onChipClick: (query: string, category?: string) => void;
+  onChipClick: (query: string, category?: string, difficulty?: string) => void;
   featuredDocuments: any[];
   onAddToLibrary: (doc: any) => void;
   isDocInLibrary: (doc: any) => boolean;
@@ -196,6 +196,8 @@ function ConversationalHero({
   const intentChips = [
     { label: t('explore.chipLatestAI'), query: 'AI', category: 'Academic' },
     { label: t('explore.chipBusinessEnglish'), query: 'business', category: 'News' },
+    { label: t('explore.chipEasyEnglish'), query: '', category: 'News', difficulty: 'beginner' },
+    { label: t('explore.chipBusinessArticle'), query: 'startup', category: 'Essays' },
     { label: t('explore.chipShortEssay'), query: 'essay', category: 'Opinion' },
     { label: t('explore.chipClassicLit'), query: '', category: 'Literature' },
     { label: t('explore.chipScienceTech'), query: 'science technology', category: 'Academic' },
@@ -238,7 +240,7 @@ function ConversationalHero({
           {intentChips.map((chip) => (
             <button
               key={chip.label}
-              onClick={() => onChipClick(chip.query, chip.category)}
+              onClick={() => onChipClick(chip.query, chip.category, (chip as any).difficulty)}
               className={cn(
                 "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm",
                 "border border-slate-200 dark:border-slate-700",
@@ -636,6 +638,9 @@ export default function Explore() {
           mittr: true,
           conversation: true,
           nautilus: true,
+          voa: true,
+          pgEssays: true,
+          wired: true,
         };
   });
 
@@ -815,9 +820,10 @@ export default function Explore() {
     }
   };
 
-  const handleChipClick = (query: string, chipCategory?: string) => {
+  const handleChipClick = (query: string, chipCategory?: string, difficulty?: string) => {
     if (query) setSearchTerm(query);
     if (chipCategory) setCategory(chipCategory);
+    if (difficulty) setDifficultyFilter(difficulty); else setDifficultyFilter('all');
     setCurrentPage(1);
   };
 
@@ -1331,18 +1337,35 @@ export default function Explore() {
                 <div className="border-t pt-4">
                   <h3 className="font-medium mb-2">{t('explore.systemSources')}</h3>
                   <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(systemSources).map(([source, enabled]) => (
-                      <div
-                        key={source}
-                        className="flex items-center justify-between p-2 border rounded"
-                      >
-                        <span className="text-sm capitalize">{source}</span>
-                        <Switch
-                          checked={enabled as boolean}
-                          onCheckedChange={() => handleSystemSourceToggle(source as keyof typeof systemSources)}
-                        />
-                      </div>
-                    ))}
+                    {Object.entries(systemSources).map(([source, enabled]) => {
+                      const sourceLabels: Record<string, { name: string; desc: string }> = {
+                        arxiv: { name: t('explore.arxiv'), desc: t('explore.arxivDesc') },
+                        gutenberg: { name: t('explore.projectGutenberg'), desc: t('explore.projectGutenbergDesc') },
+                        aeon: { name: t('explore.aeonEssays'), desc: t('explore.aeonDesc') },
+                        mittr: { name: t('explore.mitTechReview'), desc: t('explore.mitTechReviewDesc') },
+                        conversation: { name: t('explore.theConversation'), desc: t('explore.theConversationDesc') },
+                        nautilus: { name: t('explore.nautilus'), desc: t('explore.nautilusDesc') },
+                        voa: { name: t('explore.voaLearningEnglish'), desc: t('explore.voaDesc') },
+                        pgEssays: { name: t('explore.pgEssays'), desc: t('explore.pgEssaysDesc') },
+                        wired: { name: t('explore.wired'), desc: t('explore.wiredDesc') },
+                      };
+                      const label = sourceLabels[source];
+                      return (
+                        <div
+                          key={source}
+                          className="flex items-center justify-between p-2 border rounded"
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{label?.name || source}</span>
+                            {label?.desc && <span className="text-xs text-muted-foreground">{label.desc}</span>}
+                          </div>
+                          <Switch
+                            checked={enabled as boolean}
+                            onCheckedChange={() => handleSystemSourceToggle(source as keyof typeof systemSources)}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
