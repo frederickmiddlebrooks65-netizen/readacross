@@ -540,32 +540,30 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
               </p>
             </div>
 
-            {/* BOTTOM SECTION: Activity data, 2 rows */}
+            {/* BOTTOM SECTION: Activity data right-aligned, 2 rows */}
             <div className="mt-2 space-y-1">
-              <div className="flex items-center gap-2 justify-between">
-                <div className="flex items-center gap-1.5">
-                  {!isPublic && !isExploreMode && (
-                    <>
-                      {readProgress === 0 && (
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400">✨ New</span>
-                      )}
-                      {readProgress > 0 && readProgress < 100 && (
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">📖 {readProgress}%</span>
-                      )}
-                      {readProgress === 100 && (
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400">✓ Done</span>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {!isPublic && !isExploreMode && docStats && docStats.notesCount > 0 && (
+              {!isPublic && !isExploreMode && (readProgress > 0 || (docStats && docStats.notesCount > 0)) && (
+                <div className="flex items-center gap-2 justify-end">
+                  {docStats && docStats.notesCount > 0 && (
                     <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
                     </span>
                   )}
+                  {readProgress > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[hsl(var(--brand))]"
+                          style={{ width: `${Math.max(readProgress, 3)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        {readProgress}%
+                      </span>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
               <div className="flex items-center justify-end">
                 <span className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 font-light">
                   <Clock className="h-2.5 w-2.5" />
