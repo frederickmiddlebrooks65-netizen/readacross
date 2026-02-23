@@ -24,7 +24,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import DocumentCard from "@/components/DocumentCard";
 import {
   BookOpen,
   Search,
@@ -35,13 +34,16 @@ import {
   Grid3X3,
   List,
   Compass,
-  BookmarkPlus,
-  Rss,
   Pencil,
   Trash2,
   Clock,
   Sparkles,
   Check,
+  Timer,
+  BarChart3,
+  Brain,
+  Hash,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,206 +69,273 @@ function getCategoryLabel(category: string | undefined, t: any): string {
 
 import Pagination from "@/components/common/Pagination";
 
-function FeaturedCarousel({ 
-  documents, 
-  onAddToLibrary, 
-  isDocInLibrary,
-  hoveredDoc,
-  t 
-}: { 
-  documents: any[]; 
-  onAddToLibrary: (doc: any) => void;
-  isDocInLibrary: (doc: any) => boolean;
-  hoveredDoc: any | null;
-  t: any;
-}) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [, setLocation] = useLocation();
-  const [isAdding, setIsAdding] = useState(false);
-  const [displayDoc, setDisplayDoc] = useState<any | null>(null);
-  const [isFading, setIsFading] = useState(false);
+function estimateReadTime(doc: any): number {
+  const content = doc.snippetContent || doc.content || doc.rawContent || '';
+  const wordCount = content.split(/\s+/).length;
+  return Math.max(1, Math.round(wordCount / 200));
+}
 
-  const goToSlide = useCallback((index: number) => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrentIndex(index);
-    setTimeout(() => setIsTransitioning(false), 800);
-  }, [isTransitioning]);
+function estimateDifficulty(doc: any): 'high' | 'mid' | 'low' {
+  if (doc.category === 'Academic' || doc.source === 'arXiv') return 'high';
+  if (doc.category === 'Literature' || doc.source === 'Project Gutenberg') return 'mid';
+  if (doc.category === 'Opinion' || doc.category === 'News') return 'low';
+  const content = doc.snippetContent || doc.content || '';
+  const avgWordLen = content.length / Math.max(1, content.split(/\s+/).length);
+  if (avgWordLen > 6) return 'high';
+  if (avgWordLen > 4.5) return 'mid';
+  return 'low';
+}
 
-  useEffect(() => {
-    if (documents.length <= 1 || isPaused || hoveredDoc) return;
-    
-    const interval = setInterval(() => {
-      goToSlide((currentIndex + 1) % documents.length);
-    }, 6000);
+function estimateVocabLevel(doc: any): 'advanced' | 'intermediate' | 'beginner' {
+  const diff = estimateDifficulty(doc);
+  if (diff === 'high') return 'advanced';
+  if (diff === 'mid') return 'intermediate';
+  return 'beginner';
+}
 
-    return () => clearInterval(interval);
-  }, [currentIndex, documents.length, isPaused, goToSlide, hoveredDoc]);
+function LearningBadges({ document: doc, t, compact = false }: { document: any; t: any; compact?: boolean }) {
+  const readTime = estimateReadTime(doc);
+  const difficulty = estimateDifficulty(doc);
+  const vocab = estimateVocabLevel(doc);
 
-  useEffect(() => {
-    const targetDoc = hoveredDoc || documents[currentIndex];
-    if (!targetDoc) return;
-    
-    // On initial load (displayDoc is null), set immediately without fade
-    if (!displayDoc) {
-      setDisplayDoc(targetDoc);
-      return;
-    }
-    
-    // Only fade when transitioning between different documents
-    if (displayDoc.id !== targetDoc.id) {
-      setIsFading(true);
-      const timer = setTimeout(() => {
-        setDisplayDoc(targetDoc);
-        setIsFading(false);
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [hoveredDoc, documents, currentIndex, displayDoc]);
+  const diffLabel = difficulty === 'high' ? t('explore.badgeDifficultyHigh') :
+    difficulty === 'mid' ? t('explore.badgeDifficultyMid') : t('explore.badgeDifficultyLow');
+  const diffColor = difficulty === 'high' ? 'text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-950/30' :
+    difficulty === 'mid' ? 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/30' :
+    'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/30';
 
-  useEffect(() => {
-    if (documents[0] && !displayDoc) {
-      setDisplayDoc(documents[0]);
-    }
-  }, [documents, displayDoc]);
+  const vocabLabel = vocab === 'advanced' ? t('explore.badgeAdvancedVocab') :
+    vocab === 'intermediate' ? t('explore.badgeIntermediateVocab') : t('explore.badgeBeginnerFriendly');
+  const vocabColor = vocab === 'advanced' ? 'text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-950/30' :
+    vocab === 'intermediate' ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/30' :
+    'text-teal-600 bg-teal-50 dark:text-teal-400 dark:bg-teal-950/30';
 
-  const currentDoc = displayDoc || documents[currentIndex];
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const [titleFontSize, setTitleFontSize] = useState<'normal' | 'small'>('normal');
-  
-  useEffect(() => {
-    if (!currentDoc?.title) return;
-    const titleLength = currentDoc.title.length;
-    if (titleLength > 60) {
-      setTitleFontSize('small');
-    } else {
-      setTitleFontSize('normal');
-    }
-  }, [currentDoc?.title, currentDoc?.id]);
-  
-  if (!currentDoc) return null;
-
-  const snippet = extractRandomSnippet(currentDoc.snippetContent || currentDoc.content || currentDoc.rawContent, currentDoc.title, currentDoc.id);
-  const truncatedSnippet = truncateSnippet(snippet, 280);
-
-  const getSourceLabel = () => {
-    if (currentDoc.source === "arXiv") return "arXiv";
-    if (currentDoc.source === "Project Gutenberg") return "Project Gutenberg";
-    if (currentDoc.source) return currentDoc.source;
-    return t('source.explore');
-  };
-
-  const handleClick = () => {
-    setLocation(`/viewer/${currentDoc.id}`);
-  };
-
-  const handleAddToLibrary = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    const alreadyInLibrary = isDocInLibrary(currentDoc);
-    if (!alreadyInLibrary && !isAdding) {
-      setIsAdding(true);
-      try {
-        await onAddToLibrary(currentDoc);
-      } finally {
-        setIsAdding(false);
-      }
-    }
-  };
-
-  const alreadyInLibrary = isDocInLibrary(currentDoc);
-
-  const snippetPlaceholder = t('explore.exploringInsights') || 'Exploring the core insights of this document...';
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+          <Timer className="h-2.5 w-2.5" />
+          {t('explore.badgeReadTime').replace('{min}', String(readTime))}
+        </span>
+        <span className={cn("inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full", diffColor)}>
+          <BarChart3 className="h-2.5 w-2.5" />
+          {diffLabel}
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <div 
-      className="relative cursor-pointer h-[280px] md:h-[300px]"
-      onClick={handleClick}
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-    >
-      <div 
-        key={currentDoc.id}
-        className={cn(
-          "flex items-start gap-20 lg:gap-24 py-8 px-8 md:px-12 lg:px-16 xl:px-20 h-full",
-          "transition-opacity duration-[250ms] ease-in-out",
-          isFading ? "opacity-0" : "opacity-100"
-        )}
-      >
-        <div className="flex-1 max-w-[50%] flex flex-col justify-center">
-          <span className="text-[10px] tracking-[0.2em] text-forest/70 dark:text-slate-500 uppercase font-bold mb-2 block transition-opacity duration-[250ms]">
-            {getCategoryLabel(currentDoc.category, t)}
-          </span>
-          
-          <h2 
-            ref={titleRef}
-            className="font-sans font-semibold text-brand-ink dark:text-slate-100 mb-3 line-clamp-2 transition-all duration-[250ms]"
-            style={{ fontSize: '48px', lineHeight: '1.3' }}
-          >
-            {currentDoc.title}
-          </h2>
-          
-          <p className="text-sm text-muted-foreground/80 mb-6 transition-opacity duration-[250ms]">
-            {getSourceLabel()}
-          </p>
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+        <Timer className="h-3 w-3" />
+        {t('explore.badgeReadTime').replace('{min}', String(readTime))}
+      </span>
+      <span className={cn("inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full", diffColor)}>
+        <BarChart3 className="h-3 w-3" />
+        {diffLabel}
+      </span>
+      <span className={cn("inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full", vocabColor)}>
+        <Brain className="h-3 w-3" />
+        {vocabLabel}
+      </span>
+    </div>
+  );
+}
 
-          <div className="flex items-center">
-            {alreadyInLibrary ? (
-              <span className="inline-flex items-center h-9 px-4 text-sm border border-[hsl(var(--sage-soft))] dark:border-slate-700 rounded-md bg-white/60 dark:bg-slate-800/30 text-muted-foreground cursor-default">
-                <Check className="h-4 w-4 mr-2" />
-                {t('library.inLibrary')}
-              </span>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-4 text-sm border-[hsl(var(--sage-soft))] dark:border-slate-700 bg-white/60 hover:bg-white dark:bg-slate-800/50 dark:hover:bg-slate-800 text-forest dark:text-slate-300"
-                onClick={handleAddToLibrary}
-                disabled={isAdding}
-              >
-                {isAdding ? (
-                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : (
-                  <Plus className="h-4 w-4 mr-2" />
-                )}
-                {t('library.addToLibrary')}
-              </Button>
-            )}
+function ConversationalHero({
+  searchTerm,
+  onSearchChange,
+  onSearchSubmit,
+  onChipClick,
+  featuredDocuments,
+  onAddToLibrary,
+  isDocInLibrary,
+  loadingRecommendations,
+  t,
+}: {
+  searchTerm: string;
+  onSearchChange: (value: string) => void;
+  onSearchSubmit: () => void;
+  onChipClick: (query: string, category?: string) => void;
+  featuredDocuments: any[];
+  onAddToLibrary: (doc: any) => void;
+  isDocInLibrary: (doc: any) => boolean;
+  loadingRecommendations: boolean;
+  t: any;
+}) {
+  const [, setLocation] = useLocation();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      onSearchSubmit();
+    }
+  };
+
+  const intentChips = [
+    { label: t('explore.chipLatestAI'), query: 'AI', category: 'Academic' },
+    { label: t('explore.chipBusinessEnglish'), query: 'business', category: 'News' },
+    { label: t('explore.chipShortEssay'), query: 'essay', category: 'Opinion' },
+    { label: t('explore.chipClassicLit'), query: '', category: 'Literature' },
+    { label: t('explore.chipScienceTech'), query: 'science technology', category: 'Academic' },
+    { label: t('explore.chipPhilosophy'), query: 'philosophy', category: 'Opinion' },
+  ];
+
+  return (
+    <div className="relative py-12 md:py-16">
+      <div className="max-w-2xl mx-auto text-center">
+        <h1 className="text-3xl md:text-4xl font-bold text-brand-ink dark:text-slate-100 mb-3 tracking-tight">
+          {t('explore.heroTitleNew')}
+        </h1>
+        <p className="text-base md:text-lg text-muted-foreground mb-8">
+          {t('explore.heroSubtitleNew')}
+        </p>
+
+        <div className="relative max-w-xl mx-auto mb-6">
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-forest dark:group-focus-within:text-slate-300 transition-colors" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchTerm}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={t('explore.searchPlaceholderNew')}
+              className={cn(
+                "w-full h-14 pl-12 pr-4 rounded-2xl text-base",
+                "bg-white dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700",
+                "focus:border-forest dark:focus:border-slate-500 focus:ring-4 focus:ring-forest/10 dark:focus:ring-slate-500/10",
+                "outline-none transition-all duration-300",
+                "placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                "shadow-sm hover:shadow-md focus:shadow-lg"
+              )}
+            />
           </div>
         </div>
 
-        <div className="flex-1 max-w-[40%] flex items-start pt-6">
-          <p className="hero-quote text-base md:text-lg lg:text-xl line-clamp-5 transition-opacity duration-[250ms]">
-            {truncatedSnippet ? `"${truncatedSnippet}"` : (
-              <span className="text-slate-400 dark:text-slate-500">{snippetPlaceholder}</span>
-            )}
-          </p>
+        <div className="flex items-center justify-center gap-2 flex-wrap max-w-xl mx-auto">
+          {intentChips.map((chip) => (
+            <button
+              key={chip.label}
+              onClick={() => onChipClick(chip.query, chip.category)}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm",
+                "border border-slate-200 dark:border-slate-700",
+                "bg-white/80 dark:bg-slate-800/50",
+                "text-slate-600 dark:text-slate-400",
+                "hover:bg-forest/5 hover:border-forest/30 hover:text-forest",
+                "dark:hover:bg-slate-700/50 dark:hover:text-slate-300",
+                "transition-all duration-200 cursor-pointer"
+              )}
+            >
+              <Hash className="h-3 w-3" />
+              {chip.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {documents.length > 1 && !hoveredDoc && (
-        <div className="flex justify-center gap-2 mt-4">
-          {documents.map((_, index) => (
-            <button
-              key={index}
-              onClick={(e) => {
-                e.stopPropagation();
-                goToSlide(index);
-              }}
-              className={cn(
-                "h-1.5 rounded-full transition-all duration-300 ease-in-out",
-                index === currentIndex 
-                  ? "w-8 bg-forest dark:bg-slate-400" 
-                  : "w-3 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600"
-              )}
-              aria-label={`Go to slide ${index + 1}`}
-            />
-          ))}
+      {!loadingRecommendations && featuredDocuments.length > 0 && (
+        <div className="mt-12 max-w-4xl mx-auto">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="h-4 w-4 text-forest dark:text-slate-400" />
+            <h2 className="text-sm font-medium tracking-[0.1em] text-forest dark:text-slate-400 uppercase">
+              {t('explore.forYou')}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {featuredDocuments.map((doc: any) => (
+              <FeaturedCard
+                key={doc.id}
+                document={doc}
+                onAddToLibrary={onAddToLibrary}
+                isInLibrary={isDocInLibrary(doc)}
+                t={t}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+function FeaturedCard({
+  document: doc,
+  onAddToLibrary,
+  isInLibrary,
+  t,
+}: {
+  document: any;
+  onAddToLibrary: (doc: any) => void;
+  isInLibrary: boolean;
+  t: any;
+}) {
+  const [, setLocation] = useLocation();
+  const [isAdding, setIsAdding] = useState(false);
+
+  const snippet = useMemo(() => {
+    const raw = extractRandomSnippet(doc.snippetContent || doc.content || doc.rawContent, doc.title, doc.id);
+    return truncateSnippet(raw, 120);
+  }, [doc]);
+
+  const handleClick = () => setLocation(`/viewer/${doc.id}`);
+
+  const handleAdd = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!isInLibrary && !isAdding) {
+      setIsAdding(true);
+      try { await onAddToLibrary(doc); } finally { setIsAdding(false); }
+    }
+  };
+
+  return (
+    <Card
+      className={cn(
+        "group cursor-pointer p-5 border border-slate-200 dark:border-slate-700/80 rounded-xl",
+        "bg-white/60 dark:bg-slate-800/40 backdrop-blur-sm",
+        "hover:shadow-lg hover:border-forest/20 dark:hover:border-slate-600",
+        "transition-all duration-300 hover:-translate-y-0.5"
+      )}
+      onClick={handleClick}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] tracking-[0.15em] text-forest/70 dark:text-slate-500 uppercase font-semibold">
+          {getCategoryLabel(doc.category, t)}
+        </span>
+        {isInLibrary ? (
+          <span className="inline-flex items-center text-[10px] text-muted-foreground gap-1">
+            <Check className="h-3 w-3" />
+          </span>
+        ) : (
+          <button
+            onClick={handleAdd}
+            disabled={isAdding}
+            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+          >
+            {isAdding ? (
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border border-current border-t-transparent" />
+            ) : (
+              <Plus className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+            )}
+          </button>
+        )}
+      </div>
+
+      <h3 className="font-semibold text-brand-ink dark:text-slate-100 line-clamp-2 mb-2 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors text-[15px]" style={{ lineHeight: '1.5' }}>
+        {doc.title}
+      </h3>
+
+      {snippet && (
+        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
+          {snippet}
+        </p>
+      )}
+
+      <LearningBadges document={doc} t={t} compact />
+    </Card>
   );
 }
 
@@ -302,7 +371,7 @@ function ExploreDocumentCard({
     }
     hoverTimeoutRef.current = setTimeout(() => {
       onHover?.(document);
-    }, 150); // 150ms debounce for smooth UX
+    }, 150);
   };
   
   const handleMouseLeave = () => {
@@ -387,6 +456,9 @@ function ExploreDocumentCard({
                 <Clock className="h-3 w-3" />
                 {getRelativeTime()}
               </span>
+            </div>
+            <div className="mt-2">
+              <LearningBadges document={document} t={t} compact />
             </div>
             <p className={cn(
               "mt-2 text-sm text-slate-500 dark:text-slate-400 line-clamp-2",
@@ -474,9 +546,12 @@ function ExploreDocumentCard({
           </p>
         </div>
         
-        <div className="flex items-center gap-1 mt-3 text-xs text-slate-400 dark:text-slate-500">
-          <Clock className="h-3 w-3" />
-          <span>{getRelativeTime()}</span>
+        <div className="mt-3 space-y-2">
+          <LearningBadges document={document} t={t} compact />
+          <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+            <Clock className="h-3 w-3" />
+            <span>{getRelativeTime()}</span>
+          </div>
         </div>
       </div>
     </Card>
@@ -660,8 +735,7 @@ export default function Explore() {
           origin: {
             provider:
               document.sourceType === "rss" ? "RSS" : document.sourceType,
-            sourceId: document.sourceId?.toString(),
-            url: document.url,
+            externalId: document.externalId,
           },
         }),
       });
@@ -672,30 +746,34 @@ export default function Explore() {
           description: t('explore.savedToLibraryDesc'),
         });
         queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/documents", "uploads"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/documents", "saved"] });
       } else {
-        const error = await response.json();
-        if (error.message?.includes("already exists")) {
+        const data = await response.json();
+        if (data.message === "Document already saved") {
           toast({
             title: t('explore.alreadySaved'),
             description: t('explore.alreadySavedDesc'),
-            variant: "destructive",
           });
         } else {
-          throw new Error(error.message || t('explore.failedToSave'));
+          throw new Error(data.message || t('explore.failedToSave'));
         }
       }
     } catch (error) {
       toast({
         title: t('explore.saveFailed'),
-        description:
-          error instanceof Error
-            ? error.message
-            : t('explore.saveFailedDesc'),
+        description: t('explore.saveFailedDesc'),
         variant: "destructive",
       });
     }
+  };
+
+  const handleChipClick = (query: string, chipCategory?: string) => {
+    if (query) setSearchTerm(query);
+    if (chipCategory) setCategory(chipCategory);
+    setCurrentPage(1);
+  };
+
+  const handleSearchSubmit = () => {
+    setCurrentPage(1);
   };
 
   const handleViewModeChange = (value: ViewMode) => {
@@ -861,42 +939,18 @@ export default function Explore() {
   return (
     <Layout>
       <PageShell scrollMode="page" maxWidth="standard">
-        <div className="py-8">
-          <div className="mb-8">
-            <h1 className="page-title mb-2 text-[30px]">
-              {t('explore.heroTitle')}
-            </h1>
-            <p className="text-gray-500 dark:text-slate-400 text-[14px] mt-[2px] mb-[2px]">
-              {t('explore.heroSubtitle')}
-            </p>
-          </div>
-        </div>
-
-        <div 
-          className="-mx-6 lg:-mx-8 px-6 lg:px-8 pt-6 pb-10 bg-[hsl(var(--brand-subtle))]"
-        >
-          <div>
-            {loadingRecommendations ? (
-              <div className="h-[280px] md:h-[300px] animate-pulse" />
-            ) : featuredDocuments.length > 0 ? (
-              <div>
-                <div className="flex items-center gap-2 mb-5">
-                  <Sparkles className="h-4 w-4 text-forest dark:text-slate-400" />
-                  <h2 className="text-sm font-medium tracking-[0.15em] text-forest dark:text-slate-400 uppercase">
-                    For You
-                  </h2>
-                </div>
-                
-                <FeaturedCarousel
-                  documents={featuredDocuments}
-                  onAddToLibrary={handleSaveToLibrary}
-                  isDocInLibrary={isDocInLibrary}
-                  hoveredDoc={null}
-                  t={t}
-                />
-              </div>
-            ) : null}
-          </div>
+        <div className="-mx-6 lg:-mx-8 px-6 lg:px-8 bg-gradient-to-b from-[hsl(var(--brand-subtle))] to-background">
+          <ConversationalHero
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            onSearchSubmit={handleSearchSubmit}
+            onChipClick={handleChipClick}
+            featuredDocuments={featuredDocuments}
+            onAddToLibrary={handleSaveToLibrary}
+            isDocInLibrary={isDocInLibrary}
+            loadingRecommendations={loadingRecommendations}
+            t={t}
+          />
         </div>
 
         <div className="pt-8 pb-4 space-y-4">
@@ -997,7 +1051,7 @@ export default function Explore() {
             )}>
               {[...Array(12)].map((_, i) => (
                 <div 
-                  key={i} 
+                  key={i}
                   className={cn(
                     "bg-slate-100 dark:bg-slate-800 animate-pulse rounded-lg",
                     viewMode === 'grid' ? "aspect-[3/4]" : "h-20"
