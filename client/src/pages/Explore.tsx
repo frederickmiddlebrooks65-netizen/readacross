@@ -588,6 +588,7 @@ export default function Explore() {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [category, setCategory] = useState<string>("all");
+  const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [hoveredDoc, setHoveredDoc] = useState<any | null>(null);
   const [showStickySearch, setShowStickySearch] = useState(false);
   const searchSentinelRef = useRef<HTMLDivElement>(null);
@@ -720,9 +721,19 @@ export default function Explore() {
       if (source === "arXiv" && !systemSources.arxiv) return false;
       if (source === "Project Gutenberg" && !systemSources.gutenberg) return false;
 
-      return matchesSearch;
+      const matchesCategory = category === "all" || doc.category === category;
+
+      const matchesDifficulty = difficultyFilter === "all" || (() => {
+        const diff = estimateDifficulty(doc);
+        if (difficultyFilter === "beginner") return diff === "low";
+        if (difficultyFilter === "intermediate") return diff === "mid";
+        if (difficultyFilter === "advanced") return diff === "high";
+        return true;
+      })();
+
+      return matchesSearch && matchesCategory && matchesDifficulty;
     });
-  }, [exploreDocuments, searchTerm, systemSources]);
+  }, [exploreDocuments, searchTerm, systemSources, category, difficultyFilter]);
 
   const featuredDocuments = useMemo(() => {
     if (!recommendationsData?.recommendations) return [];
@@ -1068,6 +1079,19 @@ export default function Explore() {
                 <SelectItem value="Academic">{t('category.academic')}</SelectItem>
                 <SelectItem value="Opinion">{t('category.opinion')}</SelectItem>
                 <SelectItem value="Other">{t('category.other')}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+              <SelectTrigger className="w-[140px] bg-white dark:bg-slate-800">
+                <BarChart3 className="h-4 w-4 mr-2 text-slate-400" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('explore.allDifficulties', '전체 난이도')}</SelectItem>
+                <SelectItem value="beginner">{t('explore.beginner', '초급 (Beginner)')}</SelectItem>
+                <SelectItem value="intermediate">{t('explore.intermediate', '중급 (Intermediate)')}</SelectItem>
+                <SelectItem value="advanced">{t('explore.advanced', '고급 (Advanced)')}</SelectItem>
               </SelectContent>
             </Select>
 
