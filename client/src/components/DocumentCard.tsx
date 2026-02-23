@@ -435,7 +435,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
                   "h-full transition-all duration-300",
                   translationStatus === 'running'
                     ? "bg-[hsl(var(--brand))]"
-                    : "bg-emerald-500/20"
+                    : "bg-slate-300 dark:bg-slate-600"
                 )}
                 style={{ width: translationStatus === 'completed' ? '100%' : `${translationProgress}%` }}
               />
