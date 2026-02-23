@@ -81,12 +81,12 @@ export default function HeroSection() {
 
   return (
     <section
-      className="relative w-full min-h-[40vh] overflow-hidden bg-[hsl(var(--brand-subtle))]"
+      className="relative w-full min-h-[25vh] overflow-hidden bg-[hsl(var(--brand-subtle))]"
     >
 
-      <div className="relative z-10 container mx-auto px-6 pt-20 pb-12 flex flex-col items-center justify-center min-h-[40vh]">
+      <div className="relative z-10 container mx-auto px-6 py-8 flex flex-col items-center justify-center min-h-[25vh]">
         {variationType === 'contextual_insight' && (
-          <div className="flex items-center gap-2 mb-6 text-brand-amber/80">
+          <div className="flex items-center gap-2 mb-4 text-brand-amber/80">
             <Sparkles className="h-4 w-4" />
             <span className="text-sm font-medium tracking-wide">
               {curationMessage}
@@ -104,7 +104,7 @@ export default function HeroSection() {
         >
           <blockquote 
             className={cn(
-              "hero-quote text-2xl md:text-3xl lg:text-4xl",
+              "hero-quote text-xl md:text-2xl lg:text-3xl",
               "transition-all duration-400"
             )}
           >
@@ -112,13 +112,13 @@ export default function HeroSection() {
           </blockquote>
           
           <cite 
-            className="block mt-6 text-base md:text-lg text-emerald-900/50 not-italic"
+            className="block mt-4 text-sm md:text-base text-emerald-900/50 not-italic"
           >
             {displaySource}
           </cite>
 
           {todaySentence && (
-            <div className="mt-6 flex items-center justify-center gap-2 text-brand-amber opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="mt-4 flex items-center justify-center gap-2 text-brand-amber opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <span className="text-sm">
                 {language === 'ko' ? '원문 읽기' : 'Read full context'}
               </span>
@@ -128,7 +128,7 @@ export default function HeroSection() {
         </div>
 
         {variationType === 'visual_break' && recentDoc && (
-          <div className="mt-8 flex items-center gap-2 text-muted-foreground/70">
+          <div className="mt-4 flex items-center gap-2 text-muted-foreground/70">
             <BookOpen className="h-4 w-4" />
             <span className="text-sm">
               {language === 'ko' ? '최근 읽던 글:' : 'Recently reading:'}{' '}

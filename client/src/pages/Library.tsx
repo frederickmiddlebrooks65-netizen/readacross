@@ -53,6 +53,7 @@ import type { DocumentLite, UISource } from '@/lib/source/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/i18n";
+import HeroSection from "@/components/HeroSection";
 
 
 type ViewMode = "grid" | "list";
@@ -746,6 +747,11 @@ export default function Library() {
               {t('library.pageSubtitle') || 'Manage and read your saved documents and insights.'}
             </p>
           </div>
+        </div>
+
+        {/* Hero Section - Today's Sentence (Slim Banner) */}
+        <div className="-mx-6 lg:-mx-8 mb-6">
+          <HeroSection />
         </div>
 
         {/* A. Non-intrusive review nudge bar — Modern Zen style */}
