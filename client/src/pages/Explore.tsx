@@ -716,11 +716,13 @@ export default function Explore() {
     if (!exploreDocuments) return [];
 
     return exploreDocuments.filter((doc: any) => {
-      const matchesSearch =
-        searchTerm === "" ||
-        doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.author?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.content?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = searchTerm === "" || (() => {
+        const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+        const title = doc.title?.toLowerCase() || '';
+        const author = doc.author?.toLowerCase() || '';
+        const content = doc.content?.toLowerCase() || '';
+        return terms.some(term => title.includes(term) || author.includes(term) || content.includes(term));
+      })();
 
       const source = doc.source;
       if (source === "arXiv" && !systemSources.arxiv) return false;
