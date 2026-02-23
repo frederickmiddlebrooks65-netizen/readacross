@@ -522,7 +522,7 @@ export default function Viewer() {
     headerHeight: 0,
     footerHeight: 0,
     paginationControlsHeight: 96,
-    blockGap: 24,
+    blockGap: 16,
   });
 
   // Sync currentPage state with hook

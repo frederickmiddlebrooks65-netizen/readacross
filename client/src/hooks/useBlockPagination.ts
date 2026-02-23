@@ -42,7 +42,7 @@ export function useBlockPagination(
     headerHeight = 0,
     footerHeight = 0,
     paginationControlsHeight = 96,
-    blockGap = 24,
+    blockGap = 16,
   } = options;
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -86,8 +86,8 @@ export function useBlockPagination(
       }];
     }
 
-    const ESTIMATED_HEADING_HEIGHT = 60;
-    const ESTIMATED_PARAGRAPH_HEIGHT = 120;
+    const ESTIMATED_HEADING_HEIGHT = 40;
+    const ESTIMATED_PARAGRAPH_HEIGHT = 40;
     const ESTIMATED_IMAGE_HEIGHT = 300;
     const ESTIMATED_TABLE_HEIGHT = 200;
 
@@ -107,7 +107,7 @@ export function useBlockPagination(
         case 'paragraph':
         default:
           const baseHeight = ESTIMATED_PARAGRAPH_HEIGHT;
-          const additionalLines = Math.floor(contentLength / 80);
+          const additionalLines = Math.floor(contentLength / 100);
           return baseHeight + (additionalLines * 28);
       }
     };
