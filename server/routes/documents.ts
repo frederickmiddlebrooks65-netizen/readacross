@@ -1316,4 +1316,49 @@ async function translateDocumentInBackground(
   }
 }
 
+router.get("/stats/counts", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const { db } = await import("../db.js");
+    const { sql } = await import("drizzle-orm");
+
+    const result = await db.execute(sql`
+      SELECT
+        d.id AS document_id,
+        COALESCE(g.cnt, 0)::int AS glossary_count,
+        COALESCE(n.cnt, 0)::int AS notes_count
+      FROM documents d
+      LEFT JOIN (
+        SELECT document_id, COUNT(*)::int AS cnt
+        FROM glossary
+        WHERE user_id = ${userId} AND document_id IS NOT NULL
+        GROUP BY document_id
+      ) g ON g.document_id = d.id
+      LEFT JOIN (
+        SELECT p.document_id, COUNT(*)::int AS cnt
+        FROM notes nt
+        JOIN sentences s ON s.id = nt.sentence_id
+        JOIN paragraphs p ON p.id = s.paragraph_id
+        WHERE nt.user_id = ${userId}
+        GROUP BY p.document_id
+      ) n ON n.document_id = d.id
+      WHERE d.user_id = ${userId}
+        AND (COALESCE(g.cnt, 0) > 0 OR COALESCE(n.cnt, 0) > 0)
+    `);
+
+    const stats: Record<number, { glossaryCount: number; notesCount: number }> = {};
+    for (const row of result.rows as any[]) {
+      stats[row.document_id] = {
+        glossaryCount: row.glossary_count,
+        notesCount: row.notes_count,
+      };
+    }
+
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching document stats:", error);
+    res.status(500).json({ error: "Failed to fetch document stats" });
+  }
+});
+
 export default router;

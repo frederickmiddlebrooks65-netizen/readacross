@@ -308,7 +308,16 @@
     "unknownError": "Unknown error",
     "noRSSFeedsRegistered": "No RSS feeds registered.",
     "close": "Close",
-    "rssUrlPlaceholder": "https://example.com/rss.xml"
+    "rssUrlPlaceholder": "https://example.com/rss.xml",
+    "nudgeReview": "You have {count} sentences and words due for review today.",
+    "nudgeReviewButton": "5-min Review",
+    "nudgeNoItems": "You've completed today's review!",
+    "continueReading": "Continue Reading",
+    "translationRate": "Translated {percent}%",
+    "notesCountBadge": "{count} Notes",
+    "glossaryCountBadge": "{count} Words",
+    "continueReadingProgress": "{percent}% Progress",
+    "lastRead": "Last read"
   },
   "mySentences": {
     "title": "My Sentences",

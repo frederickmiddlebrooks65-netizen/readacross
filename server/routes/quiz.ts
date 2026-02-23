@@ -1418,4 +1418,38 @@ router.post("/quiz/commit-glossary", adminOnlyQuiz, async (req: AuthenticatedReq
   }
 });
 
+router.get("/practice/due-count", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const now = new Date();
+    const { sql, count } = await import("drizzle-orm");
+
+    const sentencesDue = await db.select({ cnt: count() })
+      .from(userSentenceState)
+      .where(and(
+        eq(userSentenceState.userId, userId),
+        or(
+          isNull(userSentenceState.nextReviewDate),
+          lte(userSentenceState.nextReviewDate, now)
+        )
+      ));
+
+    const glossaryDue = await db.select({ cnt: count() })
+      .from(userGlossaryState)
+      .where(and(
+        eq(userGlossaryState.userId, userId),
+        or(
+          isNull(userGlossaryState.nextReviewDate),
+          lte(userGlossaryState.nextReviewDate, now)
+        )
+      ));
+
+    const total = (sentencesDue[0]?.cnt || 0) + (glossaryDue[0]?.cnt || 0);
+    res.json({ total });
+  } catch (error) {
+    console.error("[PRACTICE] Error fetching due count:", error);
+    res.json({ total: 0 });
+  }
+});
+
 export default router;

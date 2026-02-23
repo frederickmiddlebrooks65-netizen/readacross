@@ -6,7 +6,6 @@ import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/layout/PageHeader";
 import PageBody from "@/components/layout/PageBody";
 import PageToolbar from "@/components/layout/PageToolbar";
-import HeroSection from "@/components/HeroSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,6 +24,7 @@ import DocumentCard from "@/components/DocumentCard";
 import TextContentModal from "@/components/TextContentModal";
 import FilterDropdown from "@/components/FilterDropdown";
 import FilterChips from "@/components/FilterChips";
+import { cn } from "@/lib/utils";
 import {
   LibraryIcon,
   Upload,
@@ -38,6 +38,13 @@ import {
   Trash2,
   X,
   AlertTriangle,
+  Lightbulb,
+  ChevronRight,
+  BookOpen,
+  Languages,
+  BookmarkPlus,
+  FileText,
+  Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLibraryFilters } from "@/hooks/useLibraryFilters";
@@ -72,9 +79,8 @@ export default function Library() {
     isInitialized
   } = useLibraryFilters();
 
-  // View Mode State
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    return (localStorage.getItem("library-view-mode") as ViewMode) || "grid";
+    return (localStorage.getItem("library-view-mode") as ViewMode) || "list";
   });
 
   // RSS Feed State
@@ -91,8 +97,36 @@ export default function Library() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [, setLocation] = useLocation();
   
-  // Safe auth check: only fetch when auth state is fully initialized
   const isAuthReady = !authLoading && isAuthenticated;
+
+  const { data: reviewDueCount } = useQuery<{ total: number }>({
+    queryKey: ["/api/practice/due-count"],
+    enabled: isAuthReady,
+    queryFn: async () => {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch("/api/practice/due-count", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return { total: 0 };
+      return res.json().catch(() => ({ total: 0 }));
+    },
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+  });
+
+  const { data: docStats } = useQuery<Record<number, { glossaryCount: number; notesCount: number }>>({
+    queryKey: ["/api/documents/stats/counts"],
+    enabled: isAuthReady,
+    queryFn: async () => {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch("/api/documents/stats/counts", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return {};
+      return res.json().catch(() => ({}));
+    },
+    staleTime: 1000 * 60 * 2,
+  });
 
   // Archive/Restore/Delete Handlers
   const handleArchiveDocument = async (documentId: number) => {
@@ -268,7 +302,18 @@ export default function Library() {
     return breakdown;
   }, [allDocuments]);
 
-  // Filtered and sorted documents
+  const continueReadingDocs = useMemo(() => {
+    if (!allDocuments || !Array.isArray(allDocuments)) return [];
+    return allDocuments
+      .filter((doc: any) => !doc.isArchived && (doc.progress > 0 || doc.lastActivityAt))
+      .sort((a: any, b: any) => {
+        const aTime = new Date(a.lastActivityAt || a.createdAt).getTime();
+        const bTime = new Date(b.lastActivityAt || b.createdAt).getTime();
+        return bTime - aTime;
+      })
+      .slice(0, 3);
+  }, [allDocuments]);
+
   const filteredDocuments = useMemo(() => {
     if (!allDocuments || !Array.isArray(allDocuments) || !isInitialized) return [];
 
@@ -617,7 +662,7 @@ export default function Library() {
             <DocumentCard
               key={doc.id}
               document={doc}
-              onAddToLibrary={() => {}} // Not applicable in Library
+              onAddToLibrary={() => {}}
               onArchive={handleArchiveDocument}
               onRestore={handleRestoreDocument}
               onDelete={handleDeleteDocument}
@@ -625,6 +670,7 @@ export default function Library() {
               isExploreMode={false}
               userDocuments={allDocuments}
               viewMode={viewMode}
+              docStats={docStats?.[doc.id] || null}
             />
           ))}
         </div>
@@ -635,7 +681,7 @@ export default function Library() {
         />
       </div>
     );
-  }, [viewMode, filters, badgeCount, clearAllFilters, handleArchiveDocument, handleRestoreDocument, handleDeleteDocument, allDocuments, setIsModalOpen]);
+  }, [viewMode, filters, badgeCount, clearAllFilters, handleArchiveDocument, handleRestoreDocument, handleDeleteDocument, allDocuments, setIsModalOpen, docStats]);
 
   // Show login required message for non-authenticated users
   if (!authLoading && !isAuthenticated) {
@@ -690,9 +736,9 @@ export default function Library() {
   return (
     <Layout>
       <PageShell scrollMode="page" maxWidth="standard">
-        {/* Page Header - matching Practice Hub */}
+        {/* Page Header */}
         <div className="py-8">
-          <div className="mb-8">
+          <div className="mb-4">
             <h1 className="page-title mb-2 text-[30px]">
               {t('library.pageTitle') || 'Personal Library'}
             </h1>
@@ -702,10 +748,72 @@ export default function Library() {
           </div>
         </div>
 
-        {/* Hero Section with Today's Sentence */}
-        <div className="-mx-6 lg:-mx-8">
-          <HeroSection />
-        </div>
+        {/* A. Non-intrusive review nudge bar */}
+        {(reviewDueCount?.total ?? 0) > 0 && (
+          <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
+            <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">
+              {t('library.nudgeReview').replace('{count}', String(reviewDueCount?.total || 0))}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 rounded-lg border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-xs h-8"
+              onClick={() => setLocation('/practice')}
+            >
+              {t('library.nudgeReviewButton')}
+              <ChevronRight className="h-3 w-3 ml-1" />
+            </Button>
+          </div>
+        )}
+
+        {/* C. Continue Reading section */}
+        {continueReadingDocs.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+              {t('library.continueReading')}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {continueReadingDocs.map((doc: any) => {
+                const progress = doc.progress || 0;
+                const stats = docStats?.[doc.id];
+                return (
+                  <Card
+                    key={`continue-${doc.id}`}
+                    className="p-4 cursor-pointer hover:shadow-md hover:border-border/80 transition-all duration-200 group"
+                    onClick={() => setLocation(`/viewer/${doc.id}`)}
+                  >
+                    <div className="space-y-2.5">
+                      <h3 className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-[hsl(var(--brand))] transition-colors leading-snug">
+                        {doc.title}
+                      </h3>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
+                        <div
+                          className="h-1.5 rounded-full bg-[hsl(var(--brand))] transition-all duration-300"
+                          style={{ width: `${Math.max(progress, 2)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] text-muted-foreground">
+                            {t('library.continueReadingProgress').replace('{percent}', String(progress))}
+                          </span>
+                          {stats && stats.notesCount > 0 && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                              {t('library.notesCountBadge').replace('{count}', String(stats.notesCount))}
+                            </Badge>
+                          )}
+                        </div>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Controls - Single row layout like Explore page */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 mt-8">

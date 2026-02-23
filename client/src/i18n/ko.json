@@ -308,7 +308,16 @@
     "unknownError": "알 수 없는 오류",
     "noRSSFeedsRegistered": "RSS 피드 없음",
     "close": "닫기",
-    "rssUrlPlaceholder": "https://example.com/rss.xml"
+    "rssUrlPlaceholder": "https://example.com/rss.xml",
+    "nudgeReview": "오늘 복습 주기가 돌아온 문장과 단어가 {count}개 있습니다.",
+    "nudgeReviewButton": "5분 복습하기",
+    "nudgeNoItems": "오늘의 복습을 완료했습니다!",
+    "continueReading": "이어서 읽기",
+    "translationRate": "번역 {percent}%",
+    "notesCountBadge": "노트 {count}개",
+    "glossaryCountBadge": "단어장 {count}개",
+    "continueReadingProgress": "진행률 {percent}%",
+    "lastRead": "마지막 읽기"
   },
   "mySentences": {
     "title": "��� 문   ��",

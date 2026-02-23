@@ -12,7 +12,7 @@ import { useTranslation, useLanguage } from "@/i18n";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface DocumentCardProps {
-  document: any; // Use any for flexibility with archive status
+  document: any;
   onDelete?: (id: number) => void;
   onAddToLibrary?: (document: any) => void;
   onArchive?: (id: number) => void;
@@ -21,13 +21,14 @@ interface DocumentCardProps {
   userDocuments?: any[];
   viewMode?: 'grid' | 'list';
   isExploreMode?: boolean;
+  docStats?: { glossaryCount: number; notesCount: number } | null;
 }
 
 // Color system now handled by colorUtils.ts for WCAG AA compliance
 
 
 
-export default function DocumentCard({ document, onDelete, onAddToLibrary, onArchive, onRestore, isPublic = false, userDocuments = [], viewMode = 'grid', isExploreMode = false }: DocumentCardProps) {
+export default function DocumentCard({ document, onDelete, onAddToLibrary, onArchive, onRestore, isPublic = false, userDocuments = [], viewMode = 'grid', isExploreMode = false, docStats = null }: DocumentCardProps) {
   const [, setLocation] = useLocation();
   const [isHovered, setIsHovered] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -359,9 +360,8 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             </>
           )}
         </div>
-        {/* List Card Layout - New Design */}
+        {/* List Card Layout */}
         <div className="space-y-1.5 pr-24">
-          {/* Top Row: Title only */}
           <h3 className={cn(
             "card-title font-sans font-semibold leading-tight text-brand-ink group-hover:text-brand-amber transition-colors",
             document.isArchived && "opacity-60"
@@ -376,8 +376,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             {document.title}
           </h3>
           
-          {/* Second Row: Source + Time */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span 
               className="truncate"
               style={{
@@ -398,6 +397,29 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
                 {getRelativeTime()}
               </time>
             </div>
+
+            {!isPublic && !isExploreMode && (translateProgress > 0 || docStats) && (
+              <div className="flex items-center gap-1.5 ml-auto">
+                {translateProgress > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                    <FileText className="h-2.5 w-2.5" />
+                    {t('library.translationRate').replace('{percent}', String(translateProgress))}
+                  </span>
+                )}
+                {docStats && docStats.notesCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    <BookmarkPlus className="h-2.5 w-2.5" />
+                    {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
+                  </span>
+                )}
+                {docStats && docStats.glossaryCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    <GraduationCap className="h-2.5 w-2.5" />
+                    {t('library.glossaryCountBadge').replace('{count}', String(docStats.glossaryCount))}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
