@@ -556,12 +556,12 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
             <div className="flex-1 flex flex-col justify-center text-left">
               <h3 
                 className={cn(
-                  "card-title font-sans font-semibold text-lg text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-300",
-                  isHovered ? "" : "line-clamp-3",
+                  "card-title font-sans font-semibold text-lg text-brand-ink dark:text-slate-100 group-hover:text-forest dark:group-hover:text-slate-300 transition-colors duration-300 line-clamp-3",
                   document.isArchived && "opacity-60"
                 )}
                 style={{ lineHeight: '1.5' }}
                 dir="auto"
+                title={document.title}
               >
                 {document.title}
               </h3>
