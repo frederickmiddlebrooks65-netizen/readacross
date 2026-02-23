@@ -566,12 +566,16 @@ function ExploreDocumentCard({
           </p>
         </div>
         
-        <div className="mt-3 flex items-end justify-between">
-          <LearningBadges document={document} t={t} compact />
-          <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 flex-shrink-0">
-            <Clock className="h-3 w-3" />
-            {getRelativeTime()}
-          </span>
+        <div className="mt-3 space-y-1">
+          <div className="flex items-center justify-start">
+            <LearningBadges document={document} t={t} compact />
+          </div>
+          <div className="flex items-center justify-end">
+            <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+              <Clock className="h-3 w-3" />
+              {getRelativeTime()}
+            </span>
+          </div>
         </div>
       </div>
     </Card>
