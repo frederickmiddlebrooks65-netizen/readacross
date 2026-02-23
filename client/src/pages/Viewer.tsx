@@ -90,6 +90,7 @@ export default function Viewer() {
   const [currentPage, setCurrentPage] = useState(1);
   const [paragraphsPerPage, setParagraphsPerPage] = useState(5);
   const hasRestoredPage = useRef(false);
+  const progressSaveEnabled = useRef(false);
   const progressSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Page jump functionality
@@ -550,12 +551,15 @@ export default function Viewer() {
         setHookCurrentPage(restoredPage);
       }
     }
+    setTimeout(() => {
+      progressSaveEnabled.current = true;
+    }, 1500);
   }, [paginationInitialized, document, totalPages, setHookCurrentPage]);
 
   // Save reading progress to server (debounced)
   useEffect(() => {
     if (!isAuthenticated || !documentId || !paginationInitialized || totalPages <= 0) return;
-    if (!hasRestoredPage.current) return;
+    if (!progressSaveEnabled.current) return;
 
     if (progressSaveTimerRef.current) {
       clearTimeout(progressSaveTimerRef.current);
