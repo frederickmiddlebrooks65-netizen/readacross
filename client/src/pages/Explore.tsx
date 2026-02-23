@@ -104,7 +104,9 @@ function formatReadTime(minutes: number, t: any): string {
   if (minutes >= 60) {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    return mins > 0
+      ? t('explore.badgeReadTimeHours').replace('{hours}', String(hours)).replace('{mins}', String(mins))
+      : t('explore.badgeReadTimeHoursOnly').replace('{hours}', String(hours));
   }
   return t('explore.badgeReadTime').replace('{min}', String(minutes));
 }
