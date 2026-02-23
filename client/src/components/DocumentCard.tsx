@@ -283,8 +283,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
 
         <div className="flex-shrink-0 ml-4 flex items-center gap-4 justify-end">
           {!isPublic && !isExploreMode && docStats && docStats.notesCount > 0 && (
-            <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 flex-shrink-0">
-              <BookmarkPlus className="h-2.5 w-2.5" />
+            <span className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 flex-shrink-0">
               {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
             </span>
           )}
@@ -563,8 +562,7 @@ export default function DocumentCard({ document, onDelete, onAddToLibrary, onArc
                     </div>
                   )}
                   {docStats && docStats.notesCount > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                      <BookmarkPlus className="h-2.5 w-2.5" />
+                    <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       {t('library.notesCountBadge').replace('{count}', String(docStats.notesCount))}
                     </span>
                   )}
