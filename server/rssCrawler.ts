@@ -551,6 +551,24 @@ export async function initializeNewSources(): Promise<void> {
       description: "Science, culture and philosophy magazine",
       category: "Science",
     },
+    {
+      url: "https://learningenglish.voanews.com/api/z-_mq_z$yo",
+      title: "VOA Learning English",
+      description: "News and feature stories in clear, simple English.",
+      category: "News",
+    },
+    {
+      url: "http://www.aaronsw.com/2002/feeds/pgessays.rss",
+      title: "Paul Graham Essays",
+      description: "Essays by Paul Graham on startups, technology, and life.",
+      category: "Essays",
+    },
+    {
+      url: "https://www.wired.com/feed/rss",
+      title: "WIRED",
+      description: "Latest technology news, ideas and trends.",
+      category: "News",
+    },
   ];
   
   for (const source of sources) {
