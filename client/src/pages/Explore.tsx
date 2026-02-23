@@ -200,7 +200,7 @@ function ConversationalHero({
     { label: t('explore.chipBusinessArticle'), query: 'startup', category: 'Essays' },
     { label: t('explore.chipShortEssay'), query: 'essay', category: 'Opinion' },
     { label: t('explore.chipClassicLit'), query: '', category: 'Literature' },
-    { label: t('explore.chipScienceTech'), query: 'science technology', category: 'Academic' },
+    { label: t('explore.chipScienceTech'), query: '', category: 'Academic' },
     { label: t('explore.chipPhilosophy'), query: 'philosophy', category: 'Opinion' },
   ];
 
