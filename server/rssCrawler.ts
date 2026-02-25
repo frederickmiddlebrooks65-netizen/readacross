@@ -152,12 +152,18 @@ function extractParagraphsFromHTML(htmlContent: string): string[] {
 // 웹 페이지에서 아티클 콘텐츠 추출
 async function extractArticleContent(url: string): Promise<string | null> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch(url, {
+      signal: controller.signal,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; ReadAcross/1.0; +https://readacross.app)",
       },
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.log(`Failed to fetch article: ${response.status}`);
@@ -324,14 +330,27 @@ export async function syncAllActiveFeeds(): Promise<void> {
   try {
     console.log("Starting sync of all active RSS feeds");
 
+    // feedsToSync: feedId 기준으로 중복 없이 크롤링할 피드 목록 관리
+    const feedsToSync = new Map<number, any>();
+
+    // 1) 시스템 소스 직접 크롤링 추가
+    // is_system_source=true인 피드는 구독(subscription)과 무관하게 전역적으로 크롤링
+    const allFeeds = await storage.getAllRSSFeeds();
+    const systemFeeds = allFeeds.filter(
+      (feed) => feed.isSystemSource === true && !feed.isBlocked,
+    );
+    console.log(`[SYSTEM] Found ${systemFeeds.length} active system source feeds to sync`);
+    for (const feed of systemFeeds) {
+      feedsToSync.set(feed.id, feed);
+      console.log(`[SYSTEM] Added system feed: ${feed.title} (ID: ${feed.id})`);
+    }
+
+    // 2) 기존 사용자 구독 기반 피드 크롤링 (중복 제거 포함)
     const allSubscriptions = await storage.getRSSSubscriptions();
     console.log(`Found ${allSubscriptions.length} total subscriptions`);
 
     const activeSubscriptions = allSubscriptions.filter((sub) => sub.enabled);
     console.log(`Found ${activeSubscriptions.length} enabled subscriptions`);
-
-    // 구독별로 피드 정보를 가져와서 동기화할 피드 목록 생성
-    const feedsToSync = new Map<number, any>();
 
     for (const subscription of activeSubscriptions) {
       console.log(
@@ -345,13 +364,15 @@ export async function syncAllActiveFeeds(): Promise<void> {
         );
         if (feed && !feed.isBlocked) {
           feedsToSync.set(subscription.feedId, feed);
-          console.log(`Added feed ${subscription.feedId} to sync list`);
+          console.log(`Added subscription feed ${subscription.feedId} to sync list`);
         }
+      } else {
+        console.log(`Feed ${subscription.feedId} already in sync list (system source), skipping duplicate`);
       }
     }
 
     const activeFeedsFiltered = Array.from(feedsToSync.values());
-    console.log(`Found ${activeFeedsFiltered.length} active feeds to sync`);
+    console.log(`Found ${activeFeedsFiltered.length} total feeds to sync (system + subscriptions, deduplicated)`);
 
     for (const feed of activeFeedsFiltered) {
       try {
