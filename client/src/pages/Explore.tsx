@@ -190,13 +190,9 @@ function ConversationalHero({
 
   const intentChips = [
     { label: t('explore.chipLatestAI'), query: 'AI', category: 'Academic' },
-    { label: t('explore.chipBusinessEnglish'), query: 'business', category: 'News' },
     { label: t('explore.chipEasyEnglish'), query: '', category: 'News', difficulty: 'beginner' },
-    { label: t('explore.chipBusinessArticle'), query: 'startup', category: 'Essays' },
-    { label: t('explore.chipShortEssay'), query: 'essay', category: 'Opinion' },
     { label: t('explore.chipClassicLit'), query: '', category: 'Literature' },
     { label: t('explore.chipScienceTech'), query: '', category: 'Academic' },
-    { label: t('explore.chipPhilosophy'), query: 'philosophy', category: 'Opinion' },
   ];
 
   return (
