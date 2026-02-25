@@ -626,19 +626,11 @@ export default function Explore() {
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [systemSources, setSystemSources] = useState(() => {
     const saved = localStorage.getItem("explore-system-sources");
-    return saved
-      ? JSON.parse(saved)
-      : {
-          arxiv: true,
-          gutenberg: true,
-          aeon: true,
-          mittr: true,
-          conversation: true,
-          nautilus: true,
-          voa: true,
-          pgEssays: true,
-          wired: true,
-        };
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { arxiv: parsed.arxiv ?? true, gutenberg: parsed.gutenberg ?? true, voa: parsed.voa ?? true };
+    }
+    return { arxiv: true, gutenberg: true, voa: true };
   });
 
   const { toast } = useToast();
@@ -652,6 +644,7 @@ export default function Explore() {
       const params = new URLSearchParams();
       if (category !== "all") params.set("category", category);
       params.set("sortBy", sortBy);
+      params.set("limit", "100");
       return fetch(`/api/library/explore?${params}`).then((res) => res.json());
     },
   });
@@ -724,6 +717,7 @@ export default function Explore() {
       const source = doc.source;
       if (source === "arXiv" && !systemSources.arxiv) return false;
       if (source === "Project Gutenberg" && !systemSources.gutenberg) return false;
+      if (source === "VOA Learning English" && !systemSources.voa) return false;
 
       const matchesCategory = category === "all" || doc.category === category;
 
@@ -746,6 +740,7 @@ export default function Explore() {
       const source = doc.source;
       if (source === "arXiv" && !systemSources.arxiv) return false;
       if (source === "Project Gutenberg" && !systemSources.gutenberg) return false;
+      if (source === "VOA Learning English" && !systemSources.voa) return false;
       return true;
     });
     return filtered.slice(0, 3);
@@ -1340,13 +1335,7 @@ export default function Explore() {
                       const sourceLabels: Record<string, { name: string; desc: string }> = {
                         arxiv: { name: t('explore.arxiv'), desc: t('explore.arxivDesc') },
                         gutenberg: { name: t('explore.projectGutenberg'), desc: t('explore.projectGutenbergDesc') },
-                        aeon: { name: t('explore.aeonEssays'), desc: t('explore.aeonDesc') },
-                        mittr: { name: t('explore.mitTechReview'), desc: t('explore.mitTechReviewDesc') },
-                        conversation: { name: t('explore.theConversation'), desc: t('explore.theConversationDesc') },
-                        nautilus: { name: t('explore.nautilus'), desc: t('explore.nautilusDesc') },
                         voa: { name: t('explore.voaLearningEnglish'), desc: t('explore.voaDesc') },
-                        pgEssays: { name: t('explore.pgEssays'), desc: t('explore.pgEssaysDesc') },
-                        wired: { name: t('explore.wired'), desc: t('explore.wiredDesc') },
                       };
                       const label = sourceLabels[source];
                       return (

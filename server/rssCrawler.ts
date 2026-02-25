@@ -550,45 +550,9 @@ export async function initializeNewSources(): Promise<void> {
   
   const sources = [
     {
-      url: "https://aeon.co/feed",
-      title: "Aeon Essays",
-      description: "Essays on philosophy, science, society and culture",
-      category: "Essays",
-    },
-    {
-      url: "https://www.technologyreview.com/feed/",
-      title: "MIT Technology Review", 
-      description: "Latest technology news and analysis",
-      category: "Technology",
-    },
-    {
-      url: "https://theconversation.com/global/articles.atom",
-      title: "The Conversation",
-      description: "Academic insights and expert analysis", 
-      category: "Academic",
-    },
-    {
-      url: "https://nautil.us/feed/",
-      title: "Nautilus",
-      description: "Science, culture and philosophy magazine",
-      category: "Science",
-    },
-    {
-      url: "https://feeds.npr.org/1001/rss.xml",
+      url: "https://learningenglish.voanews.com/api/zmg_pl-vomx-tpeymtm",
       title: "VOA Learning English",
       description: "News and feature stories in clear, simple English.",
-      category: "News",
-    },
-    {
-      url: "http://www.aaronsw.com/2002/feeds/pgessays.rss",
-      title: "Paul Graham Essays",
-      description: "Essays by Paul Graham on startups, technology, and life.",
-      category: "Essays",
-    },
-    {
-      url: "https://www.wired.com/feed/rss",
-      title: "WIRED",
-      description: "Latest technology news, ideas and trends.",
       category: "News",
     },
   ];
@@ -649,15 +613,6 @@ export async function convertRSSItemToDocumentEnhanced(
   try {
     console.log(`[RSS_ENHANCED] Converting item: ${item.title} from ${feed.title}`);
     
-    // Source-specific validation and processing
-    if (feed.title?.includes("MIT Technology Review")) {
-      // MIT Technology Review: Check for paywall
-      if (await isPaywalledContent(item, content)) {
-        console.log(`[MIT_TR] Skipping paywalled article: ${item.title}`);
-        return null;
-      }
-    }
-    
     // Extract and enhance tags based on source
     const tags = extractAndEnhanceTags(item, feed, content);
     
@@ -695,83 +650,11 @@ export async function convertRSSItemToDocumentEnhanced(
 }
 
 /**
- * MIT Technology Review paywall detection
- * Based on instructions.md: "Exclude any articles marked as paywalled (subscriber-only)"
- */
-async function isPaywalledContent(item: any, content: string): Promise<boolean> {
-  try {
-    // Check RSS item for paywall indicators
-    const title = item.title?.toLowerCase() || "";
-    const description = item.description?.toLowerCase() || "";
-    const summary = item.summary?.toLowerCase() || "";
-    
-    // Common paywall indicators in RSS feeds
-    const paywallIndicators = [
-      "subscriber",
-      "premium",
-      "paywall", 
-      "subscription required",
-      "paid content",
-      "member only",
-      "exclusive"
-    ];
-    
-    for (const indicator of paywallIndicators) {
-      if (title.includes(indicator) || description.includes(indicator) || summary.includes(indicator)) {
-        return true;
-      }
-    }
-    
-    // Check content for paywall markers
-    if (content) {
-      const lowercaseContent = content.toLowerCase();
-      const contentPaywallMarkers = [
-        "this content is for subscribers",
-        "become a subscriber",
-        "subscribe to continue reading",
-        "premium content",
-        "subscriber-only",
-        "paywall"
-      ];
-      
-      for (const marker of contentPaywallMarkers) {
-        if (lowercaseContent.includes(marker)) {
-          return true;
-        }
-      }
-    }
-    
-    return false;
-  } catch (error) {
-    console.error("[PAYWALL_CHECK] Error checking paywall status:", error);
-    // Default to false to avoid blocking legitimate content
-    return false;
-  }
-}
-
-/**
  * Extract and enhance tags from RSS items and content
  * Prioritizes source metadata over heuristics
  */
 function extractAndEnhanceTags(item: any, feed: any, content: string): string[] {
   const tags = new Set<string>();
-  
-  // Add source-specific base tags
-  const sourceTitle = feed.title?.toLowerCase() || "";
-  
-  if (sourceTitle.includes("aeon")) {
-    tags.add("aeon");
-    tags.add("essays");
-  } else if (sourceTitle.includes("mit technology")) {
-    tags.add("mit-technology-review");
-    tags.add("technology");
-  } else if (sourceTitle.includes("conversation")) {
-    tags.add("the-conversation");
-    tags.add("academic");
-  } else if (sourceTitle.includes("nautilus")) {
-    tags.add("nautilus");
-    tags.add("science");
-  }
   
   // Extract tags from RSS categories (prioritize official metadata)
   if (item.categories && Array.isArray(item.categories)) {
@@ -821,19 +704,10 @@ function extractAndEnhanceTags(item: any, feed: any, content: string): string[] 
 function getCategoryBySource(sourceTitle: string): string {
   const title = sourceTitle?.toLowerCase() || "";
   
-  // Academic: 학술 논문, 학회 발표 자료, 리서치 리포트
-  if (title.includes("conversation")) return "Academic";
-  
-  // Literature: 문학 작품, 에세이, 비평, 서사적 글쓰기  
-  // (Currently no RSS sources for Literature)
-  
   // News: 뉴스 기사, 저널리즘 기반 콘텐츠
-  if (title.includes("mit technology") || title.includes("nautilus") || title.includes("wired")) return "News";
+  if (title.includes("wired") || title.includes("voa")) return "News";
   
-  // Essays: 블로그 글, 칼럼, 개인 저널, 오피니언 피스
-  if (title.includes("aeon")) return "Essays";
-  
-  return "Essays"; // Default for RSS feeds (mostly blog/opinion content)
+  return "Essays"; // Default for RSS feeds
 }
 
 // 기존 RSS 문서들의 앵커 정보 재생성 함수

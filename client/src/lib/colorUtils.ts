@@ -110,14 +110,12 @@ export function determineCategory(document: any): Category {
   }
   
   // News: 뉴스 기사, 저널리즘 기반 콘텐츠
-  if (source === "MIT Technology Review" || source === "The Conversation" || 
-      source === "Reuters" || source === "BBC" || source === "Nautilus") {
+  if (source === "Reuters" || source === "BBC" || source === "WIRED" || source === "VOA Learning English") {
     return 'News';
   }
   
   // Essays: 블로그 글, 칼럼, 개인 저널, 오피니언 피스
-  if (source === "Joe's Journal" || source === "Aeon Essays" || 
-      source === "Medium" || source === "Substack" || 
+  if (source === "Joe's Journal" || source === "Medium" || source === "Substack" || 
       document.sourceType === 'uploaded') {
     return 'Essays';
   }
