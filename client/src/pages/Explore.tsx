@@ -610,6 +610,9 @@ export default function Explore() {
 
   const handleCategoryChange = (newCategory: string) => {
     setCategory(newCategory);
+    setSearchTerm("");
+    setDifficultyFilter("all");
+    setCurrentPage(1);
   };
   
   const handleCardHover = useCallback((doc: any | null) => {
@@ -815,9 +818,9 @@ export default function Explore() {
   };
 
   const handleChipClick = (query: string, chipCategory?: string, difficulty?: string) => {
-    if (query) setSearchTerm(query);
-    if (chipCategory) setCategory(chipCategory);
-    if (difficulty) setDifficultyFilter(difficulty); else setDifficultyFilter('all');
+    setSearchTerm(query);
+    setCategory(chipCategory || "all");
+    setDifficultyFilter(difficulty || "all");
     setCurrentPage(1);
   };
 
@@ -1119,7 +1122,7 @@ export default function Explore() {
                     ? "bg-forest hover:bg-forest-hover text-white" 
                     : "border-[hsl(var(--sage-soft))] text-muted-foreground hover:bg-[hsl(var(--sage-subtle))] dark:hover:bg-slate-800"
                 )}
-                onClick={() => setCategory(category === cat ? "all" : cat)}
+                onClick={() => handleCategoryChange(category === cat ? "all" : cat)}
               >
                 {t(`category.${cat.toLowerCase()}`)}
               </Badge>
