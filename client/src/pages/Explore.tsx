@@ -710,7 +710,8 @@ export default function Explore() {
         const title = doc.title?.toLowerCase() || '';
         const author = doc.author?.toLowerCase() || '';
         const content = doc.content?.toLowerCase() || '';
-        return terms.some(term => title.includes(term) || author.includes(term) || content.includes(term));
+        const sourceName = doc.source?.toLowerCase() || '';
+        return terms.some(term => title.includes(term) || author.includes(term) || content.includes(term) || sourceName.includes(term));
       })();
 
       const source = doc.source;
@@ -1107,23 +1108,6 @@ export default function Explore() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {["News", "Literature", "Academic", "Opinion"].map((cat) => (
-              <Badge
-                key={cat}
-                variant={category === cat ? "default" : "outline"}
-                className={cn(
-                  "cursor-pointer transition-all duration-300",
-                  category === cat 
-                    ? "bg-forest hover:bg-forest-hover text-white" 
-                    : "border-[hsl(var(--sage-soft))] text-muted-foreground hover:bg-[hsl(var(--sage-subtle))] dark:hover:bg-slate-800"
-                )}
-                onClick={() => handleCategoryChange(category === cat ? "all" : cat)}
-              >
-                {t(`category.${cat.toLowerCase()}`)}
-              </Badge>
-            ))}
-          </div>
         </div>
 
         <div className="mt-4 space-y-8 pb-24" data-pagination-scroll-target>
