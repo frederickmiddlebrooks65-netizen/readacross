@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { apiRequest } from '@/lib/queryClient';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
@@ -218,9 +219,6 @@ export default function Library() {
         params.set('status', filters.status);
       }
       const url = `/api/documents${params.toString() ? `?${params.toString()}` : ''}`;
-      
-      // Use apiRequest to handle authentication
-      const { apiRequest } = await import('@/lib/queryClient');
       return apiRequest(url);
     },
     enabled: isAuthReady && isInitialized,
@@ -234,58 +232,21 @@ export default function Library() {
     refetchOnWindowFocus: false,
   });
 
-  // Separate documents by type using SSOT classifier
-  const documentsByType = useMemo(() => {
-    if (!allDocuments || !Array.isArray(allDocuments)) {
-      return { uploaded: [], saved: [], rss: [] };
-    }
+  // Single-pass: classify by type (SSOT) AND compute category breakdown together
+  const { documentsByType, categoryBreakdown } = useMemo(() => {
+    const byType = { uploaded: [] as any[], saved: [] as any[], rss: [] as any[] };
+    const breakdown = { News: 0, Literature: 0, Academic: 0, Opinion: 0, Other: 0 };
 
-    const result = { uploaded: [] as any[], saved: [] as any[], rss: [] as any[] };
+    if (!allDocuments || !Array.isArray(allDocuments)) {
+      return { documentsByType: byType, categoryBreakdown: breakdown };
+    }
 
     allDocuments.forEach((doc: any) => {
       const origin = classifyOrigin(doc);
       const uiSource = toUISource(origin);
+      byType[uiSource].push(doc);
 
-      // Debug logging for ALL documents to see classification
-      console.log(`[SSOT Debug] Document "${doc.title}":`, {
-        id: doc.id,
-        source: doc.source,
-        sourceProvider: doc.sourceProvider,
-        sourceType: doc.sourceType,
-        feedId: doc.feedId,
-        fileId: doc.fileId,
-        uploadId: doc.uploadId,
-        origin: origin,
-        uiSource: uiSource
-      });
-
-      result[uiSource].push(doc);
-    });
-
-    console.log(`[SSOT Debug] Final document counts:`, {
-      uploaded: result.uploaded.length,
-      saved: result.saved.length,
-      rss: result.rss.length
-    });
-
-    return result;
-  }, [allDocuments]);
-
-  const uploadDocuments = documentsByType.uploaded;
-  const savedDocuments = documentsByType.saved;
-  const rssDocuments = documentsByType.rss;
-
-  // Calculate category breakdown for all documents
-  const categoryBreakdown = useMemo(() => {
-    if (!allDocuments || !Array.isArray(allDocuments)) {
-      return { News: 0, Literature: 0, Academic: 0, Opinion: 0, Other: 0 };
-    }
-
-    const breakdown = { News: 0, Literature: 0, Academic: 0, Opinion: 0, Other: 0 };
-
-    allDocuments.forEach(doc => {
       const docCategory = doc.category?.toLowerCase() || "";
-
       if (docCategory === "news" || docCategory === "뉴스") {
         breakdown.News++;
       } else if (docCategory === "literature" || docCategory === "문학" || docCategory === "classic") {
@@ -299,8 +260,12 @@ export default function Library() {
       }
     });
 
-    return breakdown;
+    return { documentsByType: byType, categoryBreakdown: breakdown };
   }, [allDocuments]);
+
+  const uploadDocuments = documentsByType.uploaded;
+  const savedDocuments = documentsByType.saved;
+  const rssDocuments = documentsByType.rss;
 
   const resumeDoc = useMemo(() => {
     if (!allDocuments || !Array.isArray(allDocuments)) return null;
@@ -569,12 +534,22 @@ export default function Library() {
     documents: any[];
     loading: boolean;
   }) => {
+    const gridClass = {
+      grid: "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4",
+      list: "space-y-2",
+    }[viewMode];
+
     if (loading) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-48 bg-muted animate-pulse rounded-lg" />
-          ))}
+        <div className={gridClass}>
+          {viewMode === 'grid'
+            ? [...Array(12)].map((_, i) => (
+                <div key={i} className="aspect-[3/4] bg-muted animate-pulse rounded-lg" />
+              ))
+            : [...Array(6)].map((_, i) => (
+                <div key={i} className="h-24 w-full bg-muted animate-pulse rounded-lg" />
+              ))
+          }
         </div>
       );
     }
@@ -644,11 +619,6 @@ export default function Library() {
         </div>
       );
     }
-
-    const gridClass = {
-      grid: "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4",
-      list: "space-y-2",
-    }[viewMode];
 
     // Pagination
     const startIndex = (currentPage - 1) * itemsPerPage;
