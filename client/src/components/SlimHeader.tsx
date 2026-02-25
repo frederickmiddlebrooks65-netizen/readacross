@@ -138,7 +138,7 @@ export default function SlimHeader({
   }, [viewDropdownOpen, typographyPopoverOpen, themeDropdownOpen, showShortcutHelp, onMenuStateChange]);
 
   const handleBackToHome = () => {
-    setLocation('/');
+    setLocation(isExploreDocument ? '/explore' : '/');
   };
 
   return (
