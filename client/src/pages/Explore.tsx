@@ -249,24 +249,53 @@ function ConversationalHero({
         </div>
       </div>
 
-      {!loadingRecommendations && featuredDocuments.length > 0 && (
+      {(loadingRecommendations || featuredDocuments.length > 0) && (
         <div className="mt-12 max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="h-4 w-4 text-forest dark:text-slate-400" />
-            <h2 className="text-sm font-medium tracking-[0.1em] text-forest dark:text-slate-400 uppercase">
-              {t('explore.forYou')}
-            </h2>
+            {loadingRecommendations ? (
+              <div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+            ) : (
+              <h2 className="text-sm font-medium tracking-[0.1em] text-forest dark:text-slate-400 uppercase">
+                {t('explore.forYou')}
+              </h2>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {featuredDocuments.map((doc: any) => (
-              <FeaturedCard
-                key={doc.id}
-                document={doc}
-                onAddToLibrary={onAddToLibrary}
-                isInLibrary={isDocInLibrary(doc)}
-                t={t}
-              />
-            ))}
+            {loadingRecommendations ? (
+              [...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/40 p-5 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="h-2.5 w-14 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-4 w-full bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                    <div className="h-4 w-4/5 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+                    <div className="h-3 w-2/3 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <div className="h-5 w-14 bg-slate-100 dark:bg-slate-800 rounded-full animate-pulse" />
+                    <div className="h-5 w-10 bg-slate-100 dark:bg-slate-800 rounded-full animate-pulse" />
+                  </div>
+                </div>
+              ))
+            ) : (
+              featuredDocuments.map((doc: any) => (
+                <FeaturedCard
+                  key={doc.id}
+                  document={doc}
+                  onAddToLibrary={onAddToLibrary}
+                  isInLibrary={isDocInLibrary(doc)}
+                  t={t}
+                />
+              ))
+            )}
           </div>
         </div>
       )}
