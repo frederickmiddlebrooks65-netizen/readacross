@@ -101,7 +101,7 @@ export class TokenTrackingService {
       `total: ${updated.totalTokensUsed}, premium: ${updated.premiumTokensUsed}`
     );
 
-    this.checkAndNotifyThreshold(userId, updated.totalTokensUsed, month).catch(() => {});
+    this.checkAndNotifyThreshold(userId, updated.totalTokensUsed, month).catch(() => { });
 
     return updated;
   }
@@ -149,7 +149,10 @@ export class TokenTrackingService {
     }
 
     const usage = await this.getOrCreateMonthlyUsage(userId);
-    const limits = PLAN_LIMITS[plan];
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
+    if (!PLAN_LIMITS[plan]) {
+      console.warn(`[TokenTracking] Unknown plan "${plan}" for user ${userId}, falling back to starter limits`);
+    }
 
     const remainingTokens = limits.monthlyTokenCap - usage.totalTokensUsed;
     if (remainingTokens <= this.MONTHLY_CAP_BUFFER) {
@@ -188,7 +191,7 @@ export class TokenTrackingService {
     }
 
     const usage = await this.getOrCreateMonthlyUsage(userId);
-    const limits = PLAN_LIMITS[plan];
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
 
     if (usage.fullDocTranslations >= limits.maxFullDocTranslations) {
       return {
@@ -212,7 +215,7 @@ export class TokenTrackingService {
     }
 
     const usage = await this.getOrCreateMonthlyUsage(userId);
-    const limits = PLAN_LIMITS[plan];
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
 
     if (usage.ocrCount >= limits.maxOcr) {
       return {
@@ -232,7 +235,7 @@ export class TokenTrackingService {
     plan: PlanType
   ): Promise<UsageSnapshot> {
     const usage = await this.getOrCreateMonthlyUsage(userId);
-    const limits = PLAN_LIMITS[plan];
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
 
     return {
       plan,
@@ -300,7 +303,7 @@ export class TokenTrackingService {
     plan: PlanType
   ): boolean {
     if (plan === "admin") return false;
-    const limits = PLAN_LIMITS[plan];
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
     return totalTokensUsed >= limits.monthlyTokenCap * 0.8;
   }
 

@@ -12,8 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Server, Database, FileX, FileText, BarChart3, Eye, Calendar, Clock, 
+import {
+  Server, Database, FileX, FileText, BarChart3, Eye, Calendar, Clock,
   RefreshCw, Settings, Zap, Play, Square, Rss, Cog, PlayCircle,
   CheckCircle2, XCircle, AlertCircle, ChevronDown, Trash2, Search, Filter,
   AlertTriangle, Activity, Timer, Users, Edit2
@@ -256,34 +256,34 @@ export function AdminNew() {
         />
         <PageBody className="space-y-8">
 
-        {/* 1. 시스템 현황 섹션 */}
-        <SystemOverview
-          adminStats={adminStats}
-          schedulerStatus={schedulerStatus}
-          expiredCount={expiredDocuments?.length || 0}
-        />
+          {/* 1. 시스템 현황 섹션 */}
+          <SystemOverview
+            adminStats={adminStats}
+            schedulerStatus={schedulerStatus}
+            expiredCount={expiredDocuments?.length || 0}
+          />
 
-        {/* 2. 소스 관리 (2열 레이아웃) - instructions.md */}
-        <SourceManagement
-          adminStats={adminStats}
-          schedulerStatus={schedulerStatus}
-          rssPolicy={rssPolicy}
-          feedsData={feedsData}
-          selectedRssFeeds={selectedRssFeeds}
-          setSelectedRssFeeds={setSelectedRssFeeds}
-          triggerSyncMutation={triggerSyncMutation}
-          updateRssPolicyMutation={updateRssPolicyMutation}
-          syncFeedsMutation={syncFeedsMutation}
-        />
+          {/* 2. 소스 관리 (2열 레이아웃) - instructions.md */}
+          <SourceManagement
+            adminStats={adminStats}
+            schedulerStatus={schedulerStatus}
+            rssPolicy={rssPolicy}
+            feedsData={feedsData}
+            selectedRssFeeds={selectedRssFeeds}
+            setSelectedRssFeeds={setSelectedRssFeeds}
+            triggerSyncMutation={triggerSyncMutation}
+            updateRssPolicyMutation={updateRssPolicyMutation}
+            syncFeedsMutation={syncFeedsMutation}
+          />
 
-        {/* 3. 문서 관리 섹션 */}
-        <DocumentManagement expiredDocuments={expiredDocuments} />
+          {/* 3. 문서 관리 섹션 */}
+          <DocumentManagement expiredDocuments={expiredDocuments} />
 
-        {/* 5. 사용자 관리 섹션 */}
-        <UserManagement />
+          {/* 5. 사용자 관리 섹션 */}
+          <UserManagement />
 
-        {/* 4. 동기화 로그 섹션 */}
-        <SyncLogsSection />
+          {/* 4. 동기화 로그 섹션 */}
+          <SyncLogsSection />
         </PageBody>
       </PageShell>
     </Layout>
@@ -308,13 +308,13 @@ function SystemOverview({ adminStats, schedulerStatus, expiredCount }: SystemOve
   const totalRssFeeds = feedsData?.length || 0;
   const systemSourcesCount = 2; // arXiv, Project Gutenberg (instructions.md에 명시)
   const totalSources = totalRssFeeds + systemSourcesCount;
-  
+
   // 최근 24시간 동기화 성공률 계산 (단순화 버전)
   const errorFeedsCount = feedsData?.filter(f => f.errorCount > 0).length || 0;
-  const successRate = totalRssFeeds > 0 
+  const successRate = totalRssFeeds > 0
     ? Math.round(((totalRssFeeds - errorFeedsCount) / totalRssFeeds) * 100)
     : 100;
-    
+
   const formatAdminDateTime = (dateString: string | null | undefined) => {
     if (!dateString) return '없음';
     return formatDateTime(dateString, { timezone, language });
@@ -373,10 +373,9 @@ function SystemOverview({ adminStats, schedulerStatus, expiredCount }: SystemOve
             <CheckCircle2 className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${
-              successRate >= 90 ? 'text-green-600' : 
-              successRate >= 70 ? 'text-yellow-600' : 'text-red-600'
-            }`}>{successRate}%</div>
+            <div className={`text-2xl font-bold ${successRate >= 90 ? 'text-green-600' :
+                successRate >= 70 ? 'text-yellow-600' : 'text-red-600'
+              }`}>{successRate}%</div>
             <p className="text-xs text-muted-foreground mt-1">최근 24시간</p>
           </CardContent>
         </Card>
@@ -462,9 +461,9 @@ function DocumentCountCards({ stats, expiredCount }: DocumentCountCardsProps) {
         <CardContent>
           <div className="text-3xl font-bold text-brand">{stats.userDocuments.toLocaleString()}</div>
           <p className="text-xs text-brand mt-1">업로드된 개인 문서</p>
-          <Progress 
-            value={stats.totalDocuments > 0 ? (stats.userDocuments / stats.totalDocuments) * 100 : 0} 
-            className="mt-2 h-1" 
+          <Progress
+            value={stats.totalDocuments > 0 ? (stats.userDocuments / stats.totalDocuments) * 100 : 0}
+            className="mt-2 h-1"
           />
         </CardContent>
       </Card>
@@ -477,9 +476,9 @@ function DocumentCountCards({ stats, expiredCount }: DocumentCountCardsProps) {
         <CardContent>
           <div className="text-3xl font-bold text-brand">{stats.publicDocuments.toLocaleString()}</div>
           <p className="text-xs text-brand mt-1">Explore 탭 콘텐츠</p>
-          <Progress 
-            value={stats.totalDocuments > 0 ? (stats.publicDocuments / stats.totalDocuments) * 100 : 0} 
-            className="mt-2 h-1" 
+          <Progress
+            value={stats.totalDocuments > 0 ? (stats.publicDocuments / stats.totalDocuments) * 100 : 0}
+            className="mt-2 h-1"
           />
         </CardContent>
       </Card>
@@ -492,9 +491,9 @@ function DocumentCountCards({ stats, expiredCount }: DocumentCountCardsProps) {
         <CardContent>
           <div className="text-3xl font-bold text-destructive">{expiredCount.toLocaleString()}</div>
           <p className="text-xs text-destructive mt-1">정리 대상 문서</p>
-          <Progress 
-            value={stats.totalDocuments > 0 ? (expiredCount / stats.totalDocuments) * 100 : 0} 
-            className="mt-2 h-1" 
+          <Progress
+            value={stats.totalDocuments > 0 ? (expiredCount / stats.totalDocuments) * 100 : 0}
+            className="mt-2 h-1"
           />
         </CardContent>
       </Card>
@@ -516,16 +515,16 @@ interface SourceManagementProps {
   syncFeedsMutation: any;
 }
 
-function SourceManagement({ 
-  adminStats, 
+function SourceManagement({
+  adminStats,
   schedulerStatus,
-  rssPolicy, 
-  feedsData, 
+  rssPolicy,
+  feedsData,
   selectedRssFeeds,
   setSelectedRssFeeds,
-  triggerSyncMutation, 
-  updateRssPolicyMutation, 
-  syncFeedsMutation 
+  triggerSyncMutation,
+  updateRssPolicyMutation,
+  syncFeedsMutation
 }: SourceManagementProps) {
   return (
     <div className="space-y-6">
@@ -611,9 +610,9 @@ interface DocumentSourceManagementProps {
   triggerSyncMutation: any;
 }
 
-function DocumentSourceManagement({ 
-  feedsData, 
-  rssPolicy, 
+function DocumentSourceManagement({
+  feedsData,
+  rssPolicy,
   selectedRssFeeds,
   setSelectedRssFeeds,
   syncFeedsMutation,
@@ -658,9 +657,8 @@ function DocumentSourceManagement({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
-            <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-              rssPolicy?.arxivEnabled !== false ? "bg-brand-subtle border-brand" : "bg-muted/50 border-border"
-            }`}>
+            <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${rssPolicy?.arxivEnabled !== false ? "bg-brand-subtle border-brand" : "bg-muted/50 border-border"
+              }`}>
               <div className="flex items-center gap-2">
                 <Cog className={`h-4 w-4 ${rssPolicy?.arxivEnabled !== false ? "text-brand" : "text-muted-foreground"}`} />
                 <div>
@@ -677,9 +675,8 @@ function DocumentSourceManagement({
               />
             </div>
 
-            <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-              rssPolicy?.gutenbergEnabled !== false ? "bg-brand-subtle border-brand" : "bg-muted/50 border-border"
-            }`}>
+            <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${rssPolicy?.gutenbergEnabled !== false ? "bg-brand-subtle border-brand" : "bg-muted/50 border-border"
+              }`}>
               <div className="flex items-center gap-2">
                 <Cog className={`h-4 w-4 ${rssPolicy?.gutenbergEnabled !== false ? "text-brand" : "text-muted-foreground"}`} />
                 <div>
@@ -699,11 +696,10 @@ function DocumentSourceManagement({
             {systemFeeds.map((feed) => (
               <div
                 key={feed.id}
-                className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                  feed.isBlocked
+                className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${feed.isBlocked
                     ? "bg-muted/50 border-border"
                     : "bg-brand-subtle border-brand"
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <Cog className={`h-4 w-4 flex-shrink-0 ${feed.isBlocked ? "text-muted-foreground" : "text-brand"}`} />
@@ -747,7 +743,7 @@ function DocumentSourceManagement({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <RSSSourceSection 
+          <RSSSourceSection
             feedsData={userFeeds}
             rssPolicy={rssPolicy}
             selectedRssFeeds={selectedRssFeeds}
@@ -771,9 +767,9 @@ interface RSSSourceSectionProps {
   updateRssPolicyMutation: any;
 }
 
-function RSSSourceSection({ 
-  feedsData, 
-  rssPolicy, 
+function RSSSourceSection({
+  feedsData,
+  rssPolicy,
   selectedRssFeeds,
   setSelectedRssFeeds,
   syncFeedsMutation,
@@ -818,9 +814,9 @@ function RSSSourceSection({
 
   const handleSaveEdit = () => {
     if (!editingFeed) return;
-    editFeedMutation.mutate({ 
-      id: editingFeed.id, 
-      data: editForm 
+    editFeedMutation.mutate({
+      id: editingFeed.id,
+      data: editForm
     });
   };
 
@@ -891,7 +887,7 @@ function RSSSourceSection({
 
   // 성공률 계산 (24시간 기준)
   const totalFeeds = feedsData?.length || 0;
-  const successRate = totalFeeds > 0 
+  const successRate = totalFeeds > 0
     ? Math.round(((totalFeeds - errorFeedsCount) / totalFeeds) * 100)
     : 100;
 
@@ -956,30 +952,29 @@ function RSSSourceSection({
           </div>
         </div>
 
-      {/* 탭 네비게이션 */}
-      <div className="flex space-x-1 bg-muted p-1 rounded-lg">
-        {[
-          { key: 'feeds', label: '피드 관리', icon: Database },
-          { key: 'subscriptions', label: '사용자 구독', icon: Users },
-          { key: 'policy', label: '설정', icon: Settings }
-        ].map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key as any)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === key
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
-      </div>
+        {/* 탭 네비게이션 */}
+        <div className="flex space-x-1 bg-muted p-1 rounded-lg">
+          {[
+            { key: 'feeds', label: '피드 관리', icon: Database },
+            { key: 'subscriptions', label: '사용자 구독', icon: Users },
+            { key: 'policy', label: '설정', icon: Settings }
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key as any)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === key
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+                }`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
 
-      {/* 탭 컨텐츠 */}
-      <div className="min-h-[300px]">
+        {/* 탭 컨텐츠 */}
+        <div className="min-h-[300px]">
           {activeTab === 'feeds' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -1014,7 +1009,7 @@ function RSSSourceSection({
                       if (feed.errorCount > 0) return 'warning';
                       return 'normal';
                     };
-                    
+
                     const status = getStatus();
                     const statusConfig = {
                       normal: { color: 'text-green-600', bg: 'bg-green-50', label: '정상' },
@@ -1029,18 +1024,17 @@ function RSSSourceSection({
                       const diff = Date.now() - new Date(dateString).getTime();
                       const hours = Math.floor(diff / (1000 * 60 * 60));
                       const days = Math.floor(hours / 24);
-                      
+
                       if (days > 0) return `${days}일 전`;
                       if (hours > 0) return `${hours}시간 전`;
                       return '방금 전';
                     };
 
                     return (
-                      <div key={feed.id} className={`p-3 rounded-lg border transition-colors ${
-                        status === 'pending' 
-                          ? 'bg-orange-50/50 border-orange-200 hover:border-orange-400' 
+                      <div key={feed.id} className={`p-3 rounded-lg border transition-colors ${status === 'pending'
+                          ? 'bg-orange-50/50 border-orange-200 hover:border-orange-400'
                           : 'bg-white hover:border-blue-300'
-                      }`}>
+                        }`}>
                         <div className="flex items-center justify-between">
                           {/* 기본 정보 */}
                           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1080,16 +1074,15 @@ function RSSSourceSection({
                                 {feed.lastError ? '실패' : '성공'}
                               </div>
                             </div>
-                            
+
                             {/* 액션 버튼들 */}
                             <div className="flex items-center gap-1">
                               {!feed.isSystemSource && (
                                 <button
-                                  className={`p-1 transition-colors disabled:opacity-50 ${
-                                    feed.isBlocked
+                                  className={`p-1 transition-colors disabled:opacity-50 ${feed.isBlocked
                                       ? 'text-orange-500 hover:text-green-600'
                                       : 'text-green-500 hover:text-red-600'
-                                  }`}
+                                    }`}
                                   title={feed.isBlocked ? '승인 (크롤링 허용)' : '차단'}
                                   data-testid={`button-toggle-${feed.id}`}
                                   onClick={() => toggleFeedBlockMutation.mutate({ feedId: feed.id, isBlocked: !feed.isBlocked })}
@@ -1290,7 +1283,7 @@ function RSSSourceSection({
               {selectedFeedForDetail?.title}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedFeedForDetail && (
             <div className="space-y-6">
               {/* 기본 정보 */}
@@ -1334,7 +1327,7 @@ function RSSSourceSection({
                   <div className="p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">
-                        {selectedFeedForDetail.lastRunAt 
+                        {selectedFeedForDetail.lastRunAt
                           ? new Date(selectedFeedForDetail.lastRunAt).toLocaleString('ko-KR')
                           : '실행 기록 없음'
                         }
@@ -1390,7 +1383,7 @@ function RSSSourceSection({
               피드 제목과 URL을 수정할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="title" className="text-sm font-medium">피드 제목</Label>
@@ -1418,7 +1411,7 @@ function RSSSourceSection({
             <Button variant="outline" onClick={() => setEditingFeed(null)}>
               취소
             </Button>
-            <Button 
+            <Button
               onClick={handleSaveEdit}
               disabled={editFeedMutation.isPending || !editForm.title.trim() || !editForm.url.trim()}
             >
@@ -1462,7 +1455,7 @@ function SchedulerControl({ triggerSyncMutation, selectedRssFeeds, syncFeedsMuta
   const isSchedulerRunning = scheduler?.isRunning || false;
   const lastRun = scheduler?.lastRun;
   const nextRun = scheduler?.nextRun;
-  
+
   // 실행 중인 작업 수 계산
   const activeJobsCount = scheduler?.jobs?.filter((job: any) => job.running).length || 0;
 
@@ -1529,7 +1522,7 @@ function SchedulerControl({ triggerSyncMutation, selectedRssFeeds, syncFeedsMuta
             {/* 수동 실행 버튼들 */}
             <div className="space-y-4">
               <h4 className="font-medium">수동 실행</h4>
-              
+
               {/* 전체 동기화 */}
               <Button
                 onClick={() => triggerSyncMutation.mutate('all')}
@@ -1650,7 +1643,7 @@ function SchedulerControl({ triggerSyncMutation, selectedRssFeeds, syncFeedsMuta
               동기화할 RSS 피드를 선택하고 실행하세요.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {feedsData && feedsData.length > 0 ? (
               feedsData.map((feed) => (
@@ -1705,7 +1698,7 @@ function SchedulerControl({ triggerSyncMutation, selectedRssFeeds, syncFeedsMuta
             }}>
               취소
             </Button>
-            <Button 
+            <Button
               onClick={handleSelectiveSync}
               disabled={selectedModalFeeds.size === 0 || syncFeedsMutation.isPending}
             >
@@ -1762,7 +1755,7 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
   const filteredDocuments = useMemo(() => {
     const docs = documentsResponse?.documents || [];
     return docs.filter((doc: Document) => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (doc.author && doc.author.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCategory = categoryFilter === 'all' || doc.category === categoryFilter;
@@ -1788,7 +1781,7 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
       const { id, ...updateData } = updates;
       console.log('[DEBUG] Sending to server:', updateData);
       console.log('[DEBUG] Request URL:', `/api/admin/documents/${id}`);
-      
+
       const response = await apiRequest(`/api/admin/documents/${id}`, {
         method: "PATCH",
         json: updateData,
@@ -1868,7 +1861,7 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
       setSelectedDocuments(new Set());
       setIsDeleteDialogOpen(false);
       setDeletePreviews([]);
-      
+
       const errorCount = data.errors ? data.errors.length : 0;
       toast({
         title: "일괄 삭제 완료",
@@ -1885,7 +1878,7 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
   const loadDeletePreviews = async (documentIds: number[]) => {
     setIsLoadingPreviews(true);
     try {
-      const previewPromises = documentIds.map(id => 
+      const previewPromises = documentIds.map(id =>
         apiRequest(`/api/admin/documents/${id}/delete-preview`)
       );
       const results = await Promise.allSettled(previewPromises);
@@ -1914,7 +1907,7 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
       });
       return;
     }
-    
+
     // Load deletion previews and show dialog
     await loadDeletePreviews(Array.from(selectedDocuments));
     setIsDeleteDialogOpen(true);
@@ -2133,9 +2126,9 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
                         )}
                       </td>
                       <td className="p-3">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleEditDocument(doc)}
                           className="text-xs h-7"
                         >
@@ -2152,7 +2145,7 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">
                 {searchTerm || categoryFilter !== 'all' || typeFilter !== 'all'
-                  ? '검색 조건에 맞는 문서가 없습니다.' 
+                  ? '검색 조건에 맞는 문서가 없습니다.'
                   : '문서가 없습니다.'
                 }
               </p>
@@ -2276,7 +2269,7 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
               취소
             </Button>
-            <Button 
+            <Button
               onClick={handleSaveDocument}
               disabled={updateDocumentMutation.isPending}
             >
@@ -2301,7 +2294,7 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
               선택된 {selectedDocuments.size}개의 문서와 관련된 데이터가 함께 삭제됩니다.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="max-h-[400px] overflow-y-auto space-y-4">
             {isLoadingPreviews ? (
               <div className="flex items-center justify-center py-8">
@@ -2314,14 +2307,14 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
                   <div className="flex items-center gap-2 mb-3">
                     <span className="font-medium">{preview.documentTitle}</span>
                     <Badge variant={
-                      preview.warningLevel === 'high' ? 'destructive' : 
-                      preview.warningLevel === 'medium' ? 'secondary' : 'default'
+                      preview.warningLevel === 'high' ? 'destructive' :
+                        preview.warningLevel === 'medium' ? 'secondary' : 'default'
                     }>
-                      {preview.warningLevel === 'high' ? '높은 위험' : 
-                       preview.warningLevel === 'medium' ? '중간 위험' : '낮은 위험'}
+                      {preview.warningLevel === 'high' ? '높은 위험' :
+                        preview.warningLevel === 'medium' ? '중간 위험' : '낮은 위험'}
                     </Badge>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div className="space-y-1">
                       <div className="flex justify-between">
@@ -2352,7 +2345,7 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
                       </div>
                     </div>
                   </div>
-                  
+
                   {preview.relatedData.glossaryTerms > 0 && (
                     <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
                       <AlertCircle className="h-4 w-4 inline mr-1 text-yellow-600" />
@@ -2365,15 +2358,15 @@ function DocumentManagement({ expiredDocuments }: DocumentManagementProps) {
           </div>
 
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsDeleteDialogOpen(false)}
               disabled={bulkDeleteMutation.isPending}
             >
               취소
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={confirmBulkDelete}
               disabled={bulkDeleteMutation.isPending || isLoadingPreviews}
             >
@@ -2434,7 +2427,7 @@ function UserManagement() {
     mutationFn: async ({ userId, updates }: { userId: number; updates: Record<string, string> }) => {
       return await apiRequest(`/api/admin/users/${userId}`, {
         method: "PATCH",
-        body: JSON.stringify(updates),
+        json: updates,
       });
     },
     onSuccess: () => {
