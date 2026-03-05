@@ -42,7 +42,7 @@ export const verifyPassword = async (password: string, hash: string): Promise<bo
 
 // JWT utilities
 export const generateJWT = (userId: number, passwordVersion: number = 1): string => {
-  const payload = { 
+  const payload = {
     id: userId,
     passwordVersion,
     type: 'access'
@@ -51,7 +51,7 @@ export const generateJWT = (userId: number, passwordVersion: number = 1): string
 };
 
 export const generateRefreshJWT = (userId: number): string => {
-  const payload = { 
+  const payload = {
     id: userId,
     type: 'refresh'
   };
@@ -122,7 +122,7 @@ export const authenticateJWT = async (req: AuthenticatedRequest, res: Response, 
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      
+
       // Fetch full user information from database
       let user = await storage.getUser(decoded.id);
       if (!user) {
@@ -133,7 +133,7 @@ export const authenticateJWT = async (req: AuthenticatedRequest, res: Response, 
         await storage.updateUser(user.id, { plan: "starter", betaExpiresAt: null });
         user = (await storage.getUser(user.id))!;
       }
-      
+
       req.user = user;
       req.userId = user.id;
       next();
@@ -199,7 +199,7 @@ export const optionalAuthenticateJWT = async (req: AuthenticatedRequest, res: Re
   }
 
   const token = authHeader.split(' ')[1];
-  
+
   // If auth header exists but is invalid format, proceed without authentication
   if (!token) {
     req.userId = undefined;
@@ -209,7 +209,7 @@ export const optionalAuthenticateJWT = async (req: AuthenticatedRequest, res: Re
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    
+
     // Fetch full user information from database
     let user = await storage.getUser(decoded.id);
     if (user) {
@@ -232,11 +232,9 @@ export const optionalAuthenticateJWT = async (req: AuthenticatedRequest, res: Re
   }
 };
 
-// Mock authentication for development (keeping for backward compatibility)
-export const mockAuthenticateJWT = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  req.userId = 1;
-  next();
-};
+// REMOVED: mockAuthenticateJWT was a security risk (always sets userId=1)
+// Use authenticateJWT instead for all routes that require authentication
+
 
 // JWT 토큰 검증 함수 (기존 호환성 유지)
 export const verifyJWT = (token: string): Promise<{ id: number }> => {

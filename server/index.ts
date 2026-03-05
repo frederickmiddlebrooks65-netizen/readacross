@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -12,6 +15,14 @@ import { pool } from "./db.js";
 
 const app = express();
 const PgSession = connectPgSimple(session);
+
+// Security: warn if using default JWT secrets
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'default-secret-change-in-production') {
+  console.error('⚠️  SECURITY WARNING: JWT_SECRET is not set or using default value. Set a strong secret in environment variables!');
+}
+if (!process.env.JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET === 'default-refresh-secret-change-in-production') {
+  console.error('⚠️  SECURITY WARNING: JWT_REFRESH_SECRET is not set or using default value. Set a strong secret in environment variables!');
+}
 
 // Trust proxy for rate limiting and proper IP detection
 // Configure trust proxy more securely for rate limiting
@@ -154,8 +165,8 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    console.error("[Global Error Handler]", { status, message, stack: err.stack });
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after
@@ -194,10 +205,10 @@ app.use((req, res, next) => {
 
   // Routes are registered in registerRoutes() function called above
 
-  // ALWAYS serve the app on port 5000
+  // ALWAYS serve the app on port 3000 fallback
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5000;
+  const port = process.env.PORT || 3000;
 
   server.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
@@ -210,7 +221,7 @@ app.use((req, res, next) => {
     }
   });
 
-  server.listen(port, "0.0.0.0", () => {
+  server.listen(Number(port), "0.0.0.0", () => {
     log(`serving on port ${port}`);
   });
 

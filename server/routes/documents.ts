@@ -94,7 +94,7 @@ router.patch("/:id", authenticateJWT, async (req: AuthenticatedRequest, res) => 
     // Validate the update payload
     const { category } = req.body;
     const validCategories = ['Academic', 'Literature', 'News', 'Essays'];
-    
+
     if (category && !validCategories.includes(category)) {
       return res.status(400).json({ error: "Invalid category. Must be one of: Academic, Literature, News, Essays" });
     }
@@ -113,7 +113,7 @@ router.post("/:id/add-to-library", authenticateJWT, async (req: AuthenticatedReq
   try {
     const documentId = parseInt(req.params.id);
     const userId = req.userId;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
     }
@@ -334,13 +334,13 @@ router.get("/:id", optionalAuthenticateJWT, async (req: AuthenticatedRequest, re
     // Check for stale translation status (running for more than 10 minutes)
     const TRANSLATION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
     let effectiveTranslationStatus = document.translationStatus;
-    
+
     if (document.translationStatus === 'running' && document.translationUpdatedAt) {
       const elapsedMs = Date.now() - new Date(document.translationUpdatedAt).getTime();
       if (elapsedMs > TRANSLATION_TIMEOUT_MS) {
         console.log(`[TRANSLATE] Document ${documentId} translation stale (${Math.round(elapsedMs / 1000 / 60)} min), resetting to idle`);
         // Update in background, don't wait
-        storage.updateDocument(documentId, { 
+        storage.updateDocument(documentId, {
           translationStatus: 'idle',
           translationError: 'Translation timed out. Please try again.'
         }).catch(err => console.error('[TRANSLATE] Failed to reset stale status:', err));
@@ -461,7 +461,7 @@ router.post("/upload", authenticateJWT, upload.single("file"),
 
         console.log(`[PDF Upload] 🔧 Direct-pass: ${blocks.length} blocks, ${totalContentLength} chars total`);
         console.log(`[PDF Upload] 🎯 Archetype: ${archetype.archetype} (confidence: ${archetype.confidence.toFixed(2)})`);
-        
+
         // 🔧 VERIFICATION LOG: Block[] JSON before DocumentService
         console.log(`[PDF Upload] 📋 Block[] sample (first 2):`);
         console.log(JSON.stringify(blocks.slice(0, 2), null, 2));
@@ -490,7 +490,7 @@ router.post("/upload", authenticateJWT, upload.single("file"),
         // Handle other file types with legacy pipeline
         if (
           req.file.mimetype ===
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
           req.file.mimetype === "application/msword"
         ) {
           const result = await mammoth.extractRawText({
@@ -645,14 +645,14 @@ router.get("/", authenticateJWT, async (req: AuthenticatedRequest, res: Response
     const { category, sortBy, type, status = "active", feedId, search } = req.query;
     const userId = req.userId; // Get authenticated user ID
 
-    console.log(`[DEBUG] Documents API called with:`, { 
-      type, 
-      feedId, 
+    console.log(`[DEBUG] Documents API called with:`, {
+      type,
+      feedId,
       userId: userId,
       status,
       category,
       sortBy,
-      search 
+      search
     });
 
     // CRITICAL: Validate userId is present
@@ -682,7 +682,7 @@ router.get("/", authenticateJWT, async (req: AuthenticatedRequest, res: Response
 });
 
 // Archive a document
-router.post("/:id/archive", async (req, res) => {
+router.post("/:id/archive", authenticateJWT, async (req: AuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     console.log(`[ARCHIVE] Attempting to archive document ${id}`);
@@ -692,6 +692,11 @@ router.post("/:id/archive", async (req, res) => {
     if (!document) {
       console.log(`[ARCHIVE] Document ${id} not found`);
       return res.status(404).json({ message: "Document not found" });
+    }
+
+    // Ownership check: only document owner or admin can archive
+    if (document.userId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: "Permission denied" });
     }
 
     console.log(
@@ -725,7 +730,7 @@ router.post("/:id/archive", async (req, res) => {
 });
 
 // Restore an archived document
-router.post("/:id/restore", async (req, res) => {
+router.post("/:id/restore", authenticateJWT, async (req: AuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
 
@@ -733,6 +738,11 @@ router.post("/:id/restore", async (req, res) => {
     const document = await storage.getDocument(id);
     if (!document) {
       return res.status(404).json({ message: "Document not found" });
+    }
+
+    // Ownership check: only document owner or admin can restore
+    if (document.userId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: "Permission denied" });
     }
 
     if (!document.isArchived) {
@@ -785,8 +795,8 @@ router.post("/preview-url", async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error("Error previewing URL:", error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : "Failed to preview URL" 
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to preview URL"
     });
   }
 });
@@ -828,7 +838,7 @@ router.post("/create-from-url-library", authenticateJWT, async (req: Authenticat
     });
 
     // Set thumbnail status for web content
-    await storage.updateDocument(document.id, { 
+    await storage.updateDocument(document.id, {
       thumbnailStatus: "pending"
     });
 
@@ -838,8 +848,8 @@ router.post("/create-from-url-library", authenticateJWT, async (req: Authenticat
 
   } catch (error) {
     console.error("Error creating Library document from URL:", error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : "Failed to create document from URL" 
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to create document from URL"
     });
   }
 });
@@ -852,8 +862,8 @@ router.post("/create-from-url", async (req: Request, res: Response) => {
     // Validate request body
     const validation = createFromUrlSchema.safeParse(req.body);
     if (!validation.success) {
-      return res.status(400).json({ 
-        error: validation.error.errors[0]?.message || "잘못된 요청입니다" 
+      return res.status(400).json({
+        error: validation.error.errors[0]?.message || "잘못된 요청입니다"
       });
     }
 
@@ -868,16 +878,16 @@ router.post("/create-from-url", async (req: Request, res: Response) => {
     // Check for duplicates using original URL (simplified approach)
     // In a more robust implementation, we would use canonical URL matching
     const existingDocuments = await storage.getAllDocuments();
-    const existingDocument = existingDocuments.find(doc => 
+    const existingDocument = existingDocuments.find(doc =>
       doc.originalUrl && (doc.originalUrl === url || normalizeUrl(doc.originalUrl) === normalizeUrl(url))
     );
 
     if (existingDocument) {
       console.log(`[URL_IMPORT] Duplicate found, returning existing document ${existingDocument.id}`);
-      return res.json({ 
+      return res.json({
         documentId: existingDocument.id,
         isDuplicate: true,
-        message: "이미 존재하는 문서입니다" 
+        message: "이미 존재하는 문서입니다"
       });
     }
 
@@ -956,8 +966,8 @@ router.post("/create-from-url", async (req: Request, res: Response) => {
 router.post("/:id/generate-summary", authenticateJWT, async (req: AuthenticatedRequest, res) => {
   try {
     if (!GOOGLE_API_KEY) {
-      return res.status(500).json({ 
-        error: "AI summary generation is not configured. Please set GOOGLE_API_KEY environment variable." 
+      return res.status(500).json({
+        error: "AI summary generation is not configured. Please set GOOGLE_API_KEY environment variable."
       });
     }
 
@@ -987,7 +997,7 @@ router.post("/:id/generate-summary", authenticateJWT, async (req: AuthenticatedR
 
     const paragraphs = document.paragraphs || [];
     let fullText = "";
-    
+
     for (const paragraph of paragraphs) {
       const sentences = paragraph.sentences || [];
       for (const sentence of sentences) {
@@ -1047,7 +1057,7 @@ router.post("/:id/translate", authenticateJWT, async (req: AuthenticatedRequest,
   try {
     const documentId = parseInt(req.params.id);
     const userId = req.userId!;
-    
+
     const document = await storage.getDocumentWithParagraphs(documentId);
     if (!document) {
       return res.status(404).json({ message: "Document not found" });
@@ -1076,7 +1086,7 @@ router.post("/:id/translate", authenticateJWT, async (req: AuthenticatedRequest,
 
     await TokenTrackingService.incrementFullDocTranslation(userId);
 
-    await storage.updateDocument(documentId, { 
+    await storage.updateDocument(documentId, {
       translationStatus: "running",
       translationUpdatedAt: new Date(),
       translationError: null,
@@ -1132,7 +1142,7 @@ function sendSSEEvent(documentId: number, event: { type: string; data: any }) {
 // EventSource cannot send Authorization headers, so we accept token via query parameter
 router.get("/:id/translation-stream", async (req: AuthenticatedRequest, res) => {
   const token = req.query.token as string;
-  
+
   if (!token) {
     return res.status(401).json({ error: "Authentication required" });
   }
@@ -1151,16 +1161,16 @@ router.get("/:id/translation-stream", async (req: AuthenticatedRequest, res) => 
   }
 
   const documentId = parseInt(req.params.id);
-  
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
-  
+
   registerSSEClient(documentId, res);
-  
+
   res.write(`data: ${JSON.stringify({ type: 'connected', documentId })}\n\n`);
-  
+
   req.on('close', () => {
     unregisterSSEClient(documentId, res);
   });
@@ -1176,7 +1186,7 @@ async function translateDocumentInBackground(
 ) {
   try {
     console.log(`[TRANSLATE] Starting batch translation for document ${documentId}`);
-    
+
     const paragraphs = document.paragraphs || [];
     let translatedCount = 0;
     let totalSentences = 0;
@@ -1224,7 +1234,7 @@ async function translateDocumentInBackground(
     for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
       const paragraph = paragraphs[pIdx];
       const sentences = paragraph.sentences || [];
-      
+
       // Filter untranslated sentences
       const untranslatedSentences = sentences
         .filter((s: any) => !s.target)
@@ -1233,11 +1243,11 @@ async function translateDocumentInBackground(
           source: s.source,
           type: headingSentenceIds.has(s.id) ? 'heading' as const : 'sentence' as const,
         }));
-      
+
       // Count already translated
       const alreadyTranslated = sentences.filter((s: any) => s.target).length;
       translatedCount += alreadyTranslated;
-      
+
       if (untranslatedSentences.length === 0) {
         console.log(`[TRANSLATE] Paragraph ${pIdx + 1}/${paragraphs.length}: Already translated`);
         continue;
@@ -1272,7 +1282,7 @@ async function translateDocumentInBackground(
         previousContext = paragraphTranslations.slice(-800);
 
         // Update translationUpdatedAt to prevent stale detection during active translation
-        await storage.updateDocument(documentId, { 
+        await storage.updateDocument(documentId, {
           translationUpdatedAt: new Date(),
           translatedCount: translatedCount,
         });
@@ -1299,12 +1309,12 @@ async function translateDocumentInBackground(
 
     // Mark document as translation complete
     await storage.updateDocument(documentId, { translationStatus: "completed" });
-    
+
     sendSSEEvent(documentId, {
       type: 'complete',
       progress: { translated: translatedCount, total: totalSentences },
     });
-    
+
     console.log(`[TRANSLATE] ✅ Document ${documentId} batch translation completed: ${translatedCount}/${totalSentences} sentences`);
   } catch (error) {
     console.error(`[TRANSLATE] Background translation error for document ${documentId}:`, error);

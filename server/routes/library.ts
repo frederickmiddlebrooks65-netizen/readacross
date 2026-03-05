@@ -5,7 +5,7 @@ import { documents, paragraphs, sentences } from "@shared/schema";
 import { eq, inArray, and, isNotNull, asc } from "drizzle-orm";
 // Guardian and NPR crawlers removed
 import { seedPublicLibrary } from "../seed.js";
-import { authenticateJWT, optionalAuthenticateJWT, type AuthenticatedRequest } from "../auth.js";
+import { authenticateJWT, optionalAuthenticateJWT, requireRole, type AuthenticatedRequest } from "../auth.js";
 import {
   processRSSArticles,
   validateRSSFeed,
@@ -87,24 +87,24 @@ router.get("/library/recommendations", optionalAuthenticateJWT, async (req: Auth
   try {
     const userId = req.user?.id;
     const MINIMUM_DOCS_FOR_PERSONALIZATION = 3;
-    
+
     let userLibraryCount = 0;
     let userCategories: string[] = [];
     let userKeywords: string[] = [];
-    
+
     if (userId) {
       const userDocs = await storage.getUserDocuments({ userId });
       userLibraryCount = userDocs.length;
-      
+
       if (userLibraryCount >= MINIMUM_DOCS_FOR_PERSONALIZATION) {
         const categoryCount: Record<string, number> = {};
         const keywordSet = new Set<string>();
-        
+
         for (const doc of userDocs) {
           if (doc.category) {
             categoryCount[doc.category] = (categoryCount[doc.category] || 0) + 1;
           }
-          
+
           if (doc.title) {
             const titleWords = doc.title
               .toLowerCase()
@@ -113,22 +113,22 @@ router.get("/library/recommendations", optionalAuthenticateJWT, async (req: Auth
             titleWords.forEach((w: string) => keywordSet.add(w));
           }
         }
-        
+
         userCategories = Object.entries(categoryCount)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
           .map(([cat]) => cat);
-        
+
         userKeywords = Array.from(keywordSet).slice(0, 10);
       }
     }
-    
+
     const allPublicDocs = await storage.getPublicLibraryDocuments({
       sortBy: "recent",
     });
-    
+
     let recommendedDocs: any[];
-    
+
     if (userLibraryCount < MINIMUM_DOCS_FOR_PERSONALIZATION) {
       recommendedDocs = allPublicDocs
         .sort((a: any, b: any) => {
@@ -140,12 +140,12 @@ router.get("/library/recommendations", optionalAuthenticateJWT, async (req: Auth
     } else {
       const scoredDocs = allPublicDocs.map((doc: any) => {
         let score = 0;
-        
+
         if (doc.category && userCategories.includes(doc.category)) {
           const categoryIndex = userCategories.indexOf(doc.category);
           score += (3 - categoryIndex) * 10;
         }
-        
+
         if (doc.title && userKeywords.length > 0) {
           const titleLower = doc.title.toLowerCase();
           for (const keyword of userKeywords) {
@@ -154,25 +154,25 @@ router.get("/library/recommendations", optionalAuthenticateJWT, async (req: Auth
             }
           }
         }
-        
+
         score += (doc.savedCount || 0) * 2;
         score += (doc.viewCount || 0) * 0.1;
-        
+
         const createdAt = new Date(doc.createdAt || Date.now());
         const daysSinceCreated = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
         if (daysSinceCreated < 7) score += 3;
         else if (daysSinceCreated < 30) score += 1;
-        
+
         return { ...doc, recommendationScore: score };
       });
-      
+
       recommendedDocs = scoredDocs
         .sort((a: any, b: any) => b.recommendationScore - a.recommendationScore)
         .slice(0, 6);
     }
-    
+
     const documentIds = recommendedDocs.map((doc: any) => doc.id);
-    
+
     const snippetData = await db
       .select({
         documentId: paragraphs.documentId,
@@ -198,7 +198,7 @@ router.get("/library/recommendations", optionalAuthenticateJWT, async (req: Auth
       ...doc,
       snippetContent: snippetMap.get(doc.id) || doc.rawContent || '',
     }));
-    
+
     res.json({
       recommendations: enrichedRecommendations,
       isPersonalized: userLibraryCount >= MINIMUM_DOCS_FOR_PERSONALIZATION,
@@ -211,7 +211,7 @@ router.get("/library/recommendations", optionalAuthenticateJWT, async (req: Auth
 });
 
 // Seed Gutenberg books
-router.post("/library/seed-gutenberg", async (_req: any, res: any) => {
+router.post("/library/seed-gutenberg", authenticateJWT, requireRole(['admin']), async (_req: any, res: any) => {
   try {
     const { seedGutenbergBooks } = await import("../gutenbergCrawler.js");
     await seedGutenbergBooks();
@@ -223,7 +223,7 @@ router.post("/library/seed-gutenberg", async (_req: any, res: any) => {
 });
 
 // Seed arXiv papers
-router.post("/library/seed-arxiv", async (_req: any, res: any) => {
+router.post("/library/seed-arxiv", authenticateJWT, requireRole(['admin']), async (_req: any, res: any) => {
   try {
     const { seedArxivPapers } = await import("../arxivCrawler.js");
     await seedArxivPapers();
@@ -235,7 +235,7 @@ router.post("/library/seed-arxiv", async (_req: any, res: any) => {
 });
 
 // Update existing document categories to English
-router.post("/library/update-categories", async (_req: any, res: any) => {
+router.post("/library/update-categories", authenticateJWT, requireRole(['admin']), async (_req: any, res: any) => {
   try {
     const updates = [
       { from: "뉴스", to: "News" },
@@ -276,7 +276,7 @@ router.post("/library/update-categories", async (_req: any, res: any) => {
 });
 
 // Migrate RSS documents to use proper feed titles
-router.post("/library/migrate-rss-sources", async (_req: any, res: any) => {
+router.post("/library/migrate-rss-sources", authenticateJWT, requireRole(['admin']), async (_req: any, res: any) => {
   try {
     // Find all RSS documents with generic "RSS" source (even without feedId)
     const rssDocuments = await db
@@ -355,7 +355,7 @@ router.post("/library/migrate-rss-sources", async (_req: any, res: any) => {
 });
 
 // Cleanup expired documents
-router.post("/library/cleanup", async (_req: any, res: any) => {
+router.post("/library/cleanup", authenticateJWT, requireRole(['admin']), async (_req: any, res: any) => {
   try {
     const deletedCount = await storage.cleanupExpiredDocuments();
     res.json({
@@ -369,7 +369,7 @@ router.post("/library/cleanup", async (_req: any, res: any) => {
 });
 
 // Manual delete public library document (admin only)
-router.delete("/library/documents/:id", async (req: any, res: any) => {
+router.delete("/library/documents/:id", authenticateJWT, requireRole(['admin']), async (req: any, res: any) => {
   try {
     const documentId = parseInt(req.params.id);
 
@@ -402,7 +402,7 @@ router.delete("/library/documents/:id", async (req: any, res: any) => {
 });
 
 // Set expiration dates for existing public documents
-router.post("/library/set-expiration-dates", async (_req: any, res: any) => {
+router.post("/library/set-expiration-dates", authenticateJWT, requireRole(['admin']), async (_req: any, res: any) => {
   try {
     const updatedCount =
       await storage.setExpirationDatesForExistingDocuments();
@@ -429,7 +429,7 @@ router.post("/library/set-expiration-dates", async (_req: any, res: any) => {
 // NPR document update endpoint removed
 
 // Seed entire public library endpoint
-router.post("/library/seed", async (req: Request, res: Response) => {
+router.post("/library/seed", authenticateJWT, requireRole(['admin']), async (req: Request, res: Response) => {
   try {
     console.log("Starting public library seeding...");
     await seedPublicLibrary();
@@ -444,7 +444,7 @@ router.post("/library/seed", async (req: Request, res: Response) => {
 });
 
 // Admin routes
-router.get("/admin/stats", async (_req: Request, res: Response) => {
+router.get("/admin/stats", authenticateJWT, requireRole(['admin']), async (_req: Request, res: Response) => {
   try {
     const stats = await storage.getAdminStats();
     res.json(stats);
@@ -454,7 +454,7 @@ router.get("/admin/stats", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/admin/documents", async (req: Request, res: Response) => {
+router.get("/admin/documents", authenticateJWT, requireRole(['admin']), async (req: Request, res: Response) => {
   try {
     const { search, category, type, page, limit } = req.query;
     const filters = {
@@ -602,6 +602,8 @@ router.post(
 // Document cleanup and expiration management
 router.get(
   "/admin/expired-documents",
+  authenticateJWT,
+  requireRole(['admin']),
   async (_req: Request, res: Response) => {
     try {
       const expiredDocuments = await storage.getExpiredDocuments();
@@ -615,6 +617,8 @@ router.get(
 
 router.post(
   "/admin/cleanup-expired",
+  authenticateJWT,
+  requireRole(['admin']),
   async (_req: Request, res: Response) => {
     try {
       const deletedCount = await storage.cleanupExpiredDocuments();
@@ -633,6 +637,8 @@ router.post(
 
 router.post(
   "/admin/set-expiration-dates",
+  authenticateJWT,
+  requireRole(['admin']),
   async (_req: Request, res: Response) => {
     try {
       const updatedCount =
@@ -651,6 +657,8 @@ router.post(
 // Scheduler management endpoints
 router.get(
   "/admin/scheduler/status",
+  authenticateJWT,
+  requireRole(['admin']),
   async (_req: Request, res: Response) => {
     try {
       const status = crawlerScheduler.getStatus();
@@ -664,6 +672,8 @@ router.get(
 
 router.post(
   "/admin/scheduler/trigger-sync",
+  authenticateJWT,
+  requireRole(['admin']),
   async (req: Request, res: Response) => {
     try {
       const { type } = req.body;
@@ -693,6 +703,8 @@ router.post(
 
 router.post(
   "/admin/scheduler/restart",
+  authenticateJWT,
+  requireRole(['admin']),
   async (_req: Request, res: Response) => {
     try {
       // Stop all current jobs
@@ -720,6 +732,8 @@ router.post(
 
 router.post(
   "/admin/scheduler/stop",
+  authenticateJWT,
+  requireRole(['admin']),
   async (_req: Request, res: Response) => {
     try {
       crawlerScheduler.stopAll();
@@ -738,10 +752,10 @@ router.post(
 );
 
 // System management endpoint
-router.get("/admin/system-status", async (_req: Request, res: Response) => {
+router.get("/admin/system-status", authenticateJWT, requireRole(['admin']), async (_req: Request, res: Response) => {
   try {
     const status = crawlerScheduler.getStatus();
-    res.json({ 
+    res.json({
       system: {
         isRunning: status.isRunning || false,
         lastRun: status.lastRun || null,
@@ -760,7 +774,7 @@ router.get("/admin/system-status", async (_req: Request, res: Response) => {
 });
 
 // RSS Feed management
-router.get("/admin/feeds", async (_req: Request, res: Response) => {
+router.get("/admin/feeds", authenticateJWT, requireRole(['admin']), async (_req: Request, res: Response) => {
   try {
     const feeds = await storage.getAllRSSFeeds();
     res.json(feeds);
@@ -771,7 +785,7 @@ router.get("/admin/feeds", async (_req: Request, res: Response) => {
 });
 
 // RSS Feed health endpoint
-router.get("/admin/feeds/health", async (_req: Request, res: Response) => {
+router.get("/admin/feeds/health", authenticateJWT, requireRole(['admin']), async (_req: Request, res: Response) => {
   try {
     const feeds = await storage.getAllRSSFeeds();
 
@@ -781,7 +795,7 @@ router.get("/admin/feeds/health", async (_req: Request, res: Response) => {
       activeFeedsCount: feeds.filter(f => !f.isBlocked).length,
       healthyFeedsCount: feeds.filter(f => (f.healthScore || 0) >= 80).length,
       errorFeedsCount: feeds.filter(f => (f.errorCount || 0) > 3).length,
-      averageHealthScore: feeds.length > 0 ? 
+      averageHealthScore: feeds.length > 0 ?
         feeds.reduce((sum, f) => sum + (f.healthScore || 0), 0) / feeds.length : 0,
       lastSyncTime: feeds.reduce((latest, f) => {
         const feedTime = f.lastRunAt ? new Date(f.lastRunAt).getTime() : 0;
@@ -797,7 +811,7 @@ router.get("/admin/feeds/health", async (_req: Request, res: Response) => {
 });
 
 // Get RSS feed by ID (global Feed)
-router.get("/admin/feeds/:id", async (req: Request, res: Response) => {
+router.get("/admin/feeds/:id", authenticateJWT, requireRole(['admin']), async (req: Request, res: Response) => {
   try {
     const feedId = parseInt(req.params.id);
 
@@ -814,7 +828,7 @@ router.get("/admin/feeds/:id", async (req: Request, res: Response) => {
 });
 
 // Update RSS feed (global Feed)
-router.patch("/admin/feeds/:id", async (req: Request, res: Response) => {
+router.patch("/admin/feeds/:id", authenticateJWT, requireRole(['admin']), async (req: Request, res: Response) => {
   try {
     const feedId = parseInt(req.params.id);
 
@@ -834,7 +848,7 @@ router.patch("/admin/feeds/:id", async (req: Request, res: Response) => {
 });
 
 // Bulk operations on RSS feeds
-router.post("/admin/feeds/bulk-action", async (req: Request, res: Response) => {
+router.post("/admin/feeds/bulk-action", authenticateJWT, requireRole(['admin']), async (req: Request, res: Response) => {
   try {
     const { feedIds, action, data } = req.body;
 
@@ -875,7 +889,7 @@ router.post("/admin/feeds/bulk-action", async (req: Request, res: Response) => {
 });
 
 // Get RSS subscriptions
-router.get("/admin/subscriptions", async (req: Request, res: Response) => {
+router.get("/admin/subscriptions", authenticateJWT, requireRole(['admin']), async (req: Request, res: Response) => {
   try {
     const subscriptions = await storage.getRSSSubscriptions(
       req.query.feedId ? parseInt(req.query.feedId as string) : undefined,
@@ -888,7 +902,7 @@ router.get("/admin/subscriptions", async (req: Request, res: Response) => {
 });
 
 // RSS Policy management
-router.get("/admin/rss-policy", async (_req: Request, res: Response) => {
+router.get("/admin/rss-policy", authenticateJWT, requireRole(['admin']), async (_req: Request, res: Response) => {
   try {
     const policy = await storage.getRSSPolicy();
     res.json(policy);
@@ -898,7 +912,7 @@ router.get("/admin/rss-policy", async (_req: Request, res: Response) => {
   }
 });
 
-router.patch("/admin/rss-policy", async (req: Request, res: Response) => {
+router.patch("/admin/rss-policy", authenticateJWT, requireRole(['admin']), async (req: Request, res: Response) => {
   try {
     const updatedPolicy = await storage.updateRSSPolicy(req.body);
     res.json(updatedPolicy);
@@ -998,8 +1012,8 @@ router.post("/library/save", authenticateJWT, async (req: AuthenticatedRequest, 
     );
 
     // Phase 1 Fix: Include redirect information in response
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       document: libraryDocument,
       redirectUrl: `/viewer/${libraryDocument.id}`,
       newDocumentId: libraryDocument.id
@@ -1217,7 +1231,7 @@ router.post("/rss-feeds", authenticateJWT, async (req: AuthenticatedRequest, res
   }
 });
 
-router.patch("/rss-feeds/:id", async (req: Request, res: Response) => {
+router.patch("/rss-feeds/:id", authenticateJWT, async (req: Request, res: Response) => {
   try {
     const feedId = parseInt(req.params.id);
     const { title, category } = req.body;
@@ -1238,7 +1252,7 @@ router.patch("/rss-feeds/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/rss-feeds/:id", async (req: Request, res: Response) => {
+router.delete("/rss-feeds/:id", authenticateJWT, async (req: Request, res: Response) => {
   try {
     const feedId = parseInt(req.params.id);
 
@@ -1254,7 +1268,7 @@ router.delete("/rss-feeds/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/rss-feeds/:id/sync", async (req: Request, res: Response) => {
+router.post("/rss-feeds/:id/sync", authenticateJWT, async (req: Request, res: Response) => {
   try {
     const feedId = parseInt(req.params.id);
 
