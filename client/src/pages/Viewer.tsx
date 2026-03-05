@@ -85,7 +85,7 @@ export default function Viewer() {
   
   
   // UI control states
-  const [showUIControls, setShowUIControls] = useState(false);
+  const [showUIControls, setShowUIControls] = useState(true);
   const [headerHasOpenMenu, setHeaderHasOpenMenu] = useState(false); // 헤더 메뉴 상태 추가
   const [currentPage, setCurrentPage] = useState(1);
   const [paragraphsPerPage, setParagraphsPerPage] = useState(5);
@@ -692,82 +692,7 @@ export default function Viewer() {
     null,
   );
   const [disableAutoOpen, setDisableAutoOpen] = useState(false);
-  const [showPagination, setShowPagination] = useState(false); // 페이지네이션 초기 숨김 상태
-
-  // Enhanced pagination detection with mobile and accessibility support
-  useEffect(() => {
-    let hideTimer: NodeJS.Timeout | null = null;
-    
-    const showPaginationWithTimer = () => {
-      console.log('[DEBUG] Showing pagination - bottom zone interaction');
-      setShowPagination(true);
-      // Clear any existing hide timer
-      if (hideTimer) {
-        clearTimeout(hideTimer);
-        hideTimer = null;
-      }
-      // Set new hide timer for 2.5 seconds
-      hideTimer = setTimeout(() => {
-        console.log('[DEBUG] Auto-hiding pagination after 2.5s');
-        setShowPagination(false);
-      }, 2500);
-    };
-    
-    const handlePointerMove = (e: MouseEvent | TouchEvent) => {
-      const windowHeight = window.innerHeight;
-      let clientY: number;
-      
-      if (e.type === 'touchmove') {
-        clientY = (e as TouchEvent).touches[0]?.clientY || 0;
-      } else {
-        clientY = (e as MouseEvent).clientY;
-      }
-      
-      // Check if pointer is in bottom 96px area of viewport
-      const isInPaginationZone = clientY >= windowHeight - 96;
-      
-      if (isInPaginationZone) {
-        showPaginationWithTimer();
-      }
-    };
-
-    const handleFocusIn = (e: FocusEvent) => {
-      // Show pagination when any element within it receives focus
-      const target = e.target as Element;
-      if (target?.closest('[data-testid="pagination-footer"]')) {
-        setShowPagination(true);
-        if (hideTimer) {
-          clearTimeout(hideTimer);
-          hideTimer = null;
-        }
-      }
-    };
-
-    // Throttled event listener for better performance
-    let throttled = false;
-    const throttledPointerMove = (e: MouseEvent | TouchEvent) => {
-      if (!throttled) {
-        throttled = true;
-        setTimeout(() => { throttled = false; }, 50);
-        handlePointerMove(e);
-      }
-    };
-
-    // Add event listeners for desktop and mobile
-    window.addEventListener('mousemove', throttledPointerMove as EventListener, { passive: true });
-    window.addEventListener('touchmove', throttledPointerMove as EventListener, { passive: true });
-    window.addEventListener('focusin', handleFocusIn);
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener('mousemove', throttledPointerMove as EventListener);
-      window.removeEventListener('touchmove', throttledPointerMove as EventListener);
-      window.removeEventListener('focusin', handleFocusIn);
-      if (hideTimer) {
-        clearTimeout(hideTimer);
-      }
-    };
-  }, []);
+  const [showPagination, setShowPagination] = useState(true); // 페이지네이션 항상 표시
   const [noteText, setNoteText] = useState("");
 
   const handleAddNote = (sentence: Sentence) => {

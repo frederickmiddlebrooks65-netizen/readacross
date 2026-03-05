@@ -868,18 +868,6 @@ export default function RightDrawer({
 
   return (
     <>
-      {/* Backdrop - full overlay on mobile, left-side only on desktop */}
-      <div
-        className={`
-          fixed inset-0 bg-black/20 z-[49] transition-opacity duration-300 ease-out
-          ${isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}
-        `}
-        onClick={() => {
-          console.log('[DEBUG] Backdrop clicked');
-          onClose();
-        }}
-        data-testid="drawer-backdrop"
-      />
       {/* Drawer - Side-by-side layout on desktop, overlay on mobile */}
       <div
         ref={drawerRef}
@@ -889,7 +877,7 @@ export default function RightDrawer({
           ${isOpen ? "translate-x-0 pointer-events-auto opacity-100" : "translate-x-full pointer-events-none opacity-0"}
 
           /* Always positioned fixed to not affect document layout */
-          fixed top-0 right-0 bottom-0 z-50 border-l border-border
+          fixed top-12 right-0 bottom-0 z-50 border-l border-border
           shadow-2xl will-change-transform
           
           /* Mobile: Partial width for backdrop access */
@@ -897,25 +885,9 @@ export default function RightDrawer({
         `}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="drawer-title"
         data-testid="right-drawer"
       >
         <div className="h-full flex flex-col min-w-0">
-          {/* Header */}
-          <div className="flex items-center justify-between h-12 max-[900px]:h-14 px-4 border-b border-border">
-            <h2 id="drawer-title" className="text-lg font-semibold text-foreground">{t('viewer.readerPanel')}</h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              data-testid="button-close-drawer"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
           {/* Content */}
           <div className="flex-1 flex flex-col min-w-0 min-h-0">
             <Tabs

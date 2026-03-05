@@ -258,7 +258,7 @@ export const translationCache = pgTable("translation_cache", {
   id: serial("id").primaryKey(),
   sourceText: text("source_text").notNull(),
   targetText: text("target_text").notNull(),
-  sourceLanguage: text("source_language").notNull(), 
+  sourceLanguage: text("source_language").notNull(),
   targetLanguage: text("target_language").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   usageCount: integer("usage_count").default(1).notNull(),
@@ -798,6 +798,8 @@ export const updateDocumentSchema = z.object({
   // AI-generated summaries
   summaryEn: z.string().optional(),
   summaryKo: z.string().optional(),
+  // Document retention
+  isPermanent: z.boolean().optional(),
 });
 
 // Notebook Groups schemas
@@ -919,7 +921,7 @@ export const insertLegacyRssFeedSchema = z.object({
   feedUrl: z.string().url('유효한 URL을 입력해주세요'),
   alias: z.string().optional(), // Make alias optional so it can use feed title as fallback
   category: z.string().optional(),
-  language: z.string().optional(), 
+  language: z.string().optional(),
   syncInterval: z.number().int().min(1).max(168).optional()
 });
 

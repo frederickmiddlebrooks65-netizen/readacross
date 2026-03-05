@@ -65,17 +65,17 @@ router.patch(
       const contentType = req.headers['content-type'];
       if (!contentType || !contentType.includes('application/json')) {
         console.log(`[ADMIN] Invalid Content-Type: ${contentType}`);
-        return res.status(415).json({ 
-          error: "Content-Type must be application/json" 
+        return res.status(415).json({
+          error: "Content-Type must be application/json"
         });
       }
 
       console.log('[DEBUG ROUTE] Request body:', req.body);
       console.log('[DEBUG ROUTE] Content-Type:', contentType);
-      
+
       const documentId = parseInt(req.params.id);
       const { title, category, isPublic, author } = req.body;
-      
+
       console.log('[DEBUG ROUTE] Extracted fields:', { title, category, isPublic, author });
 
       // Validate that at least one field is provided
@@ -141,16 +141,16 @@ router.delete(
       });
 
       if (!result.success) {
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: "Failed to delete document",
-          details: result.errors 
+          details: result.errors
         });
       }
 
-      res.json({ 
+      res.json({
         message: "Document deleted successfully",
         deletedCounts: result.deletedCounts,
-        duration: result.duration 
+        duration: result.duration
       });
     } catch (error) {
       console.error("Error deleting document:", error);
@@ -175,13 +175,13 @@ router.post(
       // Delete documents one by one using safe deletion method
       let deletedCount = 0;
       const errors: string[] = [];
-      
+
       for (const documentId of documentIds) {
         try {
           const result = await DocumentService.deleteDocumentSafely(documentId, {
             skipPreview: true, // Skip preview for bulk operations
           });
-          
+
           if (result.success) {
             deletedCount++;
           } else {
@@ -260,13 +260,34 @@ router.post("/documents/cleanup", authenticateJWT, requireRole(['admin']), async
   }
 });
 
+// Alias: /cleanup-expired → /documents/cleanup (프론트엔드 호환)
+router.post("/cleanup-expired", authenticateJWT, requireRole(['admin']), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const expiredDocuments = await storage.getExpiredDocuments();
+    let deletedCount = 0;
+    for (const doc of expiredDocuments) {
+      try {
+        const success = await storage.deleteDocument(doc.id);
+        if (success) deletedCount++;
+      } catch (error) {
+        console.error(`Failed to delete document ${doc.id}:`, error);
+      }
+    }
+    res.json({ message: "Document cleanup completed", deletedCount });
+  } catch (error) {
+    console.error("Error during document cleanup:", error);
+    res.status(500).json({ message: "Failed to perform document cleanup" });
+  }
+});
+
+
 // Admin: Repair broken documents (V2 structure and anchors)
 router.post("/documents/repair", authenticateJWT, requireRole(['admin']), async (req: AuthenticatedRequest, res: Response) => {
   try {
     console.log("[Admin API] Starting document repair process...");
-    
+
     const results = await DocumentService.repairBrokenDocuments();
-    
+
     res.json({
       success: true,
       message: "Document repair completed",
@@ -278,7 +299,7 @@ router.post("/documents/repair", authenticateJWT, requireRole(['admin']), async 
     });
   } catch (error) {
     console.error("Error during document repair:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: "Failed to repair documents",
       error: error instanceof Error ? error.message : "Unknown error"
@@ -314,11 +335,11 @@ router.patch("/documents/:id/permanent", authenticateJWT, requireRole(['admin'])
   try {
     const documentId = parseInt(req.params.id);
     const { isPermanent } = req.body;
-    
+
     if (typeof isPermanent !== 'boolean') {
       return res.status(400).json({ error: "isPermanent must be a boolean" });
     }
-    
+
     await storage.updateDocument(documentId, { isPermanent });
     res.json({ message: "Document permanent status updated successfully" });
   } catch (error) {
@@ -372,9 +393,9 @@ router.get("/users", authenticateJWT, requireRole(['admin']), async (req: Authen
 
     const sortColumn = sortBy === "username" ? users.username
       : sortBy === "plan" ? users.plan
-      : sortBy === "status" ? users.status
-      : sortBy === "lastLoginAt" ? users.lastLoginAt
-      : users.createdAt;
+        : sortBy === "status" ? users.status
+          : sortBy === "lastLoginAt" ? users.lastLoginAt
+            : users.createdAt;
 
     const orderFn = sortOrder === "asc" ? sql`${sortColumn} ASC NULLS LAST` : sql`${sortColumn} DESC NULLS LAST`;
 

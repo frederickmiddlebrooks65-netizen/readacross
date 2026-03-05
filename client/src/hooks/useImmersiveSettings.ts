@@ -32,7 +32,7 @@ const DEFAULT_SETTINGS: ImmersiveSettings = {
   useSerif: false,
   documentWidth: 1000,
   viewMode: 'side-by-side',
-  showRightDrawer: false,
+  showRightDrawer: true,
   showHoverTooltip: true,
   immersiveMode: true,
 };

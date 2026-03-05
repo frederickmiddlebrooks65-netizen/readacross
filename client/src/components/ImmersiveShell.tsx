@@ -54,36 +54,22 @@ export default function ImmersiveShell({
       const { clientY, clientX } = e;
       const windowWidth = window.innerWidth;
 
-      // AI Drawer나 Reader Panel이 열려있으면 모든 호버 동작 비활성화
-      if (isAIDrawerOpen || rightDrawerOpen) {
+      // AI Drawer가 열려있으면 모든 호버 동작 비활성화
+      if (isAIDrawerOpen) {
         return;
       }
-
-      // 상단 64px 영역에서 UI 표시 (10% -> 64px 고정)
-      // 사이드패널이 열려있어도 상단 헤더는 표시 가능
-      const shouldShowUI = clientY < 64;
 
       // 우측 EDGE px 영역에서 사이드패널 표시 트리거 (더 넓은 거리)
       const nearRightEdge = clientX >= windowWidth - EDGE;
 
-      // 직접 UI 상태 설정
-      setShowUIControls(shouldShowUI);
+      // 헤더는 항상 표시
+      setShowUIControls(true);
+      onShowUI?.(true);
 
       // 타임아웃 정리
       if (mouseTimeoutRef.current !== null) {
         clearTimeout(mouseTimeoutRef.current);
         mouseTimeoutRef.current = null;
-      }
-
-      // UI 표시/숨김 제어 - 메뉴가 열려있으면 숨기지 않음
-      if (!shouldShowUI && !headerHasOpenMenu) {
-        mouseTimeoutRef.current = window.setTimeout(() => {
-          setShowUIControls(false);
-          onShowUI?.(false);
-          mouseTimeoutRef.current = null;
-        }, 300);
-      } else {
-        onShowUI?.(true);
       }
 
       // 사이드패널 자동 열기 로직 제거됨 - 이제 버튼으로만 열림
@@ -109,12 +95,6 @@ export default function ImmersiveShell({
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseout", handleMouseOut);
 
-    // 초기에는 UI 표시, 2초 후 숨김
-    const initialTimeout = window.setTimeout(() => {
-      setShowUIControls(false);
-      onShowUI?.(false);
-    }, 2000);
-
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseout", handleMouseOut);
@@ -123,7 +103,6 @@ export default function ImmersiveShell({
         mouseTimeoutRef.current = null;
       }
       cancelDrawerOpen();
-      clearTimeout(initialTimeout);
     };
   }, [
     onShowUI,

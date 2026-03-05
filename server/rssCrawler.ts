@@ -247,6 +247,16 @@ export async function processRSSArticles(feedId: number): Promise<void> {
           continue;
         }
 
+        // VOA 오디오 에피소드 페이지 필터링
+        // /a/숫자.html 패턴은 텍스트 없는 방송 에피소드 페이지이므로 스킵
+        if (item.link && /\/a\/\d+\.html$/.test(item.link)) {
+          const hasDescription = !!(item.description || item.contentEncoded || item.summary || "").trim();
+          if (!hasDescription) {
+            console.log(`[RSS FILTER] Skipping audio-only episode page (no text content): ${item.title} — ${item.link}`);
+            continue;
+          }
+        }
+
         // 콘텐츠 추출 시도
         let content = null;
         if (item.link) {
@@ -547,7 +557,7 @@ export async function validateRSSFeed(
  */
 export async function initializeNewSources(): Promise<void> {
   console.log("[NEW_SOURCES] Initializing new source feeds in unified RSS system");
-  
+
   const sources = [
     {
       url: "https://learningenglish.voanews.com/api/zmg_pl-vomx-tpeymtm",
@@ -556,25 +566,25 @@ export async function initializeNewSources(): Promise<void> {
       category: "News",
     },
   ];
-  
+
   for (const source of sources) {
     try {
       // Check if feed already exists
       const existingFeeds = await storage.getAllRSSFeeds();
-      const existingFeed = existingFeeds.find(feed => 
+      const existingFeed = existingFeeds.find(feed =>
         feed.canonicalUrl === source.url
       );
-      
+
       if (existingFeed) {
         console.log(`[NEW_SOURCES] Feed already exists: ${source.title}`);
         continue;
       }
-      
+
       // Create new RSS feed in unified system
       const { normalizeUrl, generateUrlHash } = await import("./utils/urlUtils.js");
       const normalizedUrl = normalizeUrl(source.url);
       const urlHash = generateUrlHash(normalizedUrl);
-      
+
       const newFeed = await storage.createNewRSSFeed({
         canonicalUrl: source.url,
         normalizedUrlHash: urlHash,
@@ -592,9 +602,9 @@ export async function initializeNewSources(): Promise<void> {
         isBlocked: false,
         isSystemSource: true,
       });
-      
+
       console.log(`[NEW_SOURCES] Created RSS feed: ${source.title} (ID: ${newFeed.id})`);
-      
+
     } catch (error) {
       console.error(`[NEW_SOURCES] Error creating feed ${source.title}:`, error);
     }
@@ -612,10 +622,10 @@ export async function convertRSSItemToDocumentEnhanced(
 ): Promise<number | null> {
   try {
     console.log(`[RSS_ENHANCED] Converting item: ${item.title} from ${feed.title}`);
-    
+
     // Extract and enhance tags based on source
     const tags = extractAndEnhanceTags(item, feed, content);
-    
+
     // Use V2 pipeline for document creation
     const document = await DocumentService.createDocumentWithPSAndStructureV2({
       title: item.title || "Untitled Article",
@@ -631,17 +641,17 @@ export async function convertRSSItemToDocumentEnhanced(
       feedId: feed.id,
       publishedAt: item.pubDate ? new Date(item.pubDate) : undefined,
     });
-    
+
     if (document?.id) {
       // Add tags separately after document creation
       await storage.updateDocument(document.id, {
         tags: JSON.stringify(tags),
       });
-      
+
       console.log(`[RSS_ENHANCED] Created document ${document.id}: ${item.title}`);
       return document.id;
     }
-    
+
     return null;
   } catch (error) {
     console.error("[RSS_ENHANCED] Error converting RSS item:", error);
@@ -655,7 +665,7 @@ export async function convertRSSItemToDocumentEnhanced(
  */
 function extractAndEnhanceTags(item: any, feed: any, content: string): string[] {
   const tags = new Set<string>();
-  
+
   // Extract tags from RSS categories (prioritize official metadata)
   if (item.categories && Array.isArray(item.categories)) {
     item.categories.forEach((category: string) => {
@@ -665,11 +675,11 @@ function extractAndEnhanceTags(item: any, feed: any, content: string): string[] 
       }
     });
   }
-  
+
   // Content-based enhancement (supplement, don't replace)
   if (content) {
     const lowercaseContent = content.toLowerCase();
-    
+
     // Technology
     if (lowercaseContent.includes("artificial intelligence") || lowercaseContent.includes("ai")) {
       tags.add("artificial-intelligence");
@@ -677,7 +687,7 @@ function extractAndEnhanceTags(item: any, feed: any, content: string): string[] 
     if (lowercaseContent.includes("machine learning") || lowercaseContent.includes("ml")) {
       tags.add("machine-learning");
     }
-    
+
     // Science
     if (lowercaseContent.includes("research") || lowercaseContent.includes("study")) {
       tags.add("research");
@@ -685,7 +695,7 @@ function extractAndEnhanceTags(item: any, feed: any, content: string): string[] 
     if (lowercaseContent.includes("climate") || lowercaseContent.includes("environment")) {
       tags.add("climate");
     }
-    
+
     // Philosophy & Society  
     if (lowercaseContent.includes("philosophy") || lowercaseContent.includes("ethics")) {
       tags.add("philosophy");
@@ -694,7 +704,7 @@ function extractAndEnhanceTags(item: any, feed: any, content: string): string[] 
       tags.add("society");
     }
   }
-  
+
   return Array.from(tags);
 }
 
@@ -703,10 +713,10 @@ function extractAndEnhanceTags(item: any, feed: any, content: string): string[] 
  */
 function getCategoryBySource(sourceTitle: string): string {
   const title = sourceTitle?.toLowerCase() || "";
-  
+
   // News: 뉴스 기사, 저널리즘 기반 콘텐츠
   if (title.includes("wired") || title.includes("voa")) return "News";
-  
+
   return "Essays"; // Default for RSS feeds
 }
 
@@ -824,25 +834,25 @@ export async function regenerateAnchorsForRSSDocuments(): Promise<void> {
             const newAnchoredCount = finalStructuredContent.filter(
               (b: any) => b.anchor,
             ).length;
-          const oldAnchoredCount = structuredContent.filter(
-            (b: any) => b.anchor,
-          ).length;
+            const oldAnchoredCount = structuredContent.filter(
+              (b: any) => b.anchor,
+            ).length;
 
-          if (newAnchoredCount > oldAnchoredCount) {
-            // 문서 업데이트
-            await storage.updateDocument(document.id, {
-              structuredContent: JSON.stringify(finalStructuredContent),
-            });
+            if (newAnchoredCount > oldAnchoredCount) {
+              // 문서 업데이트
+              await storage.updateDocument(document.id, {
+                structuredContent: JSON.stringify(finalStructuredContent),
+              });
 
-            console.log(
-              `[REGENERATE ANCHORS] ✅ Updated document ${document.id} - anchors: ${oldAnchoredCount} -> ${newAnchoredCount}`,
-            );
-            updatedCount++;
-          } else {
-            console.log(
-              `[REGENERATE ANCHORS] No improvement for document ${document.id} - anchors: ${newAnchoredCount}`,
-            );
-          }
+              console.log(
+                `[REGENERATE ANCHORS] ✅ Updated document ${document.id} - anchors: ${oldAnchoredCount} -> ${newAnchoredCount}`,
+              );
+              updatedCount++;
+            } else {
+              console.log(
+                `[REGENERATE ANCHORS] No improvement for document ${document.id} - anchors: ${newAnchoredCount}`,
+              );
+            }
           } else {
             console.warn(`[REGENERATE ANCHORS] attachAnchorsToStructuredContent function not found in utils module`);
           }
