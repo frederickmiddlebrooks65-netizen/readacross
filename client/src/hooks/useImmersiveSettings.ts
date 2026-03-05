@@ -16,7 +16,8 @@ export interface ImmersiveSettings {
   viewMode: ViewMode;
   showRightDrawer: boolean;
   showHoverTooltip: boolean;
-  
+  panelWidth: number;
+
   // Layout settings
   immersiveMode: boolean;
 }
@@ -32,8 +33,9 @@ const DEFAULT_SETTINGS: ImmersiveSettings = {
   useSerif: false,
   documentWidth: 1000,
   viewMode: 'side-by-side',
-  showRightDrawer: true,
+  showRightDrawer: false,
   showHoverTooltip: true,
+  panelWidth: 400,
   immersiveMode: true,
 };
 

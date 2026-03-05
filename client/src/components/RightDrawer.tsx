@@ -867,26 +867,12 @@ export default function RightDrawer({
   // }, []);
 
   return (
-    <>
-      {/* Drawer - Side-by-side layout on desktop, overlay on mobile */}
-      <div
-        ref={drawerRef}
-        className={`
-          bg-background transform-gpu transition-[transform,opacity] duration-300 ease-out
-          w-[400px] min-w-[400px] max-w-[400px]
-          ${isOpen ? "translate-x-0 pointer-events-auto opacity-100" : "translate-x-full pointer-events-none opacity-0"}
-
-          /* Always positioned fixed to not affect document layout */
-          fixed top-12 right-0 bottom-0 z-50 border-l border-border
-          shadow-2xl will-change-transform
-          
-          /* Mobile: Partial width for backdrop access */
-          max-[900px]:w-[85%]
-        `}
-        role="dialog"
-        aria-modal="true"
-        data-testid="right-drawer"
-      >
+    <div
+      ref={drawerRef}
+      className="bg-background h-full w-full flex flex-col min-w-0"
+      role="dialog"
+      data-testid="right-drawer"
+    >
         <div className="h-full flex flex-col min-w-0">
           {/* Content */}
           <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -1584,6 +1570,6 @@ export default function RightDrawer({
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -77,7 +77,8 @@ export default function Viewer() {
     lineHeight,
     useSerif,
     documentWidth,
-    showRightDrawer
+    showRightDrawer,
+    panelWidth,
   } = settings;
   
   // Debug log for initial state
@@ -693,7 +694,30 @@ export default function Viewer() {
   );
   const [disableAutoOpen, setDisableAutoOpen] = useState(false);
   const [showPagination, setShowPagination] = useState(true); // 페이지네이션 항상 표시
+  const [isResizing, setIsResizing] = useState(false);
   const [noteText, setNoteText] = useState("");
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+    setIsResizing(true);
+
+    const onMove = (e: MouseEvent) => {
+      const delta = startX - e.clientX; // 왼쪽으로 드래그 = 패널 넓어짐
+      const newWidth = Math.max(240, Math.min(700, startWidth + delta));
+      updateSetting('panelWidth', newWidth);
+    };
+
+    const onUp = () => {
+      setIsResizing(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [panelWidth, updateSetting]);
 
   const handleAddNote = (sentence: Sentence) => {
     setSelectedSentenceForNote(sentence);
@@ -952,17 +976,18 @@ export default function Viewer() {
     // TODO: Implement API call to update document title
   };
 
-  // Set the default view mode and side panel state for explore documents only on initial load
+  // Set the default view mode for explore documents, and auto-open side panel once document loads
   useEffect(() => {
-    if (document?.sourceType === "explore" || document?.isPublic || false) {
+    if (!document?.id) return;
+    if (document?.sourceType === "explore" || document?.isPublic) {
       // Only set default view mode if it hasn't been explicitly changed by user
       if (viewMode === "side-by-side") {
         updateSetting('viewMode', "original-only");
       }
-      // Set side panel to be collapsed by default for explore documents
-      updateSetting('showRightDrawer', false);
     }
-  }, [document?.id, viewMode, updateSetting]); // Only trigger when document ID changes, not on every document update
+    // Open side panel once document data is ready
+    updateSetting('showRightDrawer', true);
+  }, [document?.id]); // Only trigger when document ID changes (document loaded)
 
 
   return (
@@ -1016,16 +1041,13 @@ export default function Viewer() {
       )}
 
       {/* Main layout: content + side panel */}
-      <div className="flex flex-1 min-h-0 relative">
-        {/* Content area wrapper - handles margin for side panel */}
-        <div 
+      <div className="flex flex-1 min-h-0">
+        {/* Content area wrapper */}
+        <div
           className={`
-            w-full flex-1 min-h-0 flex flex-col transition-all duration-300 ease-in-out
+            flex-1 min-h-0 flex flex-col
             ${(showRightDrawer || isAIDrawerOpen) ? 'max-[900px]:hidden' : ''}
           `}
-          style={{
-            marginRight: (showRightDrawer || isAIDrawerOpen) ? '400px' : '0',
-          }}
         >
           {/* Page scroll container - THIS is the actual scroll target */}
           <div
@@ -1186,13 +1208,24 @@ export default function Viewer() {
             )}
           </div>
         </div>
-        
-        {/* Right Drawer - Positioned absolutely to not affect layout */}
+        {/* Resize handle */}
+        {showRightDrawer && !isAIDrawerOpen && (
+          <div
+            className="w-1 flex-shrink-0 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors max-[900px]:hidden"
+            onMouseDown={handleResizeStart}
+          />
+        )}
+
+        {/* Panel wrapper - flex child, width-animated */}
+        <div
+          className={`flex-shrink-0 overflow-hidden border-l border-border max-[900px]:hidden ${!isResizing ? 'transition-[width] duration-300 ease-out' : ''}`}
+          style={{ width: showRightDrawer && !isAIDrawerOpen ? panelWidth : 0 }}
+        >
+          <div style={{ width: panelWidth }} className="h-full">
         <RightDrawer
         isOpen={showRightDrawer}
         onClose={() => {
           updateSetting('showRightDrawer', false);
-          // X 버튼을 눌러서 닫았을 때 3초간 자동 열기 비활성화
           setDisableAutoOpen(true);
           setTimeout(() => setDisableAutoOpen(false), 3000);
         }}
@@ -1275,6 +1308,8 @@ export default function Viewer() {
           }
         }}
         />
+          </div>
+        </div>
       </div>
 
       {/* Fixed Viewport Pagination - Glass morphism with improved UX */}
@@ -1287,9 +1322,13 @@ export default function Viewer() {
             bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-white/20 dark:border-gray-700/30
             rounded-2xl px-6 py-3 shadow-2xl shadow-black/10 h-11
           `}
-          style={{ 
+          style={{
             bottom: 'calc(24px + env(safe-area-inset-bottom))',
-            left: (showRightDrawer || isAIDrawerOpen) ? 'calc(50% - 100px)' : '50%' // Adjust for drawer
+            left: showRightDrawer && !isAIDrawerOpen
+              ? `calc((100vw - ${panelWidth}px) / 2)`
+              : isAIDrawerOpen
+              ? 'calc(50% - 100px)'
+              : '50%'
           }}
           data-testid="pagination-footer"
         >
