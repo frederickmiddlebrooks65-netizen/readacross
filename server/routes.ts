@@ -27,7 +27,7 @@ import {
 } from "drizzle-orm";
 import * as mammoth from "mammoth";
 import { parsePDF } from "./pdfUtils";
-import { mockAuthenticateJWT, authenticateJWT, type AuthenticatedRequest } from "./auth";
+import { authenticateJWT, type AuthenticatedRequest } from "./auth";
 import {
   processRSSArticles,
   validateRSSFeed,
