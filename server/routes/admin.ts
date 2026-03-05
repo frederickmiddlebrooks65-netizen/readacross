@@ -6,7 +6,7 @@ import { TokenTrackingService } from "../services/TokenTrackingService.js";
 import { authenticateJWT, requireRole, type AuthenticatedRequest } from "../auth.js";
 import type { Request, Response } from "express";
 import { db } from "../db.js";
-import { users, tokenUsage } from "@shared/schema";
+import { users, tokenUsage, documents } from "@shared/schema";
 import { eq, sql, desc, ilike, or, and } from "drizzle-orm";
 
 const router = Router();
@@ -514,6 +514,21 @@ router.get("/users/:id/token-usage", authenticateJWT, requireRole(['admin']), as
   } catch (error) {
     console.error("Error fetching user token usage:", error);
     res.status(500).json({ error: "Failed to fetch user token usage" });
+  }
+});
+
+// Clear all AI summaries so they get regenerated with improved settings
+router.post("/clear-summaries", authenticateJWT, requireRole(['admin']), async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await db
+      .update(documents)
+      .set({ summaryEn: null, summaryKo: null })
+      .returning({ id: documents.id });
+
+    res.json({ cleared: result.length, message: `Cleared summaries for ${result.length} documents` });
+  } catch (error) {
+    console.error("Error clearing summaries:", error);
+    res.status(500).json({ error: "Failed to clear summaries" });
   }
 });
 

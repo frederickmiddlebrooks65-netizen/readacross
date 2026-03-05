@@ -1009,7 +1009,7 @@ router.post("/:id/generate-summary", authenticateJWT, async (req: AuthenticatedR
       fullText += "\n\n";
     }
 
-    const textToSummarize = fullText.substring(0, 3000);
+    const textToSummarize = fullText.substring(0, 15000);
 
     const englishSummaryPrompt = `Summarize the following document in English in 3-5 clear, concise sentences. Focus on the main ideas and key points.
 

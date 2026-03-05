@@ -512,14 +512,21 @@ function ExploreDocumentCard({
             "opacity-0 group-hover:opacity-100"
           )}>
             {isAlreadyInLibrary ? (
-              <Badge variant="secondary" className="text-xs">
-                {t('library.inLibrary')}
-              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 cursor-default"
+                disabled
+                title={t('library.inLibrary')}
+                aria-label={t('library.inLibrary')}
+              >
+                <Check className="h-3 w-3" />
+              </Button>
             ) : (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8"
+                className="h-8 w-8 p-0"
                 onClick={handleAddToLibrary}
                 disabled={isAdding}
               >
@@ -552,9 +559,16 @@ function ExploreDocumentCard({
           isHovered ? "opacity-100" : "opacity-0"
         )}>
           {isAlreadyInLibrary ? (
-            <Badge variant="secondary" className="text-[10px]">
-              {t('library.inLibrary')}
-            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 cursor-default"
+              disabled
+              title={t('library.inLibrary')}
+              aria-label={t('library.inLibrary')}
+            >
+              <Check className="h-3.5 w-3.5 text-forest dark:text-slate-400" />
+            </Button>
           ) : (
             <Button
               variant="ghost"
