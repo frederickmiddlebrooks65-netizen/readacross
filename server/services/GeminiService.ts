@@ -37,7 +37,7 @@ const SAFETY_SETTINGS = [
 
 const MODEL_CONFIG = {
   pro: "gemini-2.5-flash",
-  flash: "gemini-2.0-flash-lite",
+  flash: "gemini-2.5-flash-lite",
 } as const;
 
 export interface ConversationMessage {
@@ -947,7 +947,7 @@ Text: "${sampleText}"`;
     expectedIds: number[]
   ): Record<string, string> {
     let parsed: any;
-    
+
     try {
       parsed = JSON.parse(responseText);
     } catch (e) {
@@ -965,7 +965,7 @@ Text: "${sampleText}"`;
 
     // Check that we got the expected sentence IDs
     const responseIds = Object.keys(parsed).map(k => parseInt(k, 10));
-    
+
     // Warn if any expected IDs are missing
     const missingIds = expectedIds.filter(id => !responseIds.includes(id));
     if (missingIds.length > 0) {
@@ -977,7 +977,7 @@ Text: "${sampleText}"`;
       if (typeof translation !== "string") {
         throw new Error(`Translation for ID ${id} is not a string`);
       }
-      
+
       // Basic check for merged sentences (heuristic)
       const sentenceEndings = (translation.match(/[.!?。！？]\s+[A-Z가-힣]/g) || []).length;
       if (sentenceEndings > 2) {
@@ -1154,7 +1154,7 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
     if (totalTokens <= TOKEN_ESTIMATION.MIN_CHUNK_TOKENS) {
       console.log(`[GLOBAL_TRANSLATE] Under threshold, using direct batch translation`);
       const directResult = await this.translateChunk(sentences, context, []);
-      
+
       directResult.forEach((translation, id) => {
         results.set(id, translation);
         if (translation.startsWith("[Translation Error:")) {
@@ -1187,7 +1187,7 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
 
       try {
         const chunkResults = await this.translateChunk(chunk, context, overlapContext);
-        
+
         let chunkHasFailures = false;
         chunkResults.forEach((translation, id) => {
           results.set(id, translation);
@@ -1205,7 +1205,7 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
 
       } catch (error: any) {
         console.error(`[GLOBAL_TRANSLATE] Fatal error on chunk ${i + 1}:`, error);
-        
+
         // Mark all sentences in this chunk as failed
         for (const sentence of chunk) {
           results.set(sentence.id, `[Translation Error: This section requires retry] ${sentence.source}`);

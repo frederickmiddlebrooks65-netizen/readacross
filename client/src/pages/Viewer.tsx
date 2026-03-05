@@ -88,6 +88,7 @@ export default function Viewer() {
   // UI control states
   const [showUIControls, setShowUIControls] = useState(true);
   const [headerHasOpenMenu, setHeaderHasOpenMenu] = useState(false); // 헤더 메뉴 상태 추가
+  const [panelTab, setPanelTab] = useState<"document" | "notes" | "outline">("document");
   const [currentPage, setCurrentPage] = useState(1);
   const [paragraphsPerPage, setParagraphsPerPage] = useState(5);
   const hasRestoredPage = useRef(false);
@@ -1037,11 +1038,13 @@ export default function Viewer() {
           onAddToLibrary={handleAddToLibrary}
           onToggleReaderPanel={() => updateSetting('showRightDrawer', !showRightDrawer)}
           isReaderPanelOpen={showRightDrawer}
+          panelTab={panelTab}
+          onPanelTabChange={setPanelTab}
         />
       )}
 
       {/* Main layout: content + side panel */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 pt-12">
         {/* Content area wrapper */}
         <div
           className={`
@@ -1232,6 +1235,8 @@ export default function Viewer() {
         onRequestOpen={() => {
           updateSetting('showRightDrawer', true);
         }}
+        activeTab={panelTab}
+        onTabChange={setPanelTab}
         document={document || null}
         onUpdateSentence={handleUpdateSentence}
         onUpdateDocument={(changes) => {

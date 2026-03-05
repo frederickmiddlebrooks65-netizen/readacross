@@ -57,6 +57,8 @@ interface SlimHeaderProps {
   onAddToLibrary?: () => void;
   onToggleReaderPanel?: () => void;
   isReaderPanelOpen?: boolean;
+  panelTab?: "document" | "notes" | "outline";
+  onPanelTabChange?: (tab: "document" | "notes" | "outline") => void;
 }
 
 /**
@@ -100,6 +102,8 @@ export default function SlimHeader({
   onAddToLibrary,
   onToggleReaderPanel,
   isReaderPanelOpen = false,
+  panelTab = "document",
+  onPanelTabChange,
 }: SlimHeaderProps) {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
@@ -437,6 +441,31 @@ export default function SlimHeader({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Panel tabs - desktop only, visible when panel is open */}
+          {isReaderPanelOpen && (
+            <div className="hidden sm:flex items-center border-l border-border pl-2 gap-0.5">
+              {(
+                [
+                  { id: "document" as const, label: t('viewer.docTab') },
+                  { id: "notes" as const, label: t('viewer.notesTab'), disabled: isExploreDocument },
+                  { id: "outline" as const, label: t('viewer.outlineTab'), disabled: isExploreDocument },
+                ] as { id: "document" | "notes" | "outline"; label: string; disabled?: boolean }[]
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => !tab.disabled && onPanelTabChange?.(tab.id)}
+                  disabled={tab.disabled}
+                  className={`px-2.5 h-7 rounded-md text-xs font-medium transition-colors
+                    ${panelTab === tab.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}
+                    ${tab.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                  `}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Reader Panel Toggle - desktop */}
           <Button

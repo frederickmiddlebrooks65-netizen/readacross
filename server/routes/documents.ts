@@ -978,6 +978,9 @@ router.post("/:id/generate-summary", authenticateJWT, async (req: AuthenticatedR
       return res.status(401).json({ error: "Authentication required" });
     }
 
+    const user = await storage.getUser(userId);
+    const userPlan = (user?.plan || "starter") as "starter" | "pro" | "admin" | "beta_pro";
+
     const document = await storage.getDocumentWithParagraphs(documentId);
     if (!document) {
       return res.status(404).json({ error: "Document not found" });
@@ -1018,7 +1021,7 @@ Summary (3-5 sentences):`;
     const summaryEn = await GeminiService.generateText(
       englishSummaryPrompt,
       "You are a professional document summarizer. Provide clear, concise summaries.",
-      { maxTokens: 300, temperature: 0.3, plan: "starter", userId }
+      { maxTokens: 300, temperature: 0.3, plan: userPlan, userId }
     );
 
     const koreanSummaryPrompt = `Summarize the following document in Korean in 3-5 clear, concise sentences. Focus on the main ideas and key points.
@@ -1031,7 +1034,7 @@ Summary (Korean, 3-5 sentences):`;
     const summaryKo = await GeminiService.generateText(
       koreanSummaryPrompt,
       "You are a professional document summarizer. Provide clear, concise summaries in Korean.",
-      { maxTokens: 300, temperature: 0.3, plan: "starter", userId }
+      { maxTokens: 300, temperature: 0.3, plan: userPlan, userId }
     );
 
     await storage.updateDocument(documentId, {
@@ -1047,8 +1050,9 @@ Summary (Korean, 3-5 sentences):`;
       cached: false,
     });
   } catch (error) {
-    console.error("Error generating document summary:", error);
-    res.status(500).json({ error: "Failed to generate summary" });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("Error generating document summary:", errMsg);
+    res.status(500).json({ error: "Failed to generate summary", detail: errMsg });
   }
 });
 

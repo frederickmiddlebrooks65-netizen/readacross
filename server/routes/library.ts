@@ -125,6 +125,7 @@ router.get("/library/recommendations", optionalAuthenticateJWT, async (req: Auth
 
     const allPublicDocs = await storage.getPublicLibraryDocuments({
       sortBy: "recent",
+      limit: 20,
     });
 
     let recommendedDocs: any[];
@@ -138,10 +139,11 @@ router.get("/library/recommendations", optionalAuthenticateJWT, async (req: Auth
         })
         .slice(0, 6);
     } else {
+      const userCategorySet = new Set(userCategories);
       const scoredDocs = allPublicDocs.map((doc: any) => {
         let score = 0;
 
-        if (doc.category && userCategories.includes(doc.category)) {
+        if (doc.category && userCategorySet.has(doc.category)) {
           const categoryIndex = userCategories.indexOf(doc.category);
           score += (3 - categoryIndex) * 10;
         }

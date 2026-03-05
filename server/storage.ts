@@ -793,19 +793,21 @@ export class DatabaseStorage implements IStorage {
 
     const paragraphsList = await this.getParagraphsForDocument(id);
 
-    const paragraphsWithSentences = await Promise.all(
-      paragraphsList.map(async paragraph => {
-        const sentencesList = await this.getSentencesForParagraph(paragraph.id, userId);
-        return {
-          ...paragraph,
-          sentences: sentencesList,
-        };
-      })
-    );
+    // Single query for all sentences, then group by paragraphId in JS
+    const allSentences = await this.getSentencesByDocumentId(id, userId);
+    const sentencesByParagraph = new Map<number, Sentence[]>();
+    for (const sentence of allSentences) {
+      const group = sentencesByParagraph.get(sentence.paragraphId) ?? [];
+      group.push(sentence);
+      sentencesByParagraph.set(sentence.paragraphId, group);
+    }
 
     return {
       ...document,
-      paragraphs: paragraphsWithSentences,
+      paragraphs: paragraphsList.map(paragraph => ({
+        ...paragraph,
+        sentences: sentencesByParagraph.get(paragraph.id) ?? [],
+      })),
     };
   }
 
@@ -1285,6 +1287,73 @@ export class DatabaseStorage implements IStorage {
       targetAi: row.targetAi,
       targetEdited: row.targetEdited,
       // Include user-specific data
+      isBookmarked: row.isBookmarked || false,
+      isScrapped: row.isBookmarked || false,
+      note: row.noteContent || undefined,
+      learningStatus: row.learningStatus || 'new',
+      lastPracticedAt: row.lastPracticedAt || null,
+    })) as Sentence[];
+  }
+
+  async getSentencesByDocumentId(documentId: number, userId?: number): Promise<Sentence[]> {
+    if (!userId) {
+      return await db
+        .select({
+          id: sentences.id,
+          paragraphId: sentences.paragraphId,
+          order: sentences.order,
+          source: sentences.source,
+          sourceHash: sentences.sourceHash,
+          target: sentences.target,
+          targetAi: sentences.targetAi,
+          targetEdited: sentences.targetEdited,
+        })
+        .from(sentences)
+        .innerJoin(paragraphs, eq(sentences.paragraphId, paragraphs.id))
+        .where(eq(paragraphs.documentId, documentId))
+        .orderBy(paragraphs.order, sentences.order) as unknown as Sentence[];
+    }
+
+    const result = await db
+      .select({
+        id: sentences.id,
+        paragraphId: sentences.paragraphId,
+        order: sentences.order,
+        source: sentences.source,
+        sourceHash: sentences.sourceHash,
+        target: sentences.target,
+        targetAi: sentences.targetAi,
+        targetEdited: sentences.targetEdited,
+        isBookmarked: userSentenceState.isBookmarked,
+        learningStatus: userSentenceState.learningStatus,
+        lastPracticedAt: userSentenceState.lastPracticedAt,
+        noteContent: notes.content,
+        noteTags: notes.tags,
+        isScrapped: userSentenceState.isBookmarked,
+        note: notes.content,
+      })
+      .from(sentences)
+      .innerJoin(paragraphs, eq(sentences.paragraphId, paragraphs.id))
+      .leftJoin(userSentenceState, and(
+        eq(userSentenceState.sentenceId, sentences.id),
+        eq(userSentenceState.userId, userId)
+      ))
+      .leftJoin(notes, and(
+        eq(notes.sentenceId, sentences.id),
+        eq(notes.userId, userId)
+      ))
+      .where(eq(paragraphs.documentId, documentId))
+      .orderBy(paragraphs.order, sentences.order);
+
+    return result.map(row => ({
+      id: row.id,
+      paragraphId: row.paragraphId,
+      order: row.order,
+      source: row.source,
+      sourceHash: row.sourceHash,
+      target: row.target,
+      targetAi: row.targetAi,
+      targetEdited: row.targetEdited,
       isBookmarked: row.isBookmarked || false,
       isScrapped: row.isBookmarked || false,
       note: row.noteContent || undefined,

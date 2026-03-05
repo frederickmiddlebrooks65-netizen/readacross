@@ -92,6 +92,9 @@ interface RightDrawerProps {
   // Pagination support for outline navigation
   currentPage?: number;
   onPageChange?: (page: number) => void;
+  // Tab control (lifted to parent)
+  activeTab?: "document" | "notes" | "outline";
+  onTabChange?: (tab: "document" | "notes" | "outline") => void;
 }
 
 /**
@@ -142,32 +145,23 @@ export default function RightDrawer({
   // Pagination support
   currentPage = 1,
   onPageChange,
+  // Tab control (lifted to parent)
+  activeTab: activeTabProp = "document",
+  onTabChange,
 }: RightDrawerProps) {
   const { t, language } = useTranslation();
   const { timezone } = useTimezone();
-  const [activeTab, setActiveTab] = useState("document");
   const queryClient = useQueryClient();
 
-  // Explore 모드에서는 Doc 탭만 허용
-  const allowedTabs = isExploreDocument ? ["document"] : ["document", "notes", "outline"];
-  
-  // 탭 변경 시 허용된 탭인지 확인
-  const handleTabChange = (tab: string) => {
-    if (allowedTabs.includes(tab)) {
-      setActiveTab(tab);
-    }
+  // Use prop-controlled tab; fall back to "document" for explore mode
+  const activeTab = isExploreDocument ? "document" : activeTabProp;
+  const handleTabChange = (tab: "document" | "notes" | "outline") => {
+    if (!isExploreDocument) onTabChange?.(tab);
   };
-
-  // Explore 모드이면서 현재 탭이 허용되지 않는 경우 document 탭으로 전환
-  useEffect(() => {
-    if (isExploreDocument && !allowedTabs.includes(activeTab)) {
-      setActiveTab("document");
-    }
-  }, [isExploreDocument, activeTab, allowedTabs]);
 
   // ChatGPT의 스크롤바 겹침 해결 - ref들 추가
   const contentRef = useRef<HTMLDivElement>(null);
-  const tabsListRef = useRef<HTMLDivElement>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditingDocNote, setIsEditingDocNote] = useState(false);
   const [documentNote, setDocumentNote] = useState("");
@@ -878,71 +872,9 @@ export default function RightDrawer({
           <div className="flex-1 flex flex-col min-w-0 min-h-0">
             <Tabs
               value={activeTab}
-              onValueChange={handleTabChange}
+              onValueChange={(tab) => handleTabChange(tab as "document" | "notes" | "outline")}
               className="h-full flex flex-col min-w-0 min-h-0"
             >
-              {/* Tab Navigation */}
-              <div
-                ref={tabsListRef}
-                role="tablist"
-                aria-label="Reader panel tabs"
-                className="sticky top-0 z-20 w-full grid grid-cols-3 items-center px-4 h-12 bg-background/95 shadow-sm border-b border-border"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "document"}
-                  onClick={() => setActiveTab("document")}
-                  className={
-                    "w-full h-8 flex items-center justify-center gap-2 px-2 text-xs font-medium focus-visible:outline-none ring-0 outline-none rounded-md transition-colors cursor-pointer text-foreground " +
-                    (activeTab === "document" ? "bg-muted" : "hover:bg-muted/50")
-                  }
-                >
-                  <svg className="w-4 h-4 shrink-0 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                  <span className="truncate min-w-0 text-center block text-foreground">{t('viewer.docTab')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "notes"}
-                  aria-disabled={isExploreDocument}
-                  tabIndex={isExploreDocument ? -1 : undefined}
-                  onClick={() => handleTabChange("notes")}
-                  disabled={isExploreDocument}
-                  className={
-                    "w-full h-8 flex items-center justify-center gap-2 px-2 text-xs font-medium focus-visible:outline-none ring-0 outline-none rounded-md transition-colors text-foreground " +
-                    (isExploreDocument
-                      ? "cursor-not-allowed opacity-50"
-                      : "cursor-pointer " + (activeTab === "notes" ? "bg-muted" : "hover:bg-muted/50")
-                    )
-                  }
-                >
-                  <FileText className="w-4 h-4 shrink-0 text-foreground" />
-                  <span className="truncate min-w-0 text-center block text-foreground">{t('viewer.notesTab')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "outline"}
-                  aria-disabled={isExploreDocument}
-                  tabIndex={isExploreDocument ? -1 : undefined}
-                  onClick={() => handleTabChange("outline")}
-                  disabled={isExploreDocument}
-                  className={
-                    "w-full h-8 flex items-center justify-center gap-2 px-2 text-xs font-medium focus-visible:outline-none ring-0 outline-none rounded-md transition-colors text-foreground " +
-                    (isExploreDocument
-                      ? "cursor-not-allowed opacity-50"
-                      : "cursor-pointer " + (activeTab === "outline" ? "bg-muted" : "hover:bg-muted/50")
-                    )
-                  }
-                >
-                  <svg className="w-4 h-4 shrink-0 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M3 12h18"></path><path d="M3 18h18"></path></svg>
-                  <span className="truncate min-w-0 text-center block text-foreground">{t('viewer.outlineTab')}</span>
-                </button>
-              </div>
-
               {/* Tab Content */}
               <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
                 {/* Doc Tab */}
