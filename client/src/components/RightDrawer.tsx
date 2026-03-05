@@ -1570,6 +1570,5 @@ export default function RightDrawer({
           </div>
         </div>
       </div>
-    </div>
   );
 }
