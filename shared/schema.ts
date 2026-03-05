@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json, unique, primaryKey, real, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, unique, primaryKey, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -232,19 +232,14 @@ export const documents = pgTable("documents", {
   archetypeSource: text("archetype_source", { enum: ["source", "auto", "user"] }).default("auto"), // How archetype was determined
   snippet: text("snippet"),
   wordCount: integer("word_count"),
-}, (t) => [
-  index("documents_user_id_idx").on(t.userId),
-  index("documents_public_idx").on(t.isPublic, t.isArchived),
-]);
+});
 
 export const paragraphs = pgTable("paragraphs", {
   id: serial("id").primaryKey(),
   documentId: integer("document_id").references(() => documents.id).notNull(),
   order: integer("order").notNull(),
   title: text("title"),
-}, (t) => [
-  index("paragraphs_document_id_idx").on(t.documentId),
-]);
+});
 
 export const sentences = pgTable("sentences", {
   id: serial("id").primaryKey(),
@@ -256,9 +251,7 @@ export const sentences = pgTable("sentences", {
   targetAi: text("target_ai"), // AI-generated original translation (immutable, for comparison)
   targetEdited: text("target_edited"), // User-edited translation (displayed, modifiable)
   language: text("language"), // The language of this specific sentence (Phase 1: language-agnostic)
-}, (t) => [
-  index("sentences_paragraph_id_idx").on(t.paragraphId),
-]);
+});
 
 // Translation cache table - stores previously translated text
 export const translationCache = pgTable("translation_cache", {
