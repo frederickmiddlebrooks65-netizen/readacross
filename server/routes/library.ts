@@ -185,7 +185,8 @@ router.get("/library/recommendations", optionalAuthenticateJWT, async (req: Auth
       .from(sentences)
       .innerJoin(paragraphs, eq(sentences.paragraphId, paragraphs.id))
       .where(inArray(paragraphs.documentId, documentIds.length > 0 ? documentIds : [0]))
-      .orderBy(asc(paragraphs.documentId), asc(paragraphs.order), asc(sentences.order));
+      .orderBy(asc(paragraphs.documentId), asc(paragraphs.order), asc(sentences.order))
+      .limit(300);
 
     const snippetMap = new Map<number, string>();
     for (const row of snippetData) {

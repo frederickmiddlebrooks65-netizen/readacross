@@ -687,6 +687,7 @@ export default function Explore() {
       }
       return fetch("/api/library/recommendations", { headers }).then((res) => res.json());
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: rssFeeds, isLoading: isLoadingFeeds } = useQuery({

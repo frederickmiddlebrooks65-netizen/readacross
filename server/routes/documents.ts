@@ -1021,7 +1021,7 @@ Summary (3-5 sentences):`;
     const summaryEn = await GeminiService.generateText(
       englishSummaryPrompt,
       "You are a professional document summarizer. Provide clear, concise summaries.",
-      { maxTokens: 300, temperature: 0.3, plan: userPlan, userId }
+      { maxTokens: 700, temperature: 0.3, plan: userPlan, userId }
     );
 
     const koreanSummaryPrompt = `Summarize the following document in Korean in 3-5 clear, concise sentences. Focus on the main ideas and key points.
@@ -1034,7 +1034,7 @@ Summary (Korean, 3-5 sentences):`;
     const summaryKo = await GeminiService.generateText(
       koreanSummaryPrompt,
       "You are a professional document summarizer. Provide clear, concise summaries in Korean.",
-      { maxTokens: 300, temperature: 0.3, plan: userPlan, userId }
+      { maxTokens: 700, temperature: 0.3, plan: userPlan, userId }
     );
 
     await storage.updateDocument(documentId, {

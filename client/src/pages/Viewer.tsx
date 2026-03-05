@@ -1222,11 +1222,11 @@ export default function Viewer() {
         {/* Panel wrapper - flex child, width-animated */}
         <div
           className={`flex-shrink-0 overflow-hidden border-l border-border max-[900px]:hidden ${!isResizing ? 'transition-[width] duration-300 ease-out' : ''}`}
-          style={{ width: showRightDrawer && !isAIDrawerOpen ? panelWidth : 0 }}
+          style={{ width: showRightDrawer && !isAIDrawerOpen && !!document ? panelWidth : 0 }}
         >
           <div style={{ width: panelWidth }} className="h-full">
         <RightDrawer
-        isOpen={showRightDrawer}
+        isOpen={showRightDrawer && !!document}
         onClose={() => {
           updateSetting('showRightDrawer', false);
           setDisableAutoOpen(true);
