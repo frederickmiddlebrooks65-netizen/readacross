@@ -963,7 +963,7 @@ router.post("/create-from-url", async (req: Request, res: Response) => {
 });
 
 // POST /:id/generate-summary - Generate AI summary for a document
-router.post("/:id/generate-summary", authenticateJWT, async (req: AuthenticatedRequest, res) => {
+router.post("/:id/generate-summary", optionalAuthenticateJWT, async (req: AuthenticatedRequest, res) => {
   try {
     if (!GOOGLE_API_KEY) {
       return res.status(500).json({
@@ -974,18 +974,12 @@ router.post("/:id/generate-summary", authenticateJWT, async (req: AuthenticatedR
     const documentId = parseInt(req.params.id);
     const userId = req.userId;
 
-    if (!userId) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-
-    const user = await storage.getUser(userId);
-    const userPlan = (user?.plan || "starter") as "starter" | "pro" | "admin" | "beta_pro";
-
     const document = await storage.getDocumentWithParagraphs(documentId);
     if (!document) {
       return res.status(404).json({ error: "Document not found" });
     }
 
+    // Allow access to public documents for anyone; private documents require ownership
     if (!document.isPublic && document.userId !== userId) {
       return res.status(403).json({ error: "Access denied" });
     }
@@ -1021,7 +1015,7 @@ Summary (3-5 sentences):`;
     const summaryEn = await GeminiService.generateText(
       englishSummaryPrompt,
       "You are a professional document summarizer. Provide clear, concise summaries.",
-      { maxTokens: 700, temperature: 0.3, plan: userPlan, userId }
+      { maxTokens: 700, temperature: 0.3, model: "flash" }
     );
 
     const koreanSummaryPrompt = `Summarize the following document in Korean in 3-5 clear, concise sentences. Focus on the main ideas and key points.
@@ -1034,7 +1028,7 @@ Summary (Korean, 3-5 sentences):`;
     const summaryKo = await GeminiService.generateText(
       koreanSummaryPrompt,
       "You are a professional document summarizer. Provide clear, concise summaries in Korean.",
-      { maxTokens: 700, temperature: 0.3, plan: userPlan, userId }
+      { maxTokens: 700, temperature: 0.3, model: "flash" }
     );
 
     await storage.updateDocument(documentId, {
