@@ -35,9 +35,9 @@ export async function apiRequest<T = any>(
     return PUBLIC_ENDPOINTS.some(endpoint => url.includes(endpoint));
   };
 
-  // Document detail endpoints (/api/documents/:id) can be accessed without auth for public documents
+  // Document endpoints that can be accessed without auth for public documents
   const isDocumentDetailEndpoint = (url: string) => {
-    return /^\/api\/documents\/\d+$/.test(url);
+    return /^\/api\/documents\/\d+(\/generate-summary)?$/.test(url);
   };
 
   // Add authorization header if token exists
