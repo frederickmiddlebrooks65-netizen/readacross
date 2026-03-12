@@ -338,21 +338,25 @@ export default function Viewer() {
       }
     };
 
+    let pollingInterval: ReturnType<typeof setInterval> | null = null;
+
     eventSource.onerror = (error) => {
       console.error('[SSE] Connection error:', error);
       eventSource.close();
       // Fallback to polling on SSE failure
-      const interval = setInterval(() => {
-        queryClient.invalidateQueries({
-          queryKey: [`/api/documents/${documentId}`],
-        });
-      }, 3000);
-      return () => clearInterval(interval);
+      if (!pollingInterval) {
+        pollingInterval = setInterval(() => {
+          queryClient.invalidateQueries({
+            queryKey: [`/api/documents/${documentId}`],
+          });
+        }, 3000);
+      }
     };
 
     return () => {
       console.log('[SSE] Closing connection for document', documentId);
       eventSource.close();
+      if (pollingInterval) clearInterval(pollingInterval);
     };
   }, [document?.translationStatus, documentId, queryClient, isAuthenticated]);
 

@@ -1188,6 +1188,19 @@ router.get("/:id/translation-stream", async (req: AuthenticatedRequest, res) => 
 
   res.write(`data: ${JSON.stringify({ type: 'connected', documentId })}\n\n`);
 
+  // If translation already finished before this (re)connection, immediately notify the client
+  // so it doesn't get stuck waiting forever (e.g. after an SSE reconnect that missed the complete event)
+  try {
+    const doc = await storage.getDocument(documentId);
+    if (doc?.translationStatus === 'completed') {
+      res.write(`data: ${JSON.stringify({ type: 'complete', progress: { translated: doc.translatedCount, total: doc.totalCount } })}\n\n`);
+    } else if (doc?.translationStatus === 'failed') {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: doc.translationError || 'Translation failed' })}\n\n`);
+    }
+  } catch (_) {
+    // Non-critical: client will fall back to polling
+  }
+
   req.on('close', () => {
     unregisterSSEClient(documentId, res);
   });
