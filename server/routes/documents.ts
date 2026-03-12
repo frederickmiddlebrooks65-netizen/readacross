@@ -795,8 +795,27 @@ router.post("/preview-url", async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error("Error previewing URL:", error);
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes('HTTP 403') || message.includes('HTTP 401')) {
+      return res.status(200).json({
+        errorCode: "URL_ACCESS_BLOCKED",
+        error: message,
+      });
+    }
+    if (message.includes('HTTP 404')) {
+      return res.status(200).json({
+        errorCode: "URL_NOT_FOUND",
+        error: message,
+      });
+    }
+    if (message.includes('시간이 초과') || message.includes('timeout') || message.includes('AbortError')) {
+      return res.status(200).json({
+        errorCode: "URL_TIMEOUT",
+        error: message,
+      });
+    }
     res.status(500).json({
-      error: error instanceof Error ? error.message : "Failed to preview URL"
+      error: message || "Failed to preview URL"
     });
   }
 });

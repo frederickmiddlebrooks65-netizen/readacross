@@ -83,6 +83,7 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>('text');
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
@@ -297,6 +298,7 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
     }
 
     setError(null);
+    setErrorCode(null);
     setIsLoadingPreview(true);
 
     try {
@@ -308,12 +310,25 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
         body: JSON.stringify({ url: url.trim() }),
       });
 
+      const data = await response.json();
+
+      if (data.errorCode === 'URL_ACCESS_BLOCKED') {
+        setErrorCode('URL_ACCESS_BLOCKED');
+        setError(t('modal.errors.urlAccessBlocked'));
+        return;
+      }
+      if (data.errorCode === 'URL_NOT_FOUND') {
+        setError(t('modal.errors.urlNotFound'));
+        return;
+      }
+      if (data.errorCode === 'URL_TIMEOUT') {
+        setError(t('modal.errors.urlTimeout'));
+        return;
+      }
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || t('modal.errors.urlFetchFailed'));
+        throw new Error(data.error || t('modal.errors.urlFetchFailed'));
       }
 
-      const data = await response.json();
       setUrlPreview(data);
 
       // Auto-fill title if empty
@@ -778,9 +793,20 @@ export default function TextContentModal({ isOpen, onClose, onSubmit }: TextCont
           )}
 
           {error && (
-            <div className="flex items-center text-red-500 text-sm">
-              <AlertCircle className="h-4 w-4 mr-1" />
-              {error}
+            <div className="space-y-2">
+              <div className="flex items-start text-red-500 text-sm gap-1">
+                <AlertCircle className="h-4 w-4 mr-1 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+              {errorCode === 'URL_ACCESS_BLOCKED' && (
+                <button
+                  type="button"
+                  onClick={() => { setInputMode('text'); setError(null); setErrorCode(null); }}
+                  className="text-sm text-[#2F5D50] underline hover:opacity-80"
+                >
+                  {t('modal.errors.switchToText')}
+                </button>
+              )}
             </div>
           )}
 
