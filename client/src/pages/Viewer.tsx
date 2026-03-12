@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useLocation, useRoute } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import ImmersiveShell from "@/components/ImmersiveShell";
 import SlimHeader from "@/components/SlimHeader";
 import RightDrawer from "@/components/RightDrawer";
@@ -16,7 +16,6 @@ import SegmentViewer from "@/components/SegmentViewer";
 // import ViewerControls from "@/components/ViewerControls";
 // import PracticePanel from "@/components/PracticePanel"; // Archived
 import {
-  ViewMode,
   DocumentWithParagraphs,
   SentenceWithUserData,
   Paragraph,
@@ -26,7 +25,7 @@ type Sentence = SentenceWithUserData;
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ChevronLeft, ChevronRight, Languages, PanelRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -35,12 +34,6 @@ import useKeyboardShortcuts from "@/hooks/useKeyboardShortcuts";
 import AddNoteModal from "@/components/AddNoteModal";
 import AISideDrawer from "@/components/AISideDrawer";
 import useBlockPagination, { PaginatedBlock } from "@/hooks/useBlockPagination";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -67,7 +60,6 @@ export default function Viewer() {
     settings,
     updateSetting,
     getEffectiveTheme,
-    isLoading: settingsLoading
   } = useImmersiveSettings(documentId);
   
   // Extract settings for easier access
@@ -90,7 +82,7 @@ export default function Viewer() {
   const [headerHasOpenMenu, setHeaderHasOpenMenu] = useState(false); // 헤더 메뉴 상태 추가
   const [panelTab, setPanelTab] = useState<"document" | "notes" | "outline">("document");
   const [currentPage, setCurrentPage] = useState(1);
-  const [paragraphsPerPage, setParagraphsPerPage] = useState(5);
+  const [paragraphsPerPage] = useState(5);
   const hasRestoredPage = useRef(false);
   const progressSaveEnabled = useRef(false);
   const progressSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -120,6 +112,9 @@ export default function Viewer() {
   const [aiDrawerMode, setAIDrawerMode] = useState<"hover" | "edit">("hover");
   
   const isMobile = useIsMobile();
+  const isMac = (navigator as any).userAgentData?.platform
+    ? (navigator as any).userAgentData.platform.toLowerCase().includes('mac')
+    : navigator.userAgent.includes('Mac');
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
@@ -219,7 +214,7 @@ export default function Viewer() {
         method: "POST",
       });
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [`/api/documents/${documentId}`],
       });
@@ -510,15 +505,11 @@ export default function Viewer() {
 
   // Use block-based pagination hook - calculates pages ONCE at document load
   const {
-    pages: paginatedPages,
     currentPageBlocks,
     currentPage: hookCurrentPage,
     totalPages,
     pageHeight,
     setCurrentPage: setHookCurrentPage,
-    goToNextPage: hookGoToNextPage,
-    goToPreviousPage: hookGoToPreviousPage,
-    goToPage: hookGoToPage,
     isInitialized: paginationInitialized,
   } = useBlockPagination(paginatedBlocksData, {
     headerHeight: 0,
@@ -641,9 +632,6 @@ export default function Viewer() {
     if (currentPage > 1) {
       handleSetCurrentPage(currentPage - 1);
       scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-      setTimeout(() => {
-        setShowPagination(false);
-      }, 2000);
     }
   };
 
@@ -651,9 +639,6 @@ export default function Viewer() {
     if (currentPage < totalPages) {
       handleSetCurrentPage(currentPage + 1);
       scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-      setTimeout(() => {
-        setShowPagination(false);
-      }, 2000);
     }
   };
   
@@ -672,9 +657,6 @@ export default function Viewer() {
     if (targetPage >= 1 && targetPage <= totalPages) {
       handleSetCurrentPage(targetPage);
       scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-      setTimeout(() => {
-        setShowPagination(false);
-      }, 2000);
     }
     setShowPageJump(false);
     setInputPage("");
@@ -694,7 +676,7 @@ export default function Viewer() {
     null,
   );
   const [disableAutoOpen, setDisableAutoOpen] = useState(false);
-  const [showPagination, setShowPagination] = useState(true); // 페이지네이션 항상 표시
+  const showPagination = true;
   const [isResizing, setIsResizing] = useState(false);
   const [noteText, setNoteText] = useState("");
 
@@ -802,87 +784,6 @@ export default function Viewer() {
     setNoteText("");
   };
 
-  const handleClosePractice = () => {
-    setSelectedSentence(null);
-  };
-
-  const handleUpdatePracticedSentence = (changes: Partial<Sentence>) => {
-    if (selectedSentence) {
-      handleUpdateSentence(selectedSentence.id, changes);
-      // Update the selected sentence with new data
-      setSelectedSentence((prev) => (prev ? { ...prev, ...changes } : null));
-    }
-  };
-
-  // Handle document download
-  const handleDownload = async () => {
-    try {
-      const response = await fetch(`/api/documents/${documentId}/download`);
-
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.statusText}`);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-
-      // Create temporary link element and trigger download
-      const a = window.document.createElement("a");
-      a.style.display = "none";
-      a.href = url;
-      a.download = `${document?.title || "document"}.txt`;
-
-      // Safely check if document.body exists
-      if (window.document.body) {
-        window.document.body.appendChild(a);
-        a.click();
-
-        // Clean up
-        window.URL.revokeObjectURL(url);
-        window.document.body.removeChild(a);
-      } else {
-        console.error("document.body is not available for file download");
-        window.URL.revokeObjectURL(url);
-      }
-
-      toast({
-        title: "Success",
-        description: "Document downloaded successfully",
-      });
-    } catch (error) {
-      toast({
-        title: "Download Failed",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Handle document sharing (simplified)
-  const handleShare = () => {
-    const shareUrl = window.location.href;
-
-    // Use Web Share API if available
-    if (navigator.share) {
-      navigator
-        .share({
-          title: document?.title || "Read Across Document",
-          url: shareUrl,
-        })
-        .catch((error) => {
-          console.error("Error sharing:", error);
-        });
-    } else {
-      // Fallback to clipboard
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        toast({
-          title: "Link Copied",
-          description: "Document link copied to clipboard",
-        });
-      });
-    }
-  };
-
   // Check if this is an explore document and if it's already in user's library
   const isExploreDocument =
     document?.sourceType === "explore" || document?.isPublic || false;
@@ -969,12 +870,6 @@ export default function Viewer() {
     } finally {
       setIsAddingToLibrary(false);
     }
-  };
-
-  // Placeholder for handleTitleChange, assuming it might be used elsewhere or for future implementation
-  const handleTitleChange = (newTitle: string) => {
-    console.log("Title change requested:", newTitle);
-    // TODO: Implement API call to update document title
   };
 
   // Set the default view mode for explore documents, and auto-open side panel once document loads
@@ -1161,6 +1056,8 @@ export default function Viewer() {
                                       (sentence as any).practiceCount || 0,
                                     isScrapped:
                                       (sentence as any).isScrapped || false,
+                                    targetAi: (sentence as any).targetAi ?? null,
+                                    targetEdited: (sentence as any).targetEdited ?? null,
                                   },
                                 ],
                               ),
@@ -1344,7 +1241,7 @@ export default function Viewer() {
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
               className="group flex items-center gap-2 h-8 px-3 hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all duration-200"
-              aria-label={`Go to previous page (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'} + Left Arrow)`}
+              aria-label={`Go to previous page (${isMac ? 'Cmd' : 'Ctrl'} + Left Arrow)`}
               data-testid="button-previous-page"
             >
               <ChevronLeft className="h-3 w-3" />
@@ -1352,7 +1249,7 @@ export default function Viewer() {
                 <>
                   <span>{t('viewer.previous')}</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-1">
-                    {navigator.platform.includes('Mac') ? '⌘←' : 'Ctrl+←'}
+                    {isMac ? '⌘←' : 'Ctrl+←'}
                   </span>
                 </>
               )}
@@ -1406,13 +1303,13 @@ export default function Viewer() {
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
               className="group flex items-center gap-2 h-8 px-3 hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all duration-200"
-              aria-label={`Go to next page (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'} + Right Arrow)`}
+              aria-label={`Go to next page (${isMac ? 'Cmd' : 'Ctrl'} + Right Arrow)`}
               data-testid="button-next-page"
             >
               {!isMobile && (
                 <>
                   <span className="text-xs text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 mr-1">
-                    {navigator.platform.includes('Mac') ? '⌘→' : 'Ctrl+→'}
+                    {isMac ? '⌘→' : 'Ctrl+→'}
                   </span>
                   <span>{t('viewer.next')}</span>
                 </>
