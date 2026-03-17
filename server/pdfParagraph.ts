@@ -40,9 +40,11 @@ export function shouldEndParagraphSimplified(
     ? stats.medianBodyFont * 1.2
     : stats.medianBodyFont * 1.5;
 
+  // Column transition: y jumps far backwards (bottom of left col → top of right col).
+  // In this case xDiff is meaninglessly large, so suppress xDiff-based breaks.
+  const isColumnTransition = yGap < -(stats.medianLineHeight * 5);
   const strongLayoutBreak =
-    yGap >= yGapThreshold ||
-    xDiff >= xDiffThreshold;
+    !isColumnTransition && (yGap >= yGapThreshold || xDiff >= xDiffThreshold);
 
   const looksLikeHeading =
     nextText.length > 0 &&

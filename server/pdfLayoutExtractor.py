@@ -46,8 +46,12 @@ def sort_page_lines_in_reading_order(page_lines: list, page_width: float, page_h
 
     # 2-column layout detected
     # Find the column boundary: midpoint between left column's rightmost edge and right column's leftmost start
+    # Exclude full-width lines (title, abstract, spanning headings) from left_max_end calculation —
+    # their xEnd reaches ~88% of page width which would push col_boundary too far right,
+    # causing all right-column lines to be misclassified into left_col.
     left_zone_lines = [l for l in body_lines if l["xStart"] <= right_zone_x]
-    left_max_end = max((l["xEnd"] for l in left_zone_lines), default=right_zone_x)
+    actual_left_lines = [l for l in left_zone_lines if l["xEnd"] <= page_width * 0.65]
+    left_max_end = max((l["xEnd"] for l in actual_left_lines), default=right_zone_x * 0.6)
     right_min_start = min((l["xStart"] for l in right_zone_lines), default=right_zone_x)
     col_boundary = (left_max_end + right_min_start) / 2
 
