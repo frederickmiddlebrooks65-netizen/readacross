@@ -502,6 +502,11 @@ async function parsePDFToBlocksWithPyMuPDF(
   let inReferencesSection = false;
   let referenceLines: TextLine[] = [];
 
+  // Short incomplete fragment from a cross-column or early-flush scenario.
+  // e.g. "However, not" at end of left column, before "all languages have..." in right column.
+  // Instead of dropping it (≤ 20 chars), carry it forward and prepend to the next paragraph.
+  let pendingFragmentPrefix = "";
+
   // Buffer for table blocks encountered mid-paragraph
   // Tables are floating elements in academic papers - they should not break paragraph flow
   let pendingTableBlocks: { content: string; page: number; origin?: { page: number; bbox: [number, number, number, number] } }[] = [];
@@ -541,7 +546,14 @@ async function parsePDFToBlocksWithPyMuPDF(
 
   const flushParagraph = () => {
     if (currentParaLines.length > 0) {
-      const paraContent = joinLinesWithHyphenPreservation(currentParaLines);
+      let paraContent = joinLinesWithHyphenPreservation(currentParaLines);
+
+      // Apply any pending short fragment prefix from a previous flush
+      if (pendingFragmentPrefix) {
+        paraContent = pendingFragmentPrefix + " " + paraContent;
+        debugLog(`[FRAGMENT_CARRY] Applied prefix "${pendingFragmentPrefix}" → "${paraContent.substring(0, 60)}"`);
+        pendingFragmentPrefix = "";
+      }
 
       if (paraContent.length > 20) {
         const firstLineOrigin = currentParaLines[0].origin;
@@ -556,6 +568,11 @@ async function parsePDFToBlocksWithPyMuPDF(
             deferSentenceSplitting,
           ),
         );
+      } else if (paraContent.trim().length > 0 && !/[.!?]["']?\s*$/.test(paraContent.trim())) {
+        // Short incomplete fragment (e.g. "However, not" at end of column):
+        // carry it forward as a prefix to the next paragraph instead of dropping it.
+        debugLog(`[FRAGMENT_CARRY] Saving short fragment "${paraContent.trim()}" as pending prefix`);
+        pendingFragmentPrefix = paraContent.trim();
       }
       currentParaLines = [];
       flushPendingTables();
@@ -1083,8 +1100,14 @@ async function parsePDFToBlocksWithPyMuPDF(
         flushParagraph();
       }
 
-      const blockContent = line.text.trim();
-      if (blockContent.length > 0) {
+      let blockContent = line.text.trim();
+      // Apply any pending short fragment prefix
+      if (pendingFragmentPrefix) {
+        blockContent = pendingFragmentPrefix + " " + blockContent;
+        debugLog(`[FRAGMENT_CARRY] Applied prefix to standalone block → "${blockContent.substring(0, 60)}"`);
+        pendingFragmentPrefix = "";
+      }
+      if (blockContent.length > 20) {
         blocks.push(
           createBlock(
             "paragraph",
@@ -1097,6 +1120,10 @@ async function parsePDFToBlocksWithPyMuPDF(
           ),
         );
         (blocks[blocks.length - 1] as any).isStandalone = true;
+      } else if (blockContent.length > 0 && !/[.!?]["']?\s*$/.test(blockContent)) {
+        // Still too short and incomplete: carry forward again
+        debugLog(`[FRAGMENT_CARRY] Standalone too short, carrying "${blockContent}" forward`);
+        pendingFragmentPrefix = blockContent;
       }
 
       lastPage = line.page;
@@ -1809,25 +1836,17 @@ async function parsePDFToBlocksWithPdftotext(
 
       if (isStandaloneParagraphCandidate(line, stats, i > 0 ? lines[i - 1] : undefined, i < lines.length - 1 ? lines[i + 1] : undefined)) {
         if (currentParaLines.length > 0) {
-          const paraContent = joinLinesWithHyphenPreservation(currentParaLines);
-          if (paraContent.length > 20) {
-            blocks.push(
-              createBlock(
-                "paragraph",
-                paraContent,
-                lastPage,
-                blocks.length,
-                undefined,
-                undefined,
-                deferSentenceSplitting,
-              ),
-            );
-          }
-          currentParaLines = [];
+          flushParagraph();
         }
 
-        const blockContent = line.text.trim();
-        if (blockContent.length > 0) {
+        let blockContent = line.text.trim();
+        // Apply any pending short fragment prefix
+        if (pendingFragmentPrefix) {
+          blockContent = pendingFragmentPrefix + " " + blockContent;
+          debugLog(`[FRAGMENT_CARRY] Applied prefix to standalone block (2) → "${blockContent.substring(0, 60)}"`);
+          pendingFragmentPrefix = "";
+        }
+        if (blockContent.length > 20) {
           blocks.push(
             createBlock(
               "paragraph",
@@ -1840,6 +1859,9 @@ async function parsePDFToBlocksWithPdftotext(
             ),
           );
           (blocks[blocks.length - 1] as any).isStandalone = true;
+        } else if (blockContent.length > 0 && !/[.!?]["']?\s*$/.test(blockContent)) {
+          debugLog(`[FRAGMENT_CARRY] Standalone (2) too short, carrying "${blockContent}" forward`);
+          pendingFragmentPrefix = blockContent;
         }
 
         lastPage = line.page;
