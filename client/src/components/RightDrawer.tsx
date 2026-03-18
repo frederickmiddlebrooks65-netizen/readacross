@@ -891,7 +891,17 @@ export default function RightDrawer({
                         {!document ? (
                           <span className="text-muted-foreground italic">{t('viewer.noDocumentSelected')}</span>
                         ) : summaryError ? (
-                          <span className="text-destructive text-xs">{summaryError}</span>
+                          <div className="space-y-1">
+                            <span className="text-destructive text-xs block">
+                              {/503|Service Unavailable|high demand|try again later/i.test(summaryError)
+                                ? (language === 'ko'
+                                    ? 'AI 서버가 일시적으로 혼잡합니다. 잠시 후 새로고침해 주세요.'
+                                    : 'AI server is temporarily busy. Please refresh and try again.')
+                                : (language === 'ko'
+                                    ? '요약을 생성할 수 없습니다. 잠시 후 다시 시도해 주세요.'
+                                    : 'Unable to generate summary. Please try again later.')}
+                            </span>
+                          </div>
                         ) : summaryLoading || summaryGenerating ? (
                           <div className="space-y-2">
                             <Skeleton className="h-4 w-full" />

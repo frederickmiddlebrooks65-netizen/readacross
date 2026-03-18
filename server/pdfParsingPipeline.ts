@@ -350,7 +350,7 @@ function looksLikeHyphenatedSlug(text: string): boolean {
   return /^[A-Za-z]+(-[A-Za-z]+){2,}-?$/.test(trimmed);
 }
 
-function isStandaloneParagraphCandidate(line: TextLine, stats: PDFStats, prevLine?: TextLine): boolean {
+function isStandaloneParagraphCandidate(line: TextLine, stats: PDFStats, prevLine?: TextLine, nextLine?: TextLine): boolean {
   const text = line.text.trim();
   if (!text) return false;
 
@@ -374,14 +374,19 @@ function isStandaloneParagraphCandidate(line: TextLine, stats: PDFStats, prevLin
   const fontJump = line.fontHeight > stats.medianBodyFont * 1.15;
 
   // If the only reason to flag this line is isShort+isRaggedRight (not looksTitleCase or fontJump),
-  // check whether the previous line ended without terminal punctuation.
-  // If so, this is almost certainly a sentence fragment at a column wrap boundary,
-  // not a genuine standalone block — regardless of its content.
+  // apply sentence-continuation checks using surrounding lines.
   if ((isShort && isRaggedRight) && !looksTitleCase && !fontJump) {
+    // Check 1: previous line ended without terminal punctuation → current line is a mid-sentence fragment
     if (prevLine) {
       const prevText = prevLine.text.trim();
       const prevWasIncomplete = !/[.!?]["']?\s*$/.test(prevText);
       if (prevWasIncomplete) return false;
+    }
+    // Check 2: current line has no terminal punctuation AND next line starts with lowercase
+    // → this line flows directly into the next, making it mid-sentence (e.g. "However, not" → "all languages have...")
+    if (nextLine && !/[.!?]["']?\s*$/.test(text)) {
+      const nextText = nextLine.text.trim();
+      if (/^[a-z]/.test(nextText)) return false;
     }
   }
 
@@ -1062,7 +1067,7 @@ async function parsePDFToBlocksWithPyMuPDF(
       );
     }
 
-    if (isStandaloneParagraphCandidate(line, stats, i > 0 ? lines[i - 1] : undefined)) {
+    if (isStandaloneParagraphCandidate(line, stats, i > 0 ? lines[i - 1] : undefined, i < lines.length - 1 ? lines[i + 1] : undefined)) {
       if (currentParaLines.length > 0) {
         flushParagraph();
       }
@@ -1786,7 +1791,7 @@ async function parsePDFToBlocksWithPdftotext(
         continue;
       }
 
-      if (isStandaloneParagraphCandidate(line, stats, i > 0 ? lines[i - 1] : undefined)) {
+      if (isStandaloneParagraphCandidate(line, stats, i > 0 ? lines[i - 1] : undefined, i < lines.length - 1 ? lines[i + 1] : undefined)) {
         if (currentParaLines.length > 0) {
           const paraContent = joinLinesWithHyphenPreservation(currentParaLines);
           if (paraContent.length > 20) {
