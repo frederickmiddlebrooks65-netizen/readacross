@@ -920,7 +920,7 @@
     "docTab": "Doc",
     "notesTab": "Notes",
     "outlineTab": "Navigate",
-    "aiSummary": "AI Summary",
+    "aiSummary": "Summary",
     "noDocumentSelected": "No document selected for summary.",
     "generatingSummary": "Generating AI summary...",
     "title": "Title",

@@ -921,7 +921,7 @@
     "docTab": "문서",
     "notesTab": "노트",
     "outlineTab": "탐색",
-    "aiSummary": "AI 요약",
+    "aiSummary": "요약",
     "noDocumentSelected": "요약할 문서가 선택되지 않았습니다.",
     "generatingSummary": "AI 요약 생성 중...",
     "title": "제목",
