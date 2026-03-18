@@ -587,6 +587,29 @@ export function postProcessBlocksStructural(
       continue;
     }
 
+    // === SENTENCE CONTINUATION PROTECTION (prev block) ===
+    // If the previous block ended without terminal punctuation, the current block
+    // is likely a sentence fragment split at a column/page boundary — not a heading.
+    if (prevBlock && prevBlock.type === "paragraph") {
+      const prevContent = prevBlock.content.trim();
+      const prevWasIncomplete = !/[.!?]["']?\s*$/.test(prevContent);
+      if (prevWasIncomplete) {
+        log(`[Structural_SKIP] prev paragraph incomplete (sentence continuation): "${text.substring(0, 60)}"`);
+        continue;
+      }
+    }
+
+    // === SENTENCE CONTINUATION PROTECTION (next block) ===
+    // If the next block starts with a lowercase letter, the current block's text
+    // flows directly into it — it is mid-sentence, not a standalone heading.
+    if (nextBlock && nextBlock.type === "paragraph") {
+      const nextContent = nextBlock.content.trim();
+      if (/^[a-z]/.test(nextContent)) {
+        log(`[Structural_SKIP] next block starts lowercase (sentence continuation): "${text.substring(0, 60)}"`);
+        continue;
+      }
+    }
+
     // === PROMOTE TO HEADING ===
     log(`[Structural_PROMOTE] noun-phrase heading: "${text}"`);
     (block as any).type = "heading";

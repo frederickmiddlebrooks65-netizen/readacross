@@ -350,7 +350,7 @@ function looksLikeHyphenatedSlug(text: string): boolean {
   return /^[A-Za-z]+(-[A-Za-z]+){2,}-?$/.test(trimmed);
 }
 
-function isStandaloneParagraphCandidate(line: TextLine, stats: PDFStats): boolean {
+function isStandaloneParagraphCandidate(line: TextLine, stats: PDFStats, prevLine?: TextLine): boolean {
   const text = line.text.trim();
   if (!text) return false;
 
@@ -372,6 +372,18 @@ function isStandaloneParagraphCandidate(line: TextLine, stats: PDFStats): boolea
   const looksTitleCase = /^[A-Z][a-z]+(\s+[A-Z][a-z]+){1,}$/.test(text);
 
   const fontJump = line.fontHeight > stats.medianBodyFont * 1.15;
+
+  // If the only reason to flag this line is isShort+isRaggedRight (not looksTitleCase or fontJump),
+  // check whether the previous line ended without terminal punctuation.
+  // If so, this is almost certainly a sentence fragment at a column wrap boundary,
+  // not a genuine standalone block — regardless of its content.
+  if ((isShort && isRaggedRight) && !looksTitleCase && !fontJump) {
+    if (prevLine) {
+      const prevText = prevLine.text.trim();
+      const prevWasIncomplete = !/[.!?]["']?\s*$/.test(prevText);
+      if (prevWasIncomplete) return false;
+    }
+  }
 
   return (isShort && isRaggedRight) || looksTitleCase || fontJump;
 }
@@ -1050,7 +1062,7 @@ async function parsePDFToBlocksWithPyMuPDF(
       );
     }
 
-    if (isStandaloneParagraphCandidate(line, stats)) {
+    if (isStandaloneParagraphCandidate(line, stats, i > 0 ? lines[i - 1] : undefined)) {
       if (currentParaLines.length > 0) {
         flushParagraph();
       }
@@ -1774,7 +1786,7 @@ async function parsePDFToBlocksWithPdftotext(
         continue;
       }
 
-      if (isStandaloneParagraphCandidate(line, stats)) {
+      if (isStandaloneParagraphCandidate(line, stats, i > 0 ? lines[i - 1] : undefined)) {
         if (currentParaLines.length > 0) {
           const paraContent = joinLinesWithHyphenPreservation(currentParaLines);
           if (paraContent.length > 20) {
