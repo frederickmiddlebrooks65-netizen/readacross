@@ -1045,6 +1045,17 @@ async function parsePDFToBlocksWithPyMuPDF(
 
     const curTextDbg = line.text.trim().toLowerCase();
     const nextTextDbg = nextLine?.text.trim().toLowerCase() || "";
+
+    if (curTextDbg.includes("however, not") || nextTextDbg.includes("however, not")) {
+      debugLog(`[HN_TRACE] i=${i}, type="${type}", processedIndices.has=${processedIndices.has(i)}`);
+      debugLog(`[HN_TRACE] cur="${line.text.trim().substring(0, 60)}"`);
+      debugLog(`[HN_TRACE] next="${nextLine?.text.trim().substring(0, 60) || "(none)"}"`);
+      debugLog(`[HN_TRACE] nextClassification="${nextClassification || "paragraph"}"`);
+      debugLog(`[HN_TRACE] currentParaLines.length=${currentParaLines.length}`);
+      const isSA = isStandaloneParagraphCandidate(line, stats, i > 0 ? lines[i - 1] : undefined, i < lines.length - 1 ? lines[i + 1] : undefined);
+      debugLog(`[HN_TRACE] isStandaloneParagraphCandidate=${isSA}`);
+    }
+
     if (
       curTextDbg.includes("produce") ||
       curTextDbg.includes("concretely") ||
@@ -1125,6 +1136,11 @@ async function parsePDFToBlocksWithPyMuPDF(
       parsingProfile,
       parsingStrictness,
     );
+
+    if (curTextDbg.includes("however, not") || nextTextDbg.includes("however, not")) {
+      debugLog(`[HN_TRACE] shouldSplit=${shouldSplit}, inAbstractBody=${inAbstractBody}, inReferencesSection=${inReferencesSection}`);
+      debugLog(`[HN_TRACE] effectiveNext="${effectiveNextLine?.text.trim().substring(0, 60) || "(none)"}"`);
+    }
 
     if (
       curTextDbg.includes("produce") ||
