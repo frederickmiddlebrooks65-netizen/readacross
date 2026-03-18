@@ -132,19 +132,14 @@ export default function Library() {
   // Archive/Restore/Delete Handlers
   const handleArchiveDocument = async (documentId: number) => {
     try {
-      const response = await fetch(`/api/documents/${documentId}/archive`, {
+      await apiRequest(`/api/documents/${documentId}/archive`, {
         method: "POST",
       });
-
-      if (response.ok) {
-        toast({
-          title: t('library.documentArchived'),
-          description: t('library.documentArchivedDesc'),
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
-      } else {
-        throw new Error(t('library.archiveFailed'));
-      }
+      toast({
+        title: t('library.documentArchived'),
+        description: t('library.documentArchivedDesc'),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
     } catch (error) {
       toast({
         title: t('library.archiveFailed'),
@@ -156,19 +151,14 @@ export default function Library() {
 
   const handleRestoreDocument = async (documentId: number) => {
     try {
-      const response = await fetch(`/api/documents/${documentId}/restore`, {
+      await apiRequest(`/api/documents/${documentId}/restore`, {
         method: "POST",
       });
-
-      if (response.ok) {
-        toast({
-          title: t('library.documentRestored'),
-          description: t('library.documentRestoredDesc'),
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
-      } else {
-        throw new Error(t('library.restoreFailed'));
-      }
+      toast({
+        title: t('library.documentRestored'),
+        description: t('library.documentRestoredDesc'),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
     } catch (error) {
       toast({
         title: t('library.restoreFailed'),
@@ -180,24 +170,14 @@ export default function Library() {
 
   const handleDeleteDocument = async (documentId: number) => {
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`/api/documents/${documentId}`, {
+      await apiRequest(`/api/documents/${documentId}`, {
         method: "DELETE",
-        headers: {
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-        },
       });
-
-      if (response.ok) {
-        toast({
-          title: t('library.documentDeleted'),
-          description: t('library.documentDeletedDesc'),
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
-      } else {
-        const error = await response.json();
-        throw new Error(error.error || t('library.deleteFailed'));
-      }
+      toast({
+        title: t('library.documentDeleted'),
+        description: t('library.documentDeletedDesc'),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
     } catch (error) {
       toast({
         title: t('library.deleteFailed'),
