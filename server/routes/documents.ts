@@ -522,6 +522,7 @@ router.post("/upload", authenticateJWT, upload.single("file"),
           title: title || filename,
           content,
           sourceLanguage: detectedSourceLanguage,
+          userId: req.userId,
         });
       }
 
