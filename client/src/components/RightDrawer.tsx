@@ -744,7 +744,7 @@ export default function RightDrawer({
     const targetPage = findPageForSentence(sentenceId);
     if (targetPage !== null && targetPage !== currentPage && onPageChange) {
       onPageChange(targetPage);
-      scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'auto' });
       setTimeout(doScroll, 500);
       return;
     }
@@ -762,7 +762,7 @@ export default function RightDrawer({
     const targetPage = findPageForSentence(sentenceId);
     if (targetPage !== null && targetPage !== currentPage && onPageChange) {
       onPageChange(targetPage);
-      scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'auto' });
       setTimeout(doScroll, 500);
     } else {
       doScroll();
@@ -781,7 +781,7 @@ export default function RightDrawer({
     const targetPage = findPageForBlock(paragraphOrder);
     if (targetPage !== null && targetPage !== currentPage && onPageChange) {
       onPageChange(targetPage);
-      scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'auto' });
       setTimeout(doScroll, 500);
     } else {
       doScroll();
@@ -805,7 +805,7 @@ export default function RightDrawer({
               };
               if (page.pageNumber !== currentPage && onPageChange) {
                 onPageChange(page.pageNumber);
-                scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+                scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'auto' });
                 setTimeout(doScroll, 500);
               } else {
                 doScroll();
