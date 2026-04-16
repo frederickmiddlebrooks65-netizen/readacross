@@ -985,7 +985,7 @@ async function parseTextContent(
 
   for (const paragraph of paragraphs) {
     const trimmed = paragraph.trim();
-    if (trimmed.length < (options?.minBlockLength || 20)) {
+    if (trimmed.length < 3) {
       continue;
     }
 
