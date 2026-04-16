@@ -570,106 +570,120 @@ export default function RightDrawer({
   }, [document, navigateSearchTerm]);
 
   // Scroll to search result with Modern Zen word-level highlight
-  const scrollToSearchResult = (sentenceId: number, isTranslation: boolean = false) => {
-    // Use specific element IDs to target source or translation correctly
-    // Try multiple ID patterns used in SegmentViewer.tsx
-    const elementIdPatterns = isTranslation 
-      ? [
-          `target-legacy-sentence-${sentenceId}`,
-          `target-sentence-${sentenceId}`,
-          `structured-sentence-${sentenceId}-translation`,
-        ]
-      : [
-          `source-sentence-${sentenceId}`,
-          `structured-sentence-${sentenceId}-original`,
-          `structured-sentence-${sentenceId}-source`,
-        ];
-    
-    let element: Element | null = null;
-    for (const id of elementIdPatterns) {
-      element = window.document.getElementById(id);
-      if (element) break;
-    }
-    
-    // Fallback to data-sentence-id selector if specific ID not found
-    if (!element) {
-      element = window.document.querySelector(
-        `[data-sentence-id="${sentenceId}"]`,
-      );
-    }
-    
-    if (element) {
-      // Clear previous highlights first (ensures only one result is highlighted)
-      clearAllSearchHighlights();
+  const scrollToSearchResult = (sentenceId: number, isTranslation: boolean = false, paragraphIndex?: number) => {
+    const doScroll = () => {
+      // Use specific element IDs to target source or translation correctly
+      // Try multiple ID patterns used in SegmentViewer.tsx
+      const elementIdPatterns = isTranslation 
+        ? [
+            `target-legacy-sentence-${sentenceId}`,
+            `target-sentence-${sentenceId}`,
+            `structured-sentence-${sentenceId}-translation`,
+          ]
+        : [
+            `source-sentence-${sentenceId}`,
+            `structured-sentence-${sentenceId}-original`,
+            `structured-sentence-${sentenceId}-source`,
+          ];
       
-      // Apply temporary sentence flash (landing cue)
-      element.classList.add('search-sentence-flash');
-      setTimeout(() => {
-        element.classList.remove('search-sentence-flash');
-      }, 1500);
+      let element: Element | null = null;
+      for (const id of elementIdPatterns) {
+        element = window.document.getElementById(id);
+        if (element) break;
+      }
       
-      // Find and wrap the search term with highlight span
-      if (navigateSearchTerm) {
-        const searchLower = navigateSearchTerm.toLowerCase();
-        const walker = window.document.createTreeWalker(
-          element,
-          NodeFilter.SHOW_TEXT,
-          null
+      // Fallback to data-sentence-id selector if specific ID not found
+      if (!element) {
+        element = window.document.querySelector(
+          `[data-sentence-id="${sentenceId}"]`,
         );
+      }
+      
+      if (element) {
+        // Clear previous highlights first (ensures only one result is highlighted)
+        clearAllSearchHighlights();
         
-        let node: Text | null;
-        const nodesToProcess: { node: Text; index: number }[] = [];
+        // Apply temporary sentence flash (landing cue)
+        element.classList.add('search-sentence-flash');
+        setTimeout(() => {
+          element?.classList.remove('search-sentence-flash');
+        }, 1500);
         
-        while ((node = walker.nextNode() as Text | null)) {
-          const text = node.textContent || '';
-          const index = text.toLowerCase().indexOf(searchLower);
-          if (index !== -1) {
-            nodesToProcess.push({ node, index });
+        // Find and wrap the search term with highlight span
+        if (navigateSearchTerm) {
+          const searchLower = navigateSearchTerm.toLowerCase();
+          const walker = window.document.createTreeWalker(
+            element,
+            NodeFilter.SHOW_TEXT,
+            null
+          );
+          
+          let node: Text | null;
+          const nodesToProcess: { node: Text; index: number }[] = [];
+          
+          while ((node = walker.nextNode() as Text | null)) {
+            const text = node.textContent || '';
+            const index = text.toLowerCase().indexOf(searchLower);
+            if (index !== -1) {
+              nodesToProcess.push({ node, index });
+            }
           }
+          
+          // Process found nodes (wrap matched text with highlight span)
+          nodesToProcess.forEach(({ node, index }) => {
+            const text = node.textContent || '';
+            const matchLength = navigateSearchTerm.length;
+            
+            // Split: before + match + after
+            const before = text.slice(0, index);
+            const match = text.slice(index, index + matchLength);
+            const after = text.slice(index + matchLength);
+            
+            const parent = node.parentNode;
+            if (parent) {
+              const fragment = window.document.createDocumentFragment();
+              
+              if (before) {
+                fragment.appendChild(window.document.createTextNode(before));
+              }
+              
+              const highlightSpan = window.document.createElement('span');
+              highlightSpan.className = 'search-word-highlight';
+              highlightSpan.textContent = match;
+              fragment.appendChild(highlightSpan);
+              
+              if (after) {
+                fragment.appendChild(window.document.createTextNode(after));
+              }
+              
+              parent.replaceChild(fragment, node);
+              
+              // Scroll to center the highlighted word
+              setTimeout(() => {
+                highlightSpan.scrollIntoView({ behavior: "smooth", block: "center" });
+              }, 50);
+            }
+          });
         }
         
-        // Process found nodes (wrap matched text with highlight span)
-        nodesToProcess.forEach(({ node, index }) => {
-          const text = node.textContent || '';
-          const matchLength = navigateSearchTerm.length;
-          
-          // Split: before + match + after
-          const before = text.slice(0, index);
-          const match = text.slice(index, index + matchLength);
-          const after = text.slice(index + matchLength);
-          
-          const parent = node.parentNode;
-          if (parent) {
-            const fragment = window.document.createDocumentFragment();
-            
-            if (before) {
-              fragment.appendChild(window.document.createTextNode(before));
-            }
-            
-            const highlightSpan = window.document.createElement('span');
-            highlightSpan.className = 'search-word-highlight';
-            highlightSpan.textContent = match;
-            fragment.appendChild(highlightSpan);
-            
-            if (after) {
-              fragment.appendChild(window.document.createTextNode(after));
-            }
-            
-            parent.replaceChild(fragment, node);
-            
-            // Scroll to center the highlighted word
-            setTimeout(() => {
-              highlightSpan.scrollIntoView({ behavior: "smooth", block: "center" });
-            }, 50);
-          }
-        });
+        // Fallback scroll if no word highlight was created
+        if (!navigateSearchTerm) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
       }
-      
-      // Fallback scroll if no word highlight was created
-      if (!navigateSearchTerm) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+
+    // Handle pagination: if result is on a different page, navigate first
+    if (paragraphIndex !== undefined && onPageChange) {
+      const targetPage = Math.floor((paragraphIndex - 1) / paragraphsPerPage) + 1;
+      if (targetPage !== currentPage) {
+        onPageChange(targetPage);
+        setTimeout(doScroll, 150);
+        return;
       }
     }
+
+    doScroll();
   };
 
   const scrollToSentence = (sentenceId: number) => {
@@ -1375,7 +1389,7 @@ export default function RightDrawer({
                           <Card
                             key={`${result.sentenceId}-${index}`}
                             className="cursor-pointer hover:bg-accent/50 transition-colors"
-                            onClick={() => scrollToSearchResult(result.sentenceId, result.isTranslation)}
+                            onClick={() => scrollToSearchResult(result.sentenceId, result.isTranslation, result.paragraphIndex)}
                             data-testid={`search-result-${index}`}
                           >
                             <CardContent className="p-3">
