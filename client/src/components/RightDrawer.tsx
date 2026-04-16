@@ -96,6 +96,8 @@ interface RightDrawerProps {
   // Tab control (lifted to parent)
   activeTab?: "document" | "notes" | "outline";
   onTabChange?: (tab: "document" | "notes" | "outline") => void;
+  // Scroll container ref for resetting position on page change
+  scrollContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
 /**
@@ -150,6 +152,7 @@ export default function RightDrawer({
   // Tab control (lifted to parent)
   activeTab: activeTabProp = "document",
   onTabChange,
+  scrollContainerRef,
 }: RightDrawerProps) {
   const { t, language } = useTranslation();
   const { timezone } = useTimezone();
@@ -575,17 +578,38 @@ export default function RightDrawer({
   // Find the correct page number for a given sentence by searching blockPages directly
   const findPageForSentence = (sentenceId: number): number | null => {
     if (!blockPages || blockPages.length === 0) return null;
+
+    // Primary: exact anchor range match
     for (const page of blockPages) {
       for (const paginatedBlock of page.blocks) {
         const block = paginatedBlock.content;
-        if (block?.anchor &&
-            block.anchor.sentenceStartId <= sentenceId &&
-            sentenceId <= block.anchor.sentenceEndId) {
+        if (
+          block?.anchor &&
+          block.anchor.sentenceStartId <= sentenceId &&
+          sentenceId <= block.anchor.sentenceEndId
+        ) {
           return page.pageNumber;
         }
       }
     }
-    return null;
+
+    // Fallback: "nearest block below" — find the anchored block whose
+    // sentenceStartId is closest to (but ≤) sentenceId. This handles gaps
+    // between anchor ranges and blocks that failed to anchor.
+    let bestPage: number | null = null;
+    let bestStart = -1;
+    for (const page of blockPages) {
+      for (const paginatedBlock of page.blocks) {
+        const block = paginatedBlock.content;
+        if (block?.anchor && block.anchor.sentenceStartId <= sentenceId) {
+          if (block.anchor.sentenceStartId > bestStart) {
+            bestStart = block.anchor.sentenceStartId;
+            bestPage = page.pageNumber;
+          }
+        }
+      }
+    }
+    return bestPage;
   };
 
   // Find the correct page number for a block by its order, searching blockPages directly
@@ -594,7 +618,12 @@ export default function RightDrawer({
     for (const page of blockPages) {
       for (const paginatedBlock of page.blocks) {
         const order = paginatedBlock.content?.order ?? paginatedBlock.order;
-        if (order === blockOrder || String(order) === String(blockOrder)) {
+        if (
+          order === blockOrder ||
+          String(order) === String(blockOrder) ||
+          // Legacy fallback: paginatedBlock.id equals paragraph DB id
+          String(paginatedBlock.id) === String(blockOrder)
+        ) {
           return page.pageNumber;
         }
       }
@@ -605,17 +634,23 @@ export default function RightDrawer({
   const scrollToSearchResult = (sentenceId: number, isTranslation: boolean = false) => {
     const doScroll = () => {
       // Use specific element IDs to target source or translation correctly
-      // Try multiple ID patterns used in SegmentViewer.tsx
-      const elementIdPatterns = isTranslation 
+      // Try ALL patterns used across SegmentViewer.tsx rendering paths:
+      //   - renderSentences (heading/document_title): sentence-${id}-${lane}
+      //   - paragraph case (single-col): structured-sentence-${id}-${lane}
+      //   - legacy side-by-side source: source-sentence-${id}
+      //   - legacy side-by-side target: target-legacy-sentence-${id}
+      const elementIdPatterns = isTranslation
         ? [
             `target-legacy-sentence-${sentenceId}`,
             `target-sentence-${sentenceId}`,
             `structured-sentence-${sentenceId}-translation`,
+            `sentence-${sentenceId}-translation`,
           ]
         : [
             `source-sentence-${sentenceId}`,
             `structured-sentence-${sentenceId}-original`,
             `structured-sentence-${sentenceId}-source`,
+            `sentence-${sentenceId}-original`,
           ];
       
       let element: Element | null = null;
@@ -709,7 +744,8 @@ export default function RightDrawer({
     const targetPage = findPageForSentence(sentenceId);
     if (targetPage !== null && targetPage !== currentPage && onPageChange) {
       onPageChange(targetPage);
-      setTimeout(doScroll, 300);
+      scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      setTimeout(doScroll, 500);
       return;
     }
 
@@ -726,7 +762,8 @@ export default function RightDrawer({
     const targetPage = findPageForSentence(sentenceId);
     if (targetPage !== null && targetPage !== currentPage && onPageChange) {
       onPageChange(targetPage);
-      setTimeout(doScroll, 300);
+      scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      setTimeout(doScroll, 500);
     } else {
       doScroll();
     }
@@ -744,7 +781,8 @@ export default function RightDrawer({
     const targetPage = findPageForBlock(paragraphOrder);
     if (targetPage !== null && targetPage !== currentPage && onPageChange) {
       onPageChange(targetPage);
-      setTimeout(doScroll, 300);
+      scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      setTimeout(doScroll, 500);
     } else {
       doScroll();
     }
@@ -767,7 +805,8 @@ export default function RightDrawer({
               };
               if (page.pageNumber !== currentPage && onPageChange) {
                 onPageChange(page.pageNumber);
-                setTimeout(doScroll, 300);
+                scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+                setTimeout(doScroll, 500);
               } else {
                 doScroll();
               }

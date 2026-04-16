@@ -1163,6 +1163,7 @@ export default function Viewer() {
         currentPage={currentPage}
         onPageChange={handleSetCurrentPage}
         blockPages={blockPages}
+        scrollContainerRef={scrollRef}
         onDownload={() => {
           if (document) {
             // Create downloadable content from sentences
