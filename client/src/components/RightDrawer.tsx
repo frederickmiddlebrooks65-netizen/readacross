@@ -572,19 +572,30 @@ export default function RightDrawer({
   }, [document, navigateSearchTerm]);
 
   // Scroll to search result with Modern Zen word-level highlight
-  // Find the correct page number for a given sentence using structured block anchors
+  // Find the correct page number for a given sentence by searching blockPages directly
   const findPageForSentence = (sentenceId: number): number | null => {
-    if (!blockPages || blockPages.length === 0 || !document) return null;
-    const structuredBlocks = getStructuredBlocks(document);
-    for (let blockIdx = 0; blockIdx < structuredBlocks.length; blockIdx++) {
-      const block = structuredBlocks[blockIdx];
-      if (block.anchor &&
-          block.anchor.sentenceStartId <= sentenceId &&
-          sentenceId <= block.anchor.sentenceEndId) {
-        for (const page of blockPages) {
-          if (blockIdx >= page.startBlockIndex && blockIdx <= page.endBlockIndex) {
-            return page.pageNumber;
-          }
+    if (!blockPages || blockPages.length === 0) return null;
+    for (const page of blockPages) {
+      for (const paginatedBlock of page.blocks) {
+        const block = paginatedBlock.content;
+        if (block?.anchor &&
+            block.anchor.sentenceStartId <= sentenceId &&
+            sentenceId <= block.anchor.sentenceEndId) {
+          return page.pageNumber;
+        }
+      }
+    }
+    return null;
+  };
+
+  // Find the correct page number for a block by its order, searching blockPages directly
+  const findPageForBlock = (blockOrder: number | string): number | null => {
+    if (!blockPages || blockPages.length === 0) return null;
+    for (const page of blockPages) {
+      for (const paginatedBlock of page.blocks) {
+        const order = paginatedBlock.content?.order ?? paginatedBlock.order;
+        if (order === blockOrder || String(order) === String(blockOrder)) {
+          return page.pageNumber;
         }
       }
     }
@@ -706,54 +717,72 @@ export default function RightDrawer({
   };
 
   const scrollToSentence = (sentenceId: number) => {
-    const element = window.document.querySelector(
-      `[data-sentence-id="${sentenceId}"]`,
-    );
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    const doScroll = () => {
+      const element = window.document.querySelector(`[data-sentence-id="${sentenceId}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    };
+    const targetPage = findPageForSentence(sentenceId);
+    if (targetPage !== null && targetPage !== currentPage && onPageChange) {
+      onPageChange(targetPage);
+      setTimeout(doScroll, 300);
+    } else {
+      doScroll();
     }
   };
 
   const scrollToParagraph = (paragraphOrder: number | string, paragraphIndex: number) => {
-    console.log('[scrollToParagraph] paragraphOrder:', paragraphOrder, 'paragraphIndex:', paragraphIndex);
-    
-    // Calculate which page this paragraph is on (0-indexed to 1-indexed)
-    const targetPage = Math.floor((paragraphIndex - 1) / paragraphsPerPage) + 1;
-    console.log('[scrollToParagraph] targetPage:', targetPage, 'currentPage:', currentPage);
-    
-    // If on different page, navigate first then scroll after a delay
-    if (targetPage !== currentPage && onPageChange) {
-      onPageChange(targetPage);
-      // Wait for page change to render, then scroll
-      setTimeout(() => {
-        const element = window.document.querySelector(
-          `[data-paragraph-id="${paragraphOrder}"]`,
-        );
-        console.log('[scrollToParagraph] After page change, found element:', element);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      }, 100);
-    } else {
-      // Same page, scroll directly
-      const element = window.document.querySelector(
-        `[data-paragraph-id="${paragraphOrder}"]`,
-      );
-      console.log('[scrollToParagraph] Same page, found element:', element);
+    const doScroll = () => {
+      const element = window.document.querySelector(`[data-paragraph-id="${paragraphOrder}"]`);
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "start" });
       }
+    };
+
+    // Use block-based page structure to find the correct page
+    const targetPage = findPageForBlock(paragraphOrder);
+    if (targetPage !== null && targetPage !== currentPage && onPageChange) {
+      onPageChange(targetPage);
+      setTimeout(doScroll, 300);
+    } else {
+      doScroll();
     }
   };
 
-  const scrollToHeading = (headingOrder: number) => {
-    // Try to find heading by order/index in the rendered content
+  const scrollToHeading = (headingIndexAmongHeadings: number) => {
+    // Use blockPages to find which page has the n-th heading block
+    if (blockPages && blockPages.length > 0) {
+      let headingCount = 0;
+      for (const page of blockPages) {
+        for (const paginatedBlock of page.blocks) {
+          if (paginatedBlock.type === 'heading') {
+            if (headingCount === headingIndexAmongHeadings) {
+              const blockOrder = paginatedBlock.content?.order ?? paginatedBlock.order;
+              const doScroll = () => {
+                const el = window.document.querySelector(`[data-paragraph-id="${blockOrder}"]`);
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              };
+              if (page.pageNumber !== currentPage && onPageChange) {
+                onPageChange(page.pageNumber);
+                setTimeout(doScroll, 300);
+              } else {
+                doScroll();
+              }
+              return;
+            }
+            headingCount++;
+          }
+        }
+      }
+    }
+    // Fallback: search DOM directly (for non-paginated documents)
     const headings = window.document.querySelectorAll('h1, h2, h3, h4, h5, h6');
     const headingArray = Array.from(headings);
-    
-    // Find heading that matches the order (0-indexed from structured blocks)
-    if (headingArray[headingOrder]) {
-      headingArray[headingOrder].scrollIntoView({ behavior: "smooth", block: "start" });
+    if (headingArray[headingIndexAmongHeadings]) {
+      headingArray[headingIndexAmongHeadings].scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
