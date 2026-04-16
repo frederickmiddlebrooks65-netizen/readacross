@@ -668,6 +668,23 @@ export async function attachAnchorsToStructuredContent(
       blocksWithAnchors.push(blockWithAnchor);
     }
     
+    // ORPHAN RECOVERY: Extend the last anchored block to cover any unmatched tail sentences
+    // This ensures short paragraphs filtered from blocks (e.g., < 50 chars) still appear in viewer
+    if (allSentences.length > 0 && usedSentenceIds.size > 0) {
+      const maxUsedId = Math.max(...usedSentenceIds);
+      const maxSentenceId = allSentences[allSentences.length - 1]?.id;
+      if (maxSentenceId > maxUsedId) {
+        const lastAnchoredBlock = [...blocksWithAnchors].reverse().find((b: any) => b.anchor);
+        if (lastAnchoredBlock && (lastAnchoredBlock as any).anchor) {
+          const oldEnd = (lastAnchoredBlock as any).anchor.sentenceEndId;
+          (lastAnchoredBlock as any).anchor.sentenceEndId = maxSentenceId;
+          (lastAnchoredBlock as any).anchor.matchedSentenceCount =
+            maxSentenceId - (lastAnchoredBlock as any).anchor.sentenceStartId + 1;
+          console.log(`[AnchorUtils] 🔧 Orphan recovery: extended last block anchor from ${oldEnd} → ${maxSentenceId} (${maxSentenceId - maxUsedId} orphaned sentences recovered)`);
+        }
+      }
+    }
+
     const duration = Date.now() - startTime;
     const successRate = safeBlocks.length > 0 ? (attachedCount / safeBlocks.length * 100).toFixed(1) : "0";
     const anchorsAttachedRate = parseFloat(successRate) / 100;

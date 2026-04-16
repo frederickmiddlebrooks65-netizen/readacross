@@ -92,6 +92,7 @@ interface RightDrawerProps {
   // Pagination support for outline navigation
   currentPage?: number;
   onPageChange?: (page: number) => void;
+  blockPages?: Array<{ pageNumber: number; startBlockIndex: number; endBlockIndex: number; blocks: any[] }>;
   // Tab control (lifted to parent)
   activeTab?: "document" | "notes" | "outline";
   onTabChange?: (tab: "document" | "notes" | "outline") => void;
@@ -145,6 +146,7 @@ export default function RightDrawer({
   // Pagination support
   currentPage = 1,
   onPageChange,
+  blockPages,
   // Tab control (lifted to parent)
   activeTab: activeTabProp = "document",
   onTabChange,
@@ -570,7 +572,26 @@ export default function RightDrawer({
   }, [document, navigateSearchTerm]);
 
   // Scroll to search result with Modern Zen word-level highlight
-  const scrollToSearchResult = (sentenceId: number, isTranslation: boolean = false, paragraphIndex?: number) => {
+  // Find the correct page number for a given sentence using structured block anchors
+  const findPageForSentence = (sentenceId: number): number | null => {
+    if (!blockPages || blockPages.length === 0 || !document) return null;
+    const structuredBlocks = getStructuredBlocks(document);
+    for (let blockIdx = 0; blockIdx < structuredBlocks.length; blockIdx++) {
+      const block = structuredBlocks[blockIdx];
+      if (block.anchor &&
+          block.anchor.sentenceStartId <= sentenceId &&
+          sentenceId <= block.anchor.sentenceEndId) {
+        for (const page of blockPages) {
+          if (blockIdx >= page.startBlockIndex && blockIdx <= page.endBlockIndex) {
+            return page.pageNumber;
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const scrollToSearchResult = (sentenceId: number, isTranslation: boolean = false) => {
     const doScroll = () => {
       // Use specific element IDs to target source or translation correctly
       // Try multiple ID patterns used in SegmentViewer.tsx
@@ -673,14 +694,12 @@ export default function RightDrawer({
       }
     };
 
-    // Handle pagination: if result is on a different page, navigate first
-    if (paragraphIndex !== undefined && onPageChange) {
-      const targetPage = Math.floor((paragraphIndex - 1) / paragraphsPerPage) + 1;
-      if (targetPage !== currentPage) {
-        onPageChange(targetPage);
-        setTimeout(doScroll, 150);
-        return;
-      }
+    // Handle pagination: find the correct page using block-based page structure
+    const targetPage = findPageForSentence(sentenceId);
+    if (targetPage !== null && targetPage !== currentPage && onPageChange) {
+      onPageChange(targetPage);
+      setTimeout(doScroll, 300);
+      return;
     }
 
     doScroll();
@@ -1389,7 +1408,7 @@ export default function RightDrawer({
                           <Card
                             key={`${result.sentenceId}-${index}`}
                             className="cursor-pointer hover:bg-accent/50 transition-colors"
-                            onClick={() => scrollToSearchResult(result.sentenceId, result.isTranslation, result.paragraphIndex)}
+                            onClick={() => scrollToSearchResult(result.sentenceId, result.isTranslation)}
                             data-testid={`search-result-${index}`}
                           >
                             <CardContent className="p-3">

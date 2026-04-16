@@ -509,6 +509,7 @@ export default function Viewer() {
 
   // Use block-based pagination hook - calculates pages ONCE at document load
   const {
+    pages: blockPages,
     currentPageBlocks,
     currentPage: hookCurrentPage,
     totalPages,
@@ -1161,6 +1162,7 @@ export default function Viewer() {
         onDocumentWidthChange={(width) => updateSetting('documentWidth', width)}
         currentPage={currentPage}
         onPageChange={handleSetCurrentPage}
+        blockPages={blockPages}
         onDownload={() => {
           if (document) {
             // Create downloadable content from sentences
