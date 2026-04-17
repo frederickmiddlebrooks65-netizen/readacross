@@ -1159,9 +1159,10 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
         results.set(id, translation);
       });
 
-      // Detect failures by finding sentence IDs missing from results
+      // Detect failures: missing IDs or placeholder-prefixed translations
       for (const s of sentences) {
-        if (!results.has(s.id)) {
+        const t = results.get(s.id);
+        if (!t || t.startsWith('[Translation Error:') || t.startsWith('[Translation pending]')) {
           failedSentences.push(s.id);
         }
       }
@@ -1196,8 +1197,11 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
           results.set(id, translation);
         });
 
-        // Detect failures by finding chunk sentence IDs missing from results
-        const chunkFailedIds = chunk.map(s => s.id).filter(id => !results.has(id));
+        // Detect failures: missing IDs or placeholder-prefixed translations
+        const chunkFailedIds = chunk.map(s => s.id).filter(id => {
+          const t = results.get(id);
+          return !t || t.startsWith('[Translation Error:') || t.startsWith('[Translation pending]');
+        });
         if (chunkFailedIds.length > 0) {
           chunkFailedIds.forEach(id => failedSentences.push(id));
           console.warn(`[GLOBAL_TRANSLATE] Chunk ${i + 1}: ${chunkFailedIds.length} sentences untranslated, will be retried`);

@@ -1336,11 +1336,6 @@ async function translateDocumentInBackground(
         });
 
         console.log(`[TRANSLATE] Document ${documentId}: ${translatedCount}/${totalSentences} sentences translated`);
-
-        // Brief delay between paragraphs to stay within API rate limits
-        if (pIdx < paragraphs.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 400));
-        }
       } catch (paragraphError) {
         console.error(`[TRANSLATE] Failed to translate paragraph ${pIdx}:`, paragraphError);
         sendSSEEvent(documentId, {
@@ -1348,6 +1343,11 @@ async function translateDocumentInBackground(
           paragraphIndex: pIdx,
           error: String(paragraphError),
         });
+      } finally {
+        // Always pace requests to stay within API rate limits, even after errors
+        if (pIdx < paragraphs.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 400));
+        }
       }
     }
 
