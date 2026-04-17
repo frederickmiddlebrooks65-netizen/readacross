@@ -1266,17 +1266,21 @@ async function translateDocumentInBackground(
       const paragraph = paragraphs[pIdx];
       const sentences = paragraph.sentences || [];
 
-      // Filter untranslated sentences
+      // Filter untranslated sentences — also re-try any that previously stored error placeholder text
       const untranslatedSentences = sentences
-        .filter((s: any) => !s.target)
+        .filter((s: any) => !s.target || s.target.startsWith('[Translation Error:') || s.target.startsWith('[Translation pending]'))
         .map((s: any) => ({
           id: s.id,
           source: s.source,
           type: headingSentenceIds.has(s.id) ? 'heading' as const : 'sentence' as const,
         }));
 
-      // Count already translated
-      const alreadyTranslated = sentences.filter((s: any) => s.target).length;
+      // Count already translated (exclude sentences with error placeholder text)
+      const alreadyTranslated = sentences.filter((s: any) =>
+        s.target &&
+        !s.target.startsWith('[Translation Error:') &&
+        !s.target.startsWith('[Translation pending]')
+      ).length;
       translatedCount += alreadyTranslated;
 
       if (untranslatedSentences.length === 0) {
@@ -1300,16 +1304,20 @@ async function translateDocumentInBackground(
           previousContext
         );
 
-        // Update sentences in database
+        // Update sentences in database — only persist clean translations (not error placeholders)
         const translatedSentences: Array<{ id: number; target: string }> = [];
         for (const [sentenceId, translation] of translations) {
+          if (translation.startsWith('[Translation Error:') || translation.startsWith('[Translation pending]')) {
+            console.warn(`[TRANSLATE] Skipping DB write for sentence ${sentenceId} — contains error placeholder`);
+            continue;
+          }
           await storage.updateSentence(sentenceId, { target: translation });
           translatedSentences.push({ id: sentenceId, target: translation });
           translatedCount++;
         }
 
-        // Build context for next paragraph
-        const paragraphTranslations = Array.from(translations.values()).join(" ");
+        // Build context for next paragraph (only from clean translations)
+        const paragraphTranslations = translatedSentences.map(s => s.target).join(" ");
         previousContext = paragraphTranslations.slice(-800);
 
         // Update translationUpdatedAt to prevent stale detection during active translation
@@ -1328,6 +1336,11 @@ async function translateDocumentInBackground(
         });
 
         console.log(`[TRANSLATE] Document ${documentId}: ${translatedCount}/${totalSentences} sentences translated`);
+
+        // Brief delay between paragraphs to stay within API rate limits
+        if (pIdx < paragraphs.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 400));
+        }
       } catch (paragraphError) {
         console.error(`[TRANSLATE] Failed to translate paragraph ${pIdx}:`, paragraphError);
         sendSSEEvent(documentId, {

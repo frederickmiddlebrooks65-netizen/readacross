@@ -1074,7 +1074,7 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
         model: modelName,
         safetySettings: SAFETY_SETTINGS,
         generationConfig: {
-          maxOutputTokens: Math.max(4096, chunk.reduce((sum, s) => sum + s.source.length * 2, 0)),
+          maxOutputTokens: Math.min(8192, Math.max(4096, chunk.reduce((sum, s) => sum + s.source.length * 2, 0))),
           temperature: 0.2,
           responseMimeType: "application/json",
         },
@@ -1119,16 +1119,16 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
 
       // Retry logic
       if (retryCount < MAX_RETRIES) {
-        console.log(`[CHUNK_TRANSLATE] Retrying chunk translation (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+        const delayMs = 2000 * (retryCount + 1); // 2s, 4s backoff
+        console.log(`[CHUNK_TRANSLATE] Retrying chunk translation (attempt ${retryCount + 2}/${MAX_RETRIES + 1}) after ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
         return this.translateChunk(chunk, context, overlapContext, retryCount + 1);
       }
 
-      // Mark all sentences in this chunk as failed
-      for (const sentence of chunk) {
-        results.set(sentence.id, `[Translation Error: This section requires retry] ${sentence.source}`);
-      }
-      return results;
+      // All retries exhausted — return empty results so sentences remain untranslated in DB
+      // and can be picked up on the next translation run. Do NOT store error text as translations.
+      console.warn(`[CHUNK_TRANSLATE] All retries exhausted for ${chunk.length} sentences. They will remain untranslated for retry.`);
+      return results; // empty map
     }
   }
 
@@ -1157,10 +1157,14 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
 
       directResult.forEach((translation, id) => {
         results.set(id, translation);
-        if (translation.startsWith("[Translation Error:")) {
-          failedSentences.push(id);
-        }
       });
+
+      // Detect failures by finding sentence IDs missing from results
+      for (const s of sentences) {
+        if (!results.has(s.id)) {
+          failedSentences.push(s.id);
+        }
+      }
 
       return {
         results,
@@ -1188,16 +1192,16 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
       try {
         const chunkResults = await this.translateChunk(chunk, context, overlapContext);
 
-        let chunkHasFailures = false;
         chunkResults.forEach((translation, id) => {
           results.set(id, translation);
-          if (translation.startsWith("[Translation Error:")) {
-            failedSentences.push(id);
-            chunkHasFailures = true;
-          }
         });
 
-        if (!chunkHasFailures) {
+        // Detect failures by finding chunk sentence IDs missing from results
+        const chunkFailedIds = chunk.map(s => s.id).filter(id => !results.has(id));
+        if (chunkFailedIds.length > 0) {
+          chunkFailedIds.forEach(id => failedSentences.push(id));
+          console.warn(`[GLOBAL_TRANSLATE] Chunk ${i + 1}: ${chunkFailedIds.length} sentences untranslated, will be retried`);
+        } else {
           successfulChunks++;
         }
 
@@ -1206,9 +1210,8 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
       } catch (error: any) {
         console.error(`[GLOBAL_TRANSLATE] Fatal error on chunk ${i + 1}:`, error);
 
-        // Mark all sentences in this chunk as failed
+        // Do NOT store error text — leave these sentences untranslated so they can be retried
         for (const sentence of chunk) {
-          results.set(sentence.id, `[Translation Error: This section requires retry] ${sentence.source}`);
           failedSentences.push(sentence.id);
         }
       }
