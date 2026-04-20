@@ -1186,7 +1186,11 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
       }
 
       if (onChunkComplete) {
-        await onChunkComplete(directResult, 0, 1);
+        try {
+          await onChunkComplete(directResult, 0, 1);
+        } catch (cbErr) {
+          console.error('[GLOBAL_TRANSLATE] onChunkComplete callback error (direct path):', cbErr);
+        }
       }
 
       return {
@@ -1232,7 +1236,11 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
         }
 
         if (onChunkComplete) {
-          await onChunkComplete(chunkResults, i, chunks.length);
+          try {
+            await onChunkComplete(chunkResults, i, chunks.length);
+          } catch (cbErr) {
+            console.error(`[GLOBAL_TRANSLATE] onChunkComplete callback error on chunk ${i + 1}:`, cbErr);
+          }
         }
 
         previousChunk = chunk;
@@ -1247,7 +1255,11 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
 
         // Still call callback with empty map so the caller can track progress
         if (onChunkComplete) {
-          await onChunkComplete(new Map(), i, chunks.length);
+          try {
+            await onChunkComplete(new Map(), i, chunks.length);
+          } catch (cbErr) {
+            console.error(`[GLOBAL_TRANSLATE] onChunkComplete callback error (failed chunk ${i + 1}):`, cbErr);
+          }
         }
       }
 
