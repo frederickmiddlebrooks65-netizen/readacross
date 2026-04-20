@@ -132,7 +132,9 @@ export default function Viewer() {
   // Derive translation state from document.translationStatus (server-side state)
   // This ensures state persists across page navigation
   const isTranslating = document?.translationStatus === 'running';
-  const isTranslationComplete = document?.translationStatus === 'completed';
+  // Only treat as "complete" if there are actually translated sentences — guards against
+  // documents stuck in "completed" state with 0 translations due to API errors.
+  const isTranslationComplete = document?.translationStatus === 'completed' && (document?.translatedCount ?? 0) > 0;
 
   // Query user documents to check if this document is already in library
   const { data: userDocuments } = useQuery({

@@ -1119,8 +1119,9 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
 
       // Retry logic
       if (retryCount < MAX_RETRIES) {
-        // Detect 429 rate limit errors — need a much longer backoff
+        // Detect error type to apply appropriate backoff
         const is429 = error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('quota');
+        const is503 = error.message?.includes('503') || error.message?.includes('Service Unavailable') || error.message?.includes('high demand');
 
         let delayMs: number;
         if (is429) {
@@ -1130,8 +1131,12 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
           const retrySeconds = retrySecMatch ? Math.ceil(parseFloat(retrySecMatch[1])) : 65;
           delayMs = (retrySeconds + 5) * 1000; // add 5s buffer
           console.warn(`[CHUNK_TRANSLATE] Rate limit (429) — waiting ${delayMs / 1000}s before retry (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
+        } else if (is503) {
+          // Model overloaded — wait 30s before retry (much longer than default 2s/4s)
+          delayMs = 30000;
+          console.warn(`[CHUNK_TRANSLATE] Model overloaded (503) — waiting 30s before retry (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
         } else {
-          delayMs = 2000 * (retryCount + 1); // 2s, 4s backoff for non-rate-limit errors
+          delayMs = 2000 * (retryCount + 1); // 2s, 4s backoff for other errors
           console.log(`[CHUNK_TRANSLATE] Retrying chunk translation (attempt ${retryCount + 2}/${MAX_RETRIES + 1}) after ${delayMs}ms...`);
         }
 

@@ -1339,24 +1339,28 @@ async function translateDocumentInBackground(
       console.log(`[TRANSLATE] Chunk ${chunkIdx + 1}/${totalChunks} saved — ${translatedCount}/${totalSentences} done`);
     };
 
-    // Run global translation: batches all untranslated sentences into ~10 API calls
-    // with 2-second pauses between chunks to respect API rate limits.
+    // Run global translation: batches all untranslated sentences into ~10 API calls.
+    // 15-second inter-chunk pause ensures we stay within free-tier rate limits (5 RPM).
     await GeminiService.translateGlobal(
       allUntranslatedSentences,
       { userEmail, userPlan, userId, sourceLanguage, targetLanguage },
       onChunkComplete,
-      2000,
+      15000,
     );
 
-    // Mark document as translation complete
-    await storage.updateDocument(documentId, { translationStatus: "completed" });
+    // If nothing was translated at all, mark as failed so the user can retry.
+    // Otherwise mark completed (partial translations are still usable).
+    const allFailed = translatedCount === 0;
+    const finalStatus = allFailed ? "failed" : "completed";
+    await storage.updateDocument(documentId, { translationStatus: finalStatus });
 
     sendSSEEvent(documentId, {
-      type: 'complete',
+      type: allFailed ? 'error' : 'complete',
       progress: { translated: translatedCount, total: totalSentences },
+      error: allFailed ? '번역 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' : undefined,
     });
 
-    console.log(`[TRANSLATE] ✅ Document ${documentId} batch translation completed: ${translatedCount}/${totalSentences} sentences`);
+    console.log(`[TRANSLATE] ${allFailed ? '❌ Failed' : '✅ Completed'} Document ${documentId}: ${translatedCount}/${totalSentences} sentences`);
   } catch (error) {
     console.error(`[TRANSLATE] Background translation error for document ${documentId}:`, error);
     await storage.updateDocument(documentId, { translationStatus: "failed" });
