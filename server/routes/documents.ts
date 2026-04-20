@@ -1221,7 +1221,6 @@ async function translateDocumentInBackground(
     const paragraphs = document.paragraphs || [];
     let translatedCount = 0;
     let totalSentences = 0;
-    let previousContext = "";
 
     const headingSentenceIds = new Set<number>();
     try {
@@ -1254,102 +1253,100 @@ async function translateDocumentInBackground(
 
     console.log(`[TRANSLATE] Dynamic target language: ${targetLanguage} (source: ${sourceLanguage}, user base: ${translationUser?.baseLanguage}, learning: ${translationUser?.learningLanguage})`);
 
-    // Count total sentences
-    for (const paragraph of paragraphs) {
-      totalSentences += (paragraph.sentences || []).length;
-    }
+    // Collect all sentences across every paragraph into one flat array.
+    // Track which paragraph each sentence belongs to for SSE notifications.
+    const allUntranslatedSentences: Array<{ id: number; source: string; type: 'heading' | 'sentence' }> = [];
+    const sentenceToParaMap = new Map<number, { paragraphId: number; paragraphIdx: number }>();
 
-    console.log(`[TRANSLATE] Document ${documentId}: ${paragraphs.length} paragraphs, ${totalSentences} total sentences`);
-
-    // Process paragraphs sequentially for context continuity
     for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
       const paragraph = paragraphs[pIdx];
       const sentences = paragraph.sentences || [];
+      totalSentences += sentences.length;
 
-      // Filter untranslated sentences — also re-try any that previously stored error placeholder text
-      const untranslatedSentences = sentences
-        .filter((s: any) => !s.target || s.target.startsWith('[Translation Error:') || s.target.startsWith('[Translation pending]'))
-        .map((s: any) => ({
-          id: s.id,
-          source: s.source,
-          type: headingSentenceIds.has(s.id) ? 'heading' as const : 'sentence' as const,
-        }));
+      for (const s of sentences) {
+        const isAlreadyTranslated = s.target &&
+          !s.target.startsWith('[Translation Error:') &&
+          !s.target.startsWith('[Translation pending]');
 
-      // Count already translated (exclude sentences with error placeholder text)
-      const alreadyTranslated = sentences.filter((s: any) =>
-        s.target &&
-        !s.target.startsWith('[Translation Error:') &&
-        !s.target.startsWith('[Translation pending]')
-      ).length;
-      translatedCount += alreadyTranslated;
-
-      if (untranslatedSentences.length === 0) {
-        console.log(`[TRANSLATE] Paragraph ${pIdx + 1}/${paragraphs.length}: Already translated`);
-        continue;
-      }
-
-      console.log(`[TRANSLATE] Paragraph ${pIdx + 1}/${paragraphs.length}: Translating ${untranslatedSentences.length} sentences`);
-
-      try {
-        // Batch translate the paragraph
-        const translations = await GeminiService.translateParagraphBatch(
-          untranslatedSentences,
-          {
-            userEmail,
-            userPlan,
-            userId,
-            sourceLanguage,
-            targetLanguage,
-          },
-          previousContext
-        );
-
-        // Update sentences in database — only persist clean translations (not error placeholders)
-        const translatedSentences: Array<{ id: number; target: string }> = [];
-        for (const [sentenceId, translation] of translations) {
-          if (translation.startsWith('[Translation Error:') || translation.startsWith('[Translation pending]')) {
-            console.warn(`[TRANSLATE] Skipping DB write for sentence ${sentenceId} — contains error placeholder`);
-            continue;
-          }
-          await storage.updateSentence(sentenceId, { target: translation });
-          translatedSentences.push({ id: sentenceId, target: translation });
+        if (isAlreadyTranslated) {
           translatedCount++;
-        }
-
-        // Build context for next paragraph (only from clean translations)
-        const paragraphTranslations = translatedSentences.map(s => s.target).join(" ");
-        previousContext = paragraphTranslations.slice(-800);
-
-        // Update translationUpdatedAt to prevent stale detection during active translation
-        await storage.updateDocument(documentId, {
-          translationUpdatedAt: new Date(),
-          translatedCount: translatedCount,
-        });
-
-        // Send SSE update for this paragraph
-        sendSSEEvent(documentId, {
-          type: 'paragraph_complete',
-          paragraphIndex: pIdx,
-          paragraphId: paragraph.id,
-          sentences: translatedSentences,
-          progress: { translated: translatedCount, total: totalSentences },
-        });
-
-        console.log(`[TRANSLATE] Document ${documentId}: ${translatedCount}/${totalSentences} sentences translated`);
-      } catch (paragraphError) {
-        console.error(`[TRANSLATE] Failed to translate paragraph ${pIdx}:`, paragraphError);
-        sendSSEEvent(documentId, {
-          type: 'paragraph_error',
-          paragraphIndex: pIdx,
-          error: String(paragraphError),
-        });
-      } finally {
-        // Always pace requests to stay within API rate limits, even after errors
-        if (pIdx < paragraphs.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 400));
+        } else {
+          allUntranslatedSentences.push({
+            id: s.id,
+            source: s.source,
+            type: headingSentenceIds.has(s.id) ? 'heading' : 'sentence',
+          });
+          sentenceToParaMap.set(s.id, { paragraphId: paragraph.id, paragraphIdx: pIdx });
         }
       }
     }
+
+    console.log(`[TRANSLATE] Document ${documentId}: ${paragraphs.length} paragraphs, ${totalSentences} total, ${translatedCount} already done, ${allUntranslatedSentences.length} to translate`);
+
+    if (allUntranslatedSentences.length === 0) {
+      // Nothing left to translate — mark complete immediately
+      await storage.updateDocument(documentId, { translationStatus: "completed" });
+      sendSSEEvent(documentId, {
+        type: 'complete',
+        progress: { translated: translatedCount, total: totalSentences },
+      });
+      console.log(`[TRANSLATE] ✅ Document ${documentId} — all sentences already translated`);
+      return;
+    }
+
+    // Per-chunk callback: save clean translations to DB and emit SSE progress per paragraph
+    const onChunkComplete = async (
+      chunkResults: Map<number, string>,
+      chunkIdx: number,
+      totalChunks: number,
+    ) => {
+      if (chunkResults.size === 0) return;
+
+      const byParagraph = new Map<number, { paragraphId: number; sentences: Array<{ id: number; target: string }> }>();
+
+      for (const [sentenceId, translation] of chunkResults) {
+        if (translation.startsWith('[Translation Error:') || translation.startsWith('[Translation pending]')) {
+          console.warn(`[TRANSLATE] Skipping DB write for sentence ${sentenceId} — placeholder text`);
+          continue;
+        }
+        await storage.updateSentence(sentenceId, { target: translation });
+        translatedCount++;
+
+        const paraInfo = sentenceToParaMap.get(sentenceId);
+        if (paraInfo) {
+          if (!byParagraph.has(paraInfo.paragraphId)) {
+            byParagraph.set(paraInfo.paragraphId, { paragraphId: paraInfo.paragraphId, sentences: [] });
+          }
+          byParagraph.get(paraInfo.paragraphId)!.sentences.push({ id: sentenceId, target: translation });
+        }
+      }
+
+      await storage.updateDocument(documentId, {
+        translationUpdatedAt: new Date(),
+        translatedCount,
+      });
+
+      // Emit one SSE event per paragraph that received new translations in this chunk
+      for (const [, data] of byParagraph) {
+        sendSSEEvent(documentId, {
+          type: 'paragraph_complete',
+          paragraphId: data.paragraphId,
+          sentences: data.sentences,
+          progress: { translated: translatedCount, total: totalSentences },
+        });
+      }
+
+      console.log(`[TRANSLATE] Chunk ${chunkIdx + 1}/${totalChunks} saved — ${translatedCount}/${totalSentences} done`);
+    };
+
+    // Run global translation: batches all untranslated sentences into ~10 API calls
+    // with 2-second pauses between chunks to respect API rate limits.
+    await GeminiService.translateGlobal(
+      allUntranslatedSentences,
+      { userEmail, userPlan, userId, sourceLanguage, targetLanguage },
+      onChunkComplete,
+      2000,
+    );
 
     // Mark document as translation complete
     await storage.updateDocument(documentId, { translationStatus: "completed" });

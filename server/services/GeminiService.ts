@@ -1119,8 +1119,22 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
 
       // Retry logic
       if (retryCount < MAX_RETRIES) {
-        const delayMs = 2000 * (retryCount + 1); // 2s, 4s backoff
-        console.log(`[CHUNK_TRANSLATE] Retrying chunk translation (attempt ${retryCount + 2}/${MAX_RETRIES + 1}) after ${delayMs}ms...`);
+        // Detect 429 rate limit errors — need a much longer backoff
+        const is429 = error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('quota');
+
+        let delayMs: number;
+        if (is429) {
+          // Parse retry delay from Gemini error response (e.g. "Please retry in 41s" or retryDelay:"41s")
+          const retrySecMatch = error.message?.match(/retry in (\d+(?:\.\d+)?)s/) ||
+                                error.message?.match(/"retryDelay":"(\d+)s"/);
+          const retrySeconds = retrySecMatch ? Math.ceil(parseFloat(retrySecMatch[1])) : 65;
+          delayMs = (retrySeconds + 5) * 1000; // add 5s buffer
+          console.warn(`[CHUNK_TRANSLATE] Rate limit (429) — waiting ${delayMs / 1000}s before retry (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
+        } else {
+          delayMs = 2000 * (retryCount + 1); // 2s, 4s backoff for non-rate-limit errors
+          console.log(`[CHUNK_TRANSLATE] Retrying chunk translation (attempt ${retryCount + 2}/${MAX_RETRIES + 1}) after ${delayMs}ms...`);
+        }
+
         await new Promise(resolve => setTimeout(resolve, delayMs));
         return this.translateChunk(chunk, context, overlapContext, retryCount + 1);
       }
@@ -1134,11 +1148,15 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
 
   /**
    * Global Translation Engine - Main entry point
-   * Handles any array of sentences with chunking, overlap, and fault tolerance
+   * Handles any array of sentences with chunking, overlap, and fault tolerance.
+   * Accepts an optional onChunkComplete callback invoked after each chunk to persist
+   * results and emit progress events incrementally.
    */
   static async translateGlobal(
     sentences: TranslationSentence[],
-    context: TranslationContext
+    context: TranslationContext,
+    onChunkComplete?: (chunkResults: Map<number, string>, chunkIndex: number, totalChunks: number) => Promise<void>,
+    interChunkDelayMs: number = 0,
   ): Promise<GlobalTranslationResult> {
     const results = new Map<number, string>();
     const failedSentences: number[] = [];
@@ -1165,6 +1183,10 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
         if (!t || t.startsWith('[Translation Error:') || t.startsWith('[Translation pending]')) {
           failedSentences.push(s.id);
         }
+      }
+
+      if (onChunkComplete) {
+        await onChunkComplete(directResult, 0, 1);
       }
 
       return {
@@ -1209,6 +1231,10 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
           successfulChunks++;
         }
 
+        if (onChunkComplete) {
+          await onChunkComplete(chunkResults, i, chunks.length);
+        }
+
         previousChunk = chunk;
 
       } catch (error: any) {
@@ -1218,6 +1244,17 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
         for (const sentence of chunk) {
           failedSentences.push(sentence.id);
         }
+
+        // Still call callback with empty map so the caller can track progress
+        if (onChunkComplete) {
+          await onChunkComplete(new Map(), i, chunks.length);
+        }
+      }
+
+      // Pause between chunks to respect API rate limits (skip after the last chunk)
+      if (interChunkDelayMs > 0 && i < chunks.length - 1) {
+        console.log(`[GLOBAL_TRANSLATE] Waiting ${interChunkDelayMs}ms before next chunk...`);
+        await new Promise(resolve => setTimeout(resolve, interChunkDelayMs));
       }
     }
 
