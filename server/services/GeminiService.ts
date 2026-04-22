@@ -1006,17 +1006,27 @@ Text: "${sampleText}"`;
       const raw = JSON.parse(sanitized);
       if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
         parsed = raw as Record<string, string>;
+      } else {
+        // JSON parsed successfully but returned wrong type (array, null, primitive)
+        throw new Error(`Response parsed as ${Array.isArray(raw) ? 'array' : typeof raw} instead of object`);
       }
     } catch (primaryError) {
-      // Step 3: JSON repair — try to recover by closing a truncated object
-      // Works best when the response is cut off mid-string (most common case)
-      const repaired = GeminiService.repairTruncatedJson(sanitized);
-      if (repaired && Object.keys(repaired).length > 0) {
-        console.warn(`[VALIDATION] JSON repair recovered ${Object.keys(repaired).length}/${expectedIds.length} translations from truncated response`);
-        parsed = repaired;
-      } else {
-        // Step 4: Regex pair extraction — works even when there are unescaped quotes in values
-        // because the regex matches individual pairs independently
+      const errMsg = String(primaryError);
+      const isTruncation = errMsg.includes('Unterminated') || errMsg.includes('Unexpected end') || errMsg.includes('unexpected end');
+
+      // Step 3: JSON repair — truncate at the last complete entry and close the object.
+      // Best for cut-off responses; skip for errors that don't look like truncation.
+      if (isTruncation || errMsg.includes('JSON')) {
+        const repaired = GeminiService.repairTruncatedJson(sanitized);
+        if (repaired && Object.keys(repaired).length > 0) {
+          console.warn(`[VALIDATION] JSON repair recovered ${Object.keys(repaired).length}/${expectedIds.length} translations from truncated response`);
+          parsed = repaired;
+        }
+      }
+
+      // Step 4: Regex pair extraction — works even when there are unescaped quotes in values
+      // because the regex matches individual pairs independently
+      if (!parsed) {
         const partial = GeminiService.extractPairsViaRegex(sanitized);
         if (Object.keys(partial).length > 0) {
           console.warn(`[VALIDATION] Partial JSON recovery via regex: ${Object.keys(partial).length}/${expectedIds.length} translations salvaged`);
@@ -1025,6 +1035,11 @@ Text: "${sampleText}"`;
           throw new Error(`Invalid JSON response: ${primaryError} — no translations recoverable`);
         }
       }
+    }
+
+    // Explicit guard: parsed must be a non-null, non-array object at this point
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Translation response did not resolve to a valid object');
     }
 
     // Warn about missing IDs
