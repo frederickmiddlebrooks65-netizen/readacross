@@ -113,8 +113,8 @@ const TOKEN_ESTIMATION = {
   KOREAN_CHARS_PER_TOKEN: 2,
   CJK_CHARS_PER_TOKEN: 2,
   DEFAULT_CHARS_PER_TOKEN: 3,
-  MIN_CHUNK_TOKENS: 2000,
-  MAX_CHUNK_TOKENS: 2500,
+  MIN_CHUNK_TOKENS: 1000,
+  MAX_CHUNK_TOKENS: 1200,
   OVERLAP_SENTENCES: 3, // Number of sentences to include as context
 } as const;
 
@@ -939,53 +939,115 @@ Text: "${sampleText}"`;
   }
 
   /**
-   * Validate LLM response format for batch translation
-   * Returns parsed translations if valid, throws error if invalid
+   * Extract all complete "id": "value" pairs from a JSON string using regex.
+   * Handles truncated responses and responses with unescaped quotes in values.
+   * Returns a partial map — may have fewer entries than expected if the response was cut off.
    */
+  private static extractPairsViaRegex(text: string): Record<string, string> {
+    const partial: Record<string, string> = {};
+    // Match "numericId": "value" where value handles escaped chars (\", \\, \n, etc.)
+    const pattern = /"(\d+)"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      const rawValue = match[2];
+      // Unescape standard JSON escape sequences
+      const unescaped = rawValue
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\r/g, '\r');
+      partial[match[1]] = unescaped;
+    }
+    return partial;
+  }
+
+  /**
+   * Attempt to repair a truncated JSON object by finding the last complete
+   * "id": "value" entry and closing the object at that point.
+   */
+  private static repairTruncatedJson(text: string): Record<string, string> | null {
+    const objStart = text.indexOf('{');
+    if (objStart < 0) return null;
+
+    // Find end position of each complete "id": "value" pair
+    const pairPattern = /"(\d+)"\s*:\s*"(?:[^"\\]|\\.)*"/g;
+    let lastEnd = -1;
+    let m: RegExpExecArray | null;
+    while ((m = pairPattern.exec(text)) !== null) {
+      lastEnd = m.index + m[0].length;
+    }
+    if (lastEnd <= objStart) return null;
+
+    const repaired = text.substring(objStart, lastEnd) + '}';
+    try {
+      const result = JSON.parse(repaired);
+      if (typeof result === 'object' && result !== null && !Array.isArray(result)) {
+        return result as Record<string, string>;
+      }
+    } catch {
+      // repair still failed — caller will fall through to regex extraction
+    }
+    return null;
+  }
+
   static validateTranslationResponse(
     responseText: string,
     expectedIds: number[]
   ): Record<string, string> {
-    let parsed: any;
+    // Step 1: Sanitize non-printable control characters that silently break JSON
+    // (keep \t \n \r which are valid in JSON strings when escaped)
+    const sanitized = responseText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
+    let parsed: Record<string, string> | null = null;
+
+    // Step 2: Standard JSON parse (fast path — works for well-formed responses)
     try {
-      parsed = JSON.parse(responseText);
-    } catch (e) {
-      throw new Error(`Invalid JSON response: ${e}`);
+      const raw = JSON.parse(sanitized);
+      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        parsed = raw as Record<string, string>;
+      }
+    } catch (primaryError) {
+      // Step 3: JSON repair — try to recover by closing a truncated object
+      // Works best when the response is cut off mid-string (most common case)
+      const repaired = GeminiService.repairTruncatedJson(sanitized);
+      if (repaired && Object.keys(repaired).length > 0) {
+        console.warn(`[VALIDATION] JSON repair recovered ${Object.keys(repaired).length}/${expectedIds.length} translations from truncated response`);
+        parsed = repaired;
+      } else {
+        // Step 4: Regex pair extraction — works even when there are unescaped quotes in values
+        // because the regex matches individual pairs independently
+        const partial = GeminiService.extractPairsViaRegex(sanitized);
+        if (Object.keys(partial).length > 0) {
+          console.warn(`[VALIDATION] Partial JSON recovery via regex: ${Object.keys(partial).length}/${expectedIds.length} translations salvaged`);
+          parsed = partial;
+        } else {
+          throw new Error(`Invalid JSON response: ${primaryError} — no translations recoverable`);
+        }
+      }
     }
 
-    // Must be an object (not array)
-    if (Array.isArray(parsed)) {
-      throw new Error("Response must be a JSON object, not an array");
-    }
-
-    if (typeof parsed !== "object" || parsed === null) {
-      throw new Error("Response must be a JSON object");
-    }
-
-    // Check that we got the expected sentence IDs
-    const responseIds = Object.keys(parsed).map(k => parseInt(k, 10));
-
-    // Warn if any expected IDs are missing
-    const missingIds = expectedIds.filter(id => !responseIds.includes(id));
+    // Warn about missing IDs
+    const responseIds = new Set(Object.keys(parsed));
+    const missingIds = expectedIds.filter(id => !responseIds.has(String(id)));
     if (missingIds.length > 0) {
       console.warn(`[VALIDATION] Missing translations for IDs: ${missingIds.join(", ")}`);
     }
 
-    // Check for merged sentences (value contains multiple sentence endings unusually)
+    // Check for merged sentences and non-string values
     for (const [id, translation] of Object.entries(parsed)) {
       if (typeof translation !== "string") {
-        throw new Error(`Translation for ID ${id} is not a string`);
+        console.warn(`[VALIDATION] Non-string translation for ID ${id}, skipping`);
+        delete parsed[id];
+        continue;
       }
-
-      // Basic check for merged sentences (heuristic)
       const sentenceEndings = (translation.match(/[.!?。！？]\s+[A-Z가-힣]/g) || []).length;
       if (sentenceEndings > 2) {
         console.warn(`[VALIDATION] Possible merged sentences detected for ID ${id}`);
       }
     }
 
-    return parsed as Record<string, string>;
+    return parsed;
   }
 
   /**
