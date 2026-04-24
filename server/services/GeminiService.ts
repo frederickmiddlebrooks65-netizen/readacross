@@ -113,8 +113,8 @@ const TOKEN_ESTIMATION = {
   KOREAN_CHARS_PER_TOKEN: 2,
   CJK_CHARS_PER_TOKEN: 2,
   DEFAULT_CHARS_PER_TOKEN: 3,
-  MIN_CHUNK_TOKENS: 1000,
-  MAX_CHUNK_TOKENS: 1200,
+  MIN_CHUNK_TOKENS: 2000,
+  MAX_CHUNK_TOKENS: 2500,
   OVERLAP_SENTENCES: 3, // Number of sentences to include as context
 } as const;
 
@@ -939,130 +939,53 @@ Text: "${sampleText}"`;
   }
 
   /**
-   * Extract all complete "id": "value" pairs from a JSON string using regex.
-   * Handles truncated responses and responses with unescaped quotes in values.
-   * Returns a partial map — may have fewer entries than expected if the response was cut off.
+   * Parse the <<<id>>>translation line-based format returned by the model.
+   * This format is immune to unescaped quotes, which was the root cause of
+   * JSON parse failures in dialogue-heavy Korean documents.
+   *
+   * Each entry is on its own line:  <<<353034>>>번역된 텍스트
+   * Any accidental newlines within a value are collapsed to a space.
+   * Markdown code fences and leading/trailing whitespace are stripped first.
    */
-  private static extractPairsViaRegex(text: string): Record<string, string> {
-    const partial: Record<string, string> = {};
-    // Match "numericId": "value" where value handles escaped chars (\", \\, \n, etc.)
-    const pattern = /"(\d+)"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(text)) !== null) {
-      const rawValue = match[2];
-      // Unescape standard JSON escape sequences
-      const unescaped = rawValue
-        .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\')
-        .replace(/\\n/g, '\n')
-        .replace(/\\t/g, '\t')
-        .replace(/\\r/g, '\r');
-      partial[match[1]] = unescaped;
-    }
-    return partial;
-  }
-
-  /**
-   * Attempt to repair a truncated JSON object by finding the last complete
-   * "id": "value" entry and closing the object at that point.
-   */
-  private static repairTruncatedJson(text: string): Record<string, string> | null {
-    const objStart = text.indexOf('{');
-    if (objStart < 0) return null;
-
-    // Find end position of each complete "id": "value" pair
-    const pairPattern = /"(\d+)"\s*:\s*"(?:[^"\\]|\\.)*"/g;
-    let lastEnd = -1;
-    let m: RegExpExecArray | null;
-    while ((m = pairPattern.exec(text)) !== null) {
-      lastEnd = m.index + m[0].length;
-    }
-    if (lastEnd <= objStart) return null;
-
-    const repaired = text.substring(objStart, lastEnd) + '}';
-    try {
-      const result = JSON.parse(repaired);
-      if (typeof result === 'object' && result !== null && !Array.isArray(result)) {
-        return result as Record<string, string>;
-      }
-    } catch {
-      // repair still failed — caller will fall through to regex extraction
-    }
-    return null;
-  }
-
-  static validateTranslationResponse(
+  static parseTranslationResponse(
     responseText: string,
     expectedIds: number[]
   ): Record<string, string> {
-    // Step 1: Sanitize non-printable control characters that silently break JSON
-    // (keep \t \n \r which are valid in JSON strings when escaped)
-    const sanitized = responseText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    const result: Record<string, string> = {};
 
-    let parsed: Record<string, string> | null = null;
+    // Strip markdown code fences the model occasionally adds
+    const cleaned = responseText
+      .replace(/^```[\w]*\n?/gm, '')
+      .replace(/^```$/gm, '')
+      .trim();
 
-    // Step 2: Standard JSON parse (fast path — works for well-formed responses)
-    try {
-      const raw = JSON.parse(sanitized);
-      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
-        parsed = raw as Record<string, string>;
-      } else {
-        // JSON parsed successfully but returned wrong type (array, null, primitive)
-        throw new Error(`Response parsed as ${Array.isArray(raw) ? 'array' : typeof raw} instead of object`);
-      }
-    } catch (primaryError) {
-      const errMsg = String(primaryError);
-      const isTruncation = errMsg.includes('Unterminated') || errMsg.includes('Unexpected end') || errMsg.includes('unexpected end');
-
-      // Step 3: JSON repair — truncate at the last complete entry and close the object.
-      // Best for cut-off responses; skip for errors that don't look like truncation.
-      if (isTruncation || errMsg.includes('JSON')) {
-        const repaired = GeminiService.repairTruncatedJson(sanitized);
-        if (repaired && Object.keys(repaired).length > 0) {
-          console.warn(`[VALIDATION] JSON repair recovered ${Object.keys(repaired).length}/${expectedIds.length} translations from truncated response`);
-          parsed = repaired;
-        }
-      }
-
-      // Step 4: Regex pair extraction — works even when there are unescaped quotes in values
-      // because the regex matches individual pairs independently
-      if (!parsed) {
-        const partial = GeminiService.extractPairsViaRegex(sanitized);
-        if (Object.keys(partial).length > 0) {
-          console.warn(`[VALIDATION] Partial JSON recovery via regex: ${Object.keys(partial).length}/${expectedIds.length} translations salvaged`);
-          parsed = partial;
-        } else {
-          throw new Error(`Invalid JSON response: ${primaryError} — no translations recoverable`);
+    // Split on <<<id>>> markers — each segment belongs to one sentence
+    const parts = cleaned.split(/(?=<<<\d+>>>)/);
+    for (const part of parts) {
+      const match = part.match(/^<<<(\d+)>>>([\s\S]*)/);
+      if (match) {
+        const id = match[1];
+        // Collapse any accidental internal newlines to a single space
+        const translation = match[2].trim().replace(/\n+/g, ' ');
+        if (translation) {
+          result[id] = translation;
         }
       }
     }
 
-    // Explicit guard: parsed must be a non-null, non-array object at this point
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('Translation response did not resolve to a valid object');
+    if (Object.keys(result).length === 0) {
+      throw new Error(
+        `No translations found in response. First 300 chars: ${responseText.substring(0, 300)}`
+      );
     }
 
-    // Warn about missing IDs
-    const responseIds = new Set(Object.keys(parsed));
-    const missingIds = expectedIds.filter(id => !responseIds.has(String(id)));
+    // Warn about missing IDs (logged but not fatal — partial results are saved)
+    const missingIds = expectedIds.filter(id => !result[String(id)]);
     if (missingIds.length > 0) {
-      console.warn(`[VALIDATION] Missing translations for IDs: ${missingIds.join(", ")}`);
+      console.warn(`[VALIDATION] Missing translations for IDs: ${missingIds.join(', ')}`);
     }
 
-    // Check for merged sentences and non-string values
-    for (const [id, translation] of Object.entries(parsed)) {
-      if (typeof translation !== "string") {
-        console.warn(`[VALIDATION] Non-string translation for ID ${id}, skipping`);
-        delete parsed[id];
-        continue;
-      }
-      const sentenceEndings = (translation.match(/[.!?。！？]\s+[A-Z가-힣]/g) || []).length;
-      if (sentenceEndings > 2) {
-        console.warn(`[VALIDATION] Possible merged sentences detected for ID ${id}`);
-      }
-    }
-
-    return parsed;
+    return result;
   }
 
   /**
@@ -1111,12 +1034,11 @@ CRITICAL RULES:
 - Sentences marked [HEADING] are section titles: translate as noun phrases (명사구), NOT full sentences. Do NOT add verb endings like ~이다/~하다. Example: "Ethical considerations" → "윤리적 고려 사항" (NOT "윤리적 고려 사항이다.")
 
 STRICT OUTPUT FORMAT:
-- Return ONLY a JSON object: {"sentence_id": "translated_text", ...}
-- Keys must be the exact sentence IDs as numbers or strings
-- Values must be the translated text only
-- NO arrays, NO reordered keys, NO merged sentences
-- NO additional fields, NO explanatory text
-- Each sentence ID maps to exactly ONE translated sentence
+- Output ONLY lines in the format: <<<sentence_id>>>translated_text
+- One line per sentence, no blank lines between entries
+- Do NOT wrap in JSON, markdown, or code fences
+- Do NOT add any text before or after the entries
+- Each sentence ID must appear exactly once
 ${contextSection}`
       : `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
 
@@ -1130,12 +1052,11 @@ CRITICAL RULES:
 - Sentences marked [HEADING] are section titles: translate as noun phrases, NOT full sentences. Keep them concise without verb endings.
 
 STRICT OUTPUT FORMAT:
-- Return ONLY a JSON object: {"sentence_id": "translated_text", ...}
-- Keys must be the exact sentence IDs as numbers or strings
-- Values must be the translated text only
-- NO arrays, NO reordered keys, NO merged sentences
-- NO additional fields, NO explanatory text
-- Each sentence ID maps to exactly ONE translated sentence
+- Output ONLY lines in the format: <<<sentence_id>>>translated_text
+- One line per sentence, no blank lines between entries
+- Do NOT wrap in JSON, markdown, or code fences
+- Do NOT add any text before or after the entries
+- Each sentence ID must appear exactly once
 ${contextSection}`;
 
     const prompt = `${systemPrompt}
@@ -1144,7 +1065,7 @@ Translate the following sentences from ${context.sourceLanguage} to ${context.ta
 
 ${sentenceList}
 
-Return ONLY a JSON object mapping sentence IDs to their translations:`;
+Output ONLY lines in the format <<<id>>>translation, one per sentence:`;
 
     try {
       const model = genAI.getGenerativeModel({
@@ -1153,7 +1074,6 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
         generationConfig: {
           maxOutputTokens: Math.min(8192, Math.max(4096, chunk.reduce((sum, s) => sum + s.source.length * 2, 0))),
           temperature: 0.2,
-          responseMimeType: "application/json",
         },
       });
 
@@ -1172,8 +1092,8 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
       const responseText = result.response.text();
       const expectedIds = chunk.map(s => s.id);
 
-      // Validate response format
-      const translations = this.validateTranslationResponse(responseText, expectedIds);
+      // Parse the <<<id>>>translation format
+      const translations = this.parseTranslationResponse(responseText, expectedIds);
 
       for (const sentence of chunk) {
         const translation = translations[sentence.id.toString()] || translations[String(sentence.id)];

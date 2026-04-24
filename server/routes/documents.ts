@@ -1339,13 +1339,12 @@ async function translateDocumentInBackground(
       console.log(`[TRANSLATE] Chunk ${chunkIdx + 1}/${totalChunks} saved — ${translatedCount}/${totalSentences} done`);
     };
 
-    // Run global translation: batches all untranslated sentences into ~10 API calls.
-    // 15-second inter-chunk pause ensures we stay within free-tier rate limits (5 RPM).
+    // Run global translation: batches all untranslated sentences into API calls.
     await GeminiService.translateGlobal(
       allUntranslatedSentences,
       { userEmail, userPlan, userId, sourceLanguage, targetLanguage },
       onChunkComplete,
-      15000,
+      2000,
     );
 
     // If nothing was translated at all, mark as failed so the user can retry.
