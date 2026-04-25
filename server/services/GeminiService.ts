@@ -939,53 +939,53 @@ Text: "${sampleText}"`;
   }
 
   /**
-   * Parse the <<<id>>>translation line-based format returned by the model.
-   * This format is immune to unescaped quotes, which was the root cause of
-   * JSON parse failures in dialogue-heavy Korean documents.
-   *
-   * Each entry is on its own line:  <<<353034>>>번역된 텍스트
-   * Any accidental newlines within a value are collapsed to a space.
-   * Markdown code fences and leading/trailing whitespace are stripped first.
+   * Validate LLM response format for batch translation
+   * Returns parsed translations if valid, throws error if invalid
    */
-  static parseTranslationResponse(
+  static validateTranslationResponse(
     responseText: string,
     expectedIds: number[]
   ): Record<string, string> {
-    const result: Record<string, string> = {};
+    let parsed: any;
 
-    // Strip markdown code fences the model occasionally adds
-    const cleaned = responseText
-      .replace(/^```[\w]*\n?/gm, '')
-      .replace(/^```$/gm, '')
-      .trim();
+    try {
+      parsed = JSON.parse(responseText);
+    } catch (e) {
+      throw new Error(`Invalid JSON response: ${e}`);
+    }
 
-    // Split on <<<id>>> markers — each segment belongs to one sentence
-    const parts = cleaned.split(/(?=<<<\d+>>>)/);
-    for (const part of parts) {
-      const match = part.match(/^<<<(\d+)>>>([\s\S]*)/);
-      if (match) {
-        const id = match[1];
-        // Collapse any accidental internal newlines to a single space
-        const translation = match[2].trim().replace(/\n+/g, ' ');
-        if (translation) {
-          result[id] = translation;
-        }
+    // Must be an object (not array)
+    if (Array.isArray(parsed)) {
+      throw new Error("Response must be a JSON object, not an array");
+    }
+
+    if (typeof parsed !== "object" || parsed === null) {
+      throw new Error("Response must be a JSON object");
+    }
+
+    // Check that we got the expected sentence IDs
+    const responseIds = Object.keys(parsed).map(k => parseInt(k, 10));
+
+    // Warn if any expected IDs are missing
+    const missingIds = expectedIds.filter(id => !responseIds.includes(id));
+    if (missingIds.length > 0) {
+      console.warn(`[VALIDATION] Missing translations for IDs: ${missingIds.join(", ")}`);
+    }
+
+    // Check for merged sentences (value contains multiple sentence endings unusually)
+    for (const [id, translation] of Object.entries(parsed)) {
+      if (typeof translation !== "string") {
+        throw new Error(`Translation for ID ${id} is not a string`);
+      }
+
+      // Basic check for merged sentences (heuristic)
+      const sentenceEndings = (translation.match(/[.!?。！？]\s+[A-Z가-힣]/g) || []).length;
+      if (sentenceEndings > 2) {
+        console.warn(`[VALIDATION] Possible merged sentences detected for ID ${id}`);
       }
     }
 
-    if (Object.keys(result).length === 0) {
-      throw new Error(
-        `No translations found in response. First 300 chars: ${responseText.substring(0, 300)}`
-      );
-    }
-
-    // Warn about missing IDs (logged but not fatal — partial results are saved)
-    const missingIds = expectedIds.filter(id => !result[String(id)]);
-    if (missingIds.length > 0) {
-      console.warn(`[VALIDATION] Missing translations for IDs: ${missingIds.join(', ')}`);
-    }
-
-    return result;
+    return parsed as Record<string, string>;
   }
 
   /**
@@ -1034,11 +1034,12 @@ CRITICAL RULES:
 - Sentences marked [HEADING] are section titles: translate as noun phrases (명사구), NOT full sentences. Do NOT add verb endings like ~이다/~하다. Example: "Ethical considerations" → "윤리적 고려 사항" (NOT "윤리적 고려 사항이다.")
 
 STRICT OUTPUT FORMAT:
-- Output ONLY lines in the format: <<<sentence_id>>>translated_text
-- One line per sentence, no blank lines between entries
-- Do NOT wrap in JSON, markdown, or code fences
-- Do NOT add any text before or after the entries
-- Each sentence ID must appear exactly once
+- Return ONLY a JSON object: {"sentence_id": "translated_text", ...}
+- Keys must be the exact sentence IDs as numbers or strings
+- Values must be the translated text only
+- NO arrays, NO reordered keys, NO merged sentences
+- NO additional fields, NO explanatory text
+- Each sentence ID maps to exactly ONE translated sentence
 ${contextSection}`
       : `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
 
@@ -1052,11 +1053,12 @@ CRITICAL RULES:
 - Sentences marked [HEADING] are section titles: translate as noun phrases, NOT full sentences. Keep them concise without verb endings.
 
 STRICT OUTPUT FORMAT:
-- Output ONLY lines in the format: <<<sentence_id>>>translated_text
-- One line per sentence, no blank lines between entries
-- Do NOT wrap in JSON, markdown, or code fences
-- Do NOT add any text before or after the entries
-- Each sentence ID must appear exactly once
+- Return ONLY a JSON object: {"sentence_id": "translated_text", ...}
+- Keys must be the exact sentence IDs as numbers or strings
+- Values must be the translated text only
+- NO arrays, NO reordered keys, NO merged sentences
+- NO additional fields, NO explanatory text
+- Each sentence ID maps to exactly ONE translated sentence
 ${contextSection}`;
 
     const prompt = `${systemPrompt}
@@ -1065,15 +1067,16 @@ Translate the following sentences from ${context.sourceLanguage} to ${context.ta
 
 ${sentenceList}
 
-Output ONLY lines in the format <<<id>>>translation, one per sentence:`;
+Return ONLY a JSON object mapping sentence IDs to their translations:`;
 
     try {
       const model = genAI.getGenerativeModel({
         model: modelName,
         safetySettings: SAFETY_SETTINGS,
         generationConfig: {
-          maxOutputTokens: Math.min(8192, Math.max(4096, chunk.reduce((sum, s) => sum + s.source.length * 2, 0))),
+          maxOutputTokens: Math.max(4096, chunk.reduce((sum, s) => sum + s.source.length * 2, 0)),
           temperature: 0.2,
+          responseMimeType: "application/json",
         },
       });
 
@@ -1092,8 +1095,8 @@ Output ONLY lines in the format <<<id>>>translation, one per sentence:`;
       const responseText = result.response.text();
       const expectedIds = chunk.map(s => s.id);
 
-      // Parse the <<<id>>>translation format
-      const translations = this.parseTranslationResponse(responseText, expectedIds);
+      // Validate response format
+      const translations = this.validateTranslationResponse(responseText, expectedIds);
 
       for (const sentence of chunk) {
         const translation = translations[sentence.id.toString()] || translations[String(sentence.id)];
@@ -1116,49 +1119,26 @@ Output ONLY lines in the format <<<id>>>translation, one per sentence:`;
 
       // Retry logic
       if (retryCount < MAX_RETRIES) {
-        // Detect error type to apply appropriate backoff
-        const is429 = error.message?.includes('429') || error.message?.includes('Too Many Requests') || error.message?.includes('quota');
-        const is503 = error.message?.includes('503') || error.message?.includes('Service Unavailable') || error.message?.includes('high demand');
-
-        let delayMs: number;
-        if (is429) {
-          // Parse retry delay from Gemini error response (e.g. "Please retry in 41s" or retryDelay:"41s")
-          const retrySecMatch = error.message?.match(/retry in (\d+(?:\.\d+)?)s/) ||
-                                error.message?.match(/"retryDelay":"(\d+)s"/);
-          const retrySeconds = retrySecMatch ? Math.ceil(parseFloat(retrySecMatch[1])) : 65;
-          delayMs = (retrySeconds + 5) * 1000; // add 5s buffer
-          console.warn(`[CHUNK_TRANSLATE] Rate limit (429) — waiting ${delayMs / 1000}s before retry (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
-        } else if (is503) {
-          // Model overloaded — wait 30s before retry (much longer than default 2s/4s)
-          delayMs = 30000;
-          console.warn(`[CHUNK_TRANSLATE] Model overloaded (503) — waiting 30s before retry (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
-        } else {
-          delayMs = 2000 * (retryCount + 1); // 2s, 4s backoff for other errors
-          console.log(`[CHUNK_TRANSLATE] Retrying chunk translation (attempt ${retryCount + 2}/${MAX_RETRIES + 1}) after ${delayMs}ms...`);
-        }
-
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        console.log(`[CHUNK_TRANSLATE] Retrying chunk translation (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
         return this.translateChunk(chunk, context, overlapContext, retryCount + 1);
       }
 
-      // All retries exhausted — return empty results so sentences remain untranslated in DB
-      // and can be picked up on the next translation run. Do NOT store error text as translations.
-      console.warn(`[CHUNK_TRANSLATE] All retries exhausted for ${chunk.length} sentences. They will remain untranslated for retry.`);
-      return results; // empty map
+      // Mark all sentences in this chunk as failed
+      for (const sentence of chunk) {
+        results.set(sentence.id, `[Translation Error: This section requires retry] ${sentence.source}`);
+      }
+      return results;
     }
   }
 
   /**
    * Global Translation Engine - Main entry point
-   * Handles any array of sentences with chunking, overlap, and fault tolerance.
-   * Accepts an optional onChunkComplete callback invoked after each chunk to persist
-   * results and emit progress events incrementally.
+   * Handles any array of sentences with chunking, overlap, and fault tolerance
    */
   static async translateGlobal(
     sentences: TranslationSentence[],
-    context: TranslationContext,
-    onChunkComplete?: (chunkResults: Map<number, string>, chunkIndex: number, totalChunks: number) => Promise<void>,
-    interChunkDelayMs: number = 0,
+    context: TranslationContext
   ): Promise<GlobalTranslationResult> {
     const results = new Map<number, string>();
     const failedSentences: number[] = [];
@@ -1177,23 +1157,10 @@ Output ONLY lines in the format <<<id>>>translation, one per sentence:`;
 
       directResult.forEach((translation, id) => {
         results.set(id, translation);
+        if (translation.startsWith("[Translation Error:")) {
+          failedSentences.push(id);
+        }
       });
-
-      // Detect failures: missing IDs or placeholder-prefixed translations
-      for (const s of sentences) {
-        const t = results.get(s.id);
-        if (!t || t.startsWith('[Translation Error:') || t.startsWith('[Translation pending]')) {
-          failedSentences.push(s.id);
-        }
-      }
-
-      if (onChunkComplete) {
-        try {
-          await onChunkComplete(directResult, 0, 1);
-        } catch (cbErr) {
-          console.error('[GLOBAL_TRANSLATE] onChunkComplete callback error (direct path):', cbErr);
-        }
-      }
 
       return {
         results,
@@ -1221,28 +1188,17 @@ Output ONLY lines in the format <<<id>>>translation, one per sentence:`;
       try {
         const chunkResults = await this.translateChunk(chunk, context, overlapContext);
 
+        let chunkHasFailures = false;
         chunkResults.forEach((translation, id) => {
           results.set(id, translation);
-        });
-
-        // Detect failures: missing IDs or placeholder-prefixed translations
-        const chunkFailedIds = chunk.map(s => s.id).filter(id => {
-          const t = results.get(id);
-          return !t || t.startsWith('[Translation Error:') || t.startsWith('[Translation pending]');
-        });
-        if (chunkFailedIds.length > 0) {
-          chunkFailedIds.forEach(id => failedSentences.push(id));
-          console.warn(`[GLOBAL_TRANSLATE] Chunk ${i + 1}: ${chunkFailedIds.length} sentences untranslated, will be retried`);
-        } else {
-          successfulChunks++;
-        }
-
-        if (onChunkComplete) {
-          try {
-            await onChunkComplete(chunkResults, i, chunks.length);
-          } catch (cbErr) {
-            console.error(`[GLOBAL_TRANSLATE] onChunkComplete callback error on chunk ${i + 1}:`, cbErr);
+          if (translation.startsWith("[Translation Error:")) {
+            failedSentences.push(id);
+            chunkHasFailures = true;
           }
+        });
+
+        if (!chunkHasFailures) {
+          successfulChunks++;
         }
 
         previousChunk = chunk;
@@ -1250,25 +1206,11 @@ Output ONLY lines in the format <<<id>>>translation, one per sentence:`;
       } catch (error: any) {
         console.error(`[GLOBAL_TRANSLATE] Fatal error on chunk ${i + 1}:`, error);
 
-        // Do NOT store error text — leave these sentences untranslated so they can be retried
+        // Mark all sentences in this chunk as failed
         for (const sentence of chunk) {
+          results.set(sentence.id, `[Translation Error: This section requires retry] ${sentence.source}`);
           failedSentences.push(sentence.id);
         }
-
-        // Still call callback with empty map so the caller can track progress
-        if (onChunkComplete) {
-          try {
-            await onChunkComplete(new Map(), i, chunks.length);
-          } catch (cbErr) {
-            console.error(`[GLOBAL_TRANSLATE] onChunkComplete callback error (failed chunk ${i + 1}):`, cbErr);
-          }
-        }
-      }
-
-      // Pause between chunks to respect API rate limits (skip after the last chunk)
-      if (interChunkDelayMs > 0 && i < chunks.length - 1) {
-        console.log(`[GLOBAL_TRANSLATE] Waiting ${interChunkDelayMs}ms before next chunk...`);
-        await new Promise(resolve => setTimeout(resolve, interChunkDelayMs));
       }
     }
 

@@ -132,9 +132,7 @@ export default function Viewer() {
   // Derive translation state from document.translationStatus (server-side state)
   // This ensures state persists across page navigation
   const isTranslating = document?.translationStatus === 'running';
-  // Only treat as "complete" if there are actually translated sentences — guards against
-  // documents stuck in "completed" state with 0 translations due to API errors.
-  const isTranslationComplete = document?.translationStatus === 'completed' && (document?.translatedCount ?? 0) > 0;
+  const isTranslationComplete = document?.translationStatus === 'completed';
 
   // Query user documents to check if this document is already in library
   const { data: userDocuments } = useQuery({
@@ -511,7 +509,6 @@ export default function Viewer() {
 
   // Use block-based pagination hook - calculates pages ONCE at document load
   const {
-    pages: blockPages,
     currentPageBlocks,
     currentPage: hookCurrentPage,
     totalPages,
@@ -1164,8 +1161,6 @@ export default function Viewer() {
         onDocumentWidthChange={(width) => updateSetting('documentWidth', width)}
         currentPage={currentPage}
         onPageChange={handleSetCurrentPage}
-        blockPages={blockPages}
-        scrollContainerRef={scrollRef}
         onDownload={() => {
           if (document) {
             // Create downloadable content from sentences
