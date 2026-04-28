@@ -785,12 +785,21 @@ router.post("/preview-url", async (req: Request, res: Response) => {
     // Extract content and metadata without creating document
     const result = await extractContentFromUrl(url);
 
+    // result.content is now HTML (Readability output) — strip tags for the
+    // user-facing "characters extracted" count so it reflects readable text
+    // length, not raw HTML length. The full HTML is still returned in
+    // `content` for downstream consumers that need it.
+    const textLength = result.content
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim().length;
+
     res.json({
       title: result.title,
       author: result.author,
       source: result.source,
       content: result.content,
-      contentLength: result.content.length
+      contentLength: textLength
     });
 
   } catch (error) {
