@@ -1436,10 +1436,33 @@ async function translateDocumentInBackground(
       // Non-critical: fall back to in-memory counter
     }
 
-    // Mark document as translation complete
+    // Decide final status based on whether all sentences were translated.
+    // If gap-fill couldn't fill every sentence after MAX_GAPFILL_PASSES, we
+    // surface this as a failure rather than silently marking complete. The
+    // user-visible error includes how many sentences are still missing.
+    const remainingGaps = totalSentences - finalTranslatedCount;
+    if (remainingGaps > 0) {
+      const gapMessage = `Translation incomplete: ${remainingGaps}/${totalSentences} sentences could not be translated after ${MAX_GAPFILL_PASSES} gap-fill attempts`;
+      await storage.updateDocument(documentId, {
+        translationStatus: "failed",
+        translatedCount: finalTranslatedCount,
+        translationError: gapMessage,
+      });
+      sendSSEEvent(documentId, {
+        type: 'error',
+        error: gapMessage,
+        progress: { translated: finalTranslatedCount, total: totalSentences },
+        remainingGaps,
+      });
+      console.warn(`[TRANSLATE] ⚠️ Document ${documentId} translation incomplete: ${finalTranslatedCount}/${totalSentences} (${remainingGaps} gaps remain)`);
+      return;
+    }
+
+    // All sentences translated — mark as complete.
     await storage.updateDocument(documentId, {
       translationStatus: "completed",
       translatedCount: finalTranslatedCount,
+      translationError: null,
     });
 
     sendSSEEvent(documentId, {

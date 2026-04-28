@@ -3,6 +3,7 @@ import {
   HarmCategory,
   HarmBlockThreshold,
   SchemaType,
+  type ResponseSchema,
 } from "@google/generative-ai";
 import { storage } from "../storage.js";
 import { TokenTrackingService } from "./TokenTrackingService.js";
@@ -1080,7 +1081,7 @@ Return the JSON array now:`;
     const sourceChars = chunk.reduce((sum, s) => sum + s.source.length, 0);
     const maxOutputTokens = Math.min(8192, Math.max(4096, sourceChars * 4));
 
-    const responseSchema: any = {
+    const responseSchema: ResponseSchema = {
       type: SchemaType.ARRAY,
       items: {
         type: SchemaType.OBJECT,
