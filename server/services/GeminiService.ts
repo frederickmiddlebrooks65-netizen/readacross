@@ -2,6 +2,7 @@ import {
   GoogleGenerativeAI,
   HarmCategory,
   HarmBlockThreshold,
+  SchemaType,
 } from "@google/generative-ai";
 import { storage } from "../storage.js";
 import { TokenTrackingService } from "./TokenTrackingService.js";
@@ -113,8 +114,13 @@ const TOKEN_ESTIMATION = {
   KOREAN_CHARS_PER_TOKEN: 2,
   CJK_CHARS_PER_TOKEN: 2,
   DEFAULT_CHARS_PER_TOKEN: 3,
-  MIN_CHUNK_TOKENS: 2000,
-  MAX_CHUNK_TOKENS: 2500,
+  // Tightened so a single chunk stays comfortably below the model's reliable
+  // output ceiling, avoiding mid-array truncation on long Korean dialogue.
+  MIN_CHUNK_TOKENS: 800,
+  MAX_CHUNK_TOKENS: 1200,
+  // Hard cap on sentences per chunk regardless of token estimate.
+  // Keeps each request small enough that the model rarely drops or merges entries.
+  MAX_SENTENCES_PER_CHUNK: 30,
   OVERLAP_SENTENCES: 3, // Number of sentences to include as context
 } as const;
 
@@ -885,7 +891,8 @@ Text: "${sampleText}"`;
   static createSentenceAwareChunks(
     sentences: TranslationSentence[],
     minTokens: number = TOKEN_ESTIMATION.MIN_CHUNK_TOKENS,
-    maxTokens: number = TOKEN_ESTIMATION.MAX_CHUNK_TOKENS
+    maxTokens: number = TOKEN_ESTIMATION.MAX_CHUNK_TOKENS,
+    maxSentences: number = TOKEN_ESTIMATION.MAX_SENTENCES_PER_CHUNK
   ): TranslationSentence[][] {
     const chunks: TranslationSentence[][] = [];
     let currentChunk: TranslationSentence[] = [];
@@ -894,8 +901,11 @@ Text: "${sampleText}"`;
     for (const sentence of sentences) {
       const sentenceTokens = this.estimateTokenCount(sentence.source);
 
-      // If adding this sentence exceeds max tokens, start a new chunk
-      if (currentTokens + sentenceTokens > maxTokens && currentChunk.length > 0) {
+      // Start a new chunk if adding this sentence would exceed either the
+      // token budget or the hard sentence-count cap.
+      const wouldExceedTokens = currentTokens + sentenceTokens > maxTokens;
+      const wouldExceedCount = currentChunk.length >= maxSentences;
+      if ((wouldExceedTokens || wouldExceedCount) && currentChunk.length > 0) {
         chunks.push(currentChunk);
         currentChunk = [];
         currentTokens = 0;
@@ -903,11 +913,6 @@ Text: "${sampleText}"`;
 
       currentChunk.push(sentence);
       currentTokens += sentenceTokens;
-
-      // If we've reached a good stopping point (min tokens), check next sentence
-      if (currentTokens >= minTokens) {
-        // Continue adding until we hit max or natural break
-      }
     }
 
     // Don't forget the last chunk
@@ -942,55 +947,63 @@ Text: "${sampleText}"`;
    * Validate LLM response format for batch translation
    * Returns parsed translations if valid, throws error if invalid
    */
-  static validateTranslationResponse(
-    responseText: string,
-    expectedIds: number[]
-  ): Record<string, string> {
-    let parsed: any;
+  /**
+   * Parse a translation response that conforms to the array schema:
+   *   [{ "id": <int>, "text": "<translation>" }, ...]
+   *
+   * The Gemini SDK enforces the schema when responseSchema + responseMimeType
+   * are set, so we just need to JSON.parse and shape-check. Returns a Map of
+   * id → translation containing only entries with non-empty text.
+   */
+  static parseTranslationResponse(
+    responseText: string
+  ): Map<number, string> {
+    const out = new Map<number, string>();
 
+    let parsed: any;
     try {
       parsed = JSON.parse(responseText);
     } catch (e) {
       throw new Error(`Invalid JSON response: ${e}`);
     }
 
-    // Must be an object (not array)
+    // The schema declares an array at the root, but be defensive:
+    // also accept { translations: [...] } in case the model wraps it.
+    let arr: any[] | null = null;
     if (Array.isArray(parsed)) {
-      throw new Error("Response must be a JSON object, not an array");
+      arr = parsed;
+    } else if (parsed && Array.isArray(parsed.translations)) {
+      arr = parsed.translations;
     }
 
-    if (typeof parsed !== "object" || parsed === null) {
-      throw new Error("Response must be a JSON object");
+    if (!arr) {
+      throw new Error("Response must be a JSON array of {id, text} objects");
     }
 
-    // Check that we got the expected sentence IDs
-    const responseIds = Object.keys(parsed).map(k => parseInt(k, 10));
-
-    // Warn if any expected IDs are missing
-    const missingIds = expectedIds.filter(id => !responseIds.includes(id));
-    if (missingIds.length > 0) {
-      console.warn(`[VALIDATION] Missing translations for IDs: ${missingIds.join(", ")}`);
+    for (const entry of arr) {
+      if (!entry || typeof entry !== "object") continue;
+      const idRaw = entry.id;
+      const textRaw = entry.text;
+      const id = typeof idRaw === "number" ? idRaw : parseInt(String(idRaw), 10);
+      if (!Number.isFinite(id)) continue;
+      const text = typeof textRaw === "string" ? textRaw.trim() : "";
+      if (text.length === 0) continue;
+      out.set(id, text);
     }
 
-    // Check for merged sentences (value contains multiple sentence endings unusually)
-    for (const [id, translation] of Object.entries(parsed)) {
-      if (typeof translation !== "string") {
-        throw new Error(`Translation for ID ${id} is not a string`);
-      }
-
-      // Basic check for merged sentences (heuristic)
-      const sentenceEndings = (translation.match(/[.!?。！？]\s+[A-Z가-힣]/g) || []).length;
-      if (sentenceEndings > 2) {
-        console.warn(`[VALIDATION] Possible merged sentences detected for ID ${id}`);
-      }
-    }
-
-    return parsed as Record<string, string>;
+    return out;
   }
 
   /**
-   * Translate a single chunk with retry logic
-   * Returns map of sentence ID to translation
+   * Translate a single chunk and return only the IDs that came back with a
+   * non-empty translation. Missing or failed IDs are simply absent from the
+   * returned map so the caller (translateGlobal / gap-fill loop) can retry
+   * just those sentences instead of writing placeholder text to the database.
+   *
+   * The model output is constrained by responseSchema so the SDK enforces a
+   * `[{id:int, text:string}, ...]` shape with proper string escaping. This
+   * avoids the unescaped-quote / truncated-array failure modes that broke
+   * earlier JSON-object and `<<<id>>>` line formats on Korean dialogue.
    */
   static async translateChunk(
     chunk: TranslationSentence[],
@@ -998,9 +1011,8 @@ Text: "${sampleText}"`;
     overlapContext: { source: string; translation: string }[],
     retryCount: number = 0
   ): Promise<Map<number, string>> {
-    const MAX_RETRIES = 2;
+    const MAX_RETRIES = 3;
     const modelName = this.getModelForPlan(context.userPlan, false);
-    const results = new Map<number, string>();
 
     // Build the context section from overlap
     let contextSection = "";
@@ -1017,8 +1029,10 @@ Text: "${sampleText}"`;
       .join("\n\n");
 
     const isKoreanTarget = context.targetLanguage === "ko";
+    const expectedIds = chunk.map(s => s.id);
+    const expectedIdSet = new Set(expectedIds);
 
-    const systemPrompt = isKoreanTarget
+    const baseStyleRules = isKoreanTarget
       ? `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
 Output must be Korean 'plain academic style' (하다체): only ~다/~는다/~했다/~이다/~되다 endings.
 
@@ -1031,16 +1045,7 @@ CRITICAL RULES:
 - No colloquialisms, no honorifics, no emojis
 - Use UTF-8 encoding for all text
 - Maintain consistency with the previous context if provided
-- Sentences marked [HEADING] are section titles: translate as noun phrases (명사구), NOT full sentences. Do NOT add verb endings like ~이다/~하다. Example: "Ethical considerations" → "윤리적 고려 사항" (NOT "윤리적 고려 사항이다.")
-
-STRICT OUTPUT FORMAT:
-- Return ONLY a JSON object: {"sentence_id": "translated_text", ...}
-- Keys must be the exact sentence IDs as numbers or strings
-- Values must be the translated text only
-- NO arrays, NO reordered keys, NO merged sentences
-- NO additional fields, NO explanatory text
-- Each sentence ID maps to exactly ONE translated sentence
-${contextSection}`
+- Sentences marked [HEADING] are section titles: translate as noun phrases (명사구), NOT full sentences. Do NOT add verb endings like ~이다/~하다. Example: "Ethical considerations" → "윤리적 고려 사항" (NOT "윤리적 고려 사항이다.")`
       : `You are a professional translator for ${context.sourceLanguage}→${context.targetLanguage}.
 
 CRITICAL RULES:
@@ -1050,33 +1055,53 @@ CRITICAL RULES:
 - Do not add explanations or comments
 - Use UTF-8 encoding for all text
 - Maintain consistency with the previous context if provided
-- Sentences marked [HEADING] are section titles: translate as noun phrases, NOT full sentences. Keep them concise without verb endings.
+- Sentences marked [HEADING] are section titles: translate as noun phrases, NOT full sentences. Keep them concise without verb endings.`;
 
-STRICT OUTPUT FORMAT:
-- Return ONLY a JSON object: {"sentence_id": "translated_text", ...}
-- Keys must be the exact sentence IDs as numbers or strings
-- Values must be the translated text only
-- NO arrays, NO reordered keys, NO merged sentences
-- NO additional fields, NO explanatory text
-- Each sentence ID maps to exactly ONE translated sentence
-${contextSection}`;
+    const outputFormatRules = `STRICT OUTPUT FORMAT:
+- Return ONLY a JSON array. Each element MUST be an object with exactly two fields: "id" (integer) and "text" (string).
+- Include EVERY input sentence ID exactly once, in the same order as the input.
+- "text" must be the translation only — no commentary, no quotes around the translation, no markdown.
+- Do NOT merge sentences. Do NOT skip sentences. Do NOT renumber.
+- Total number of array elements MUST equal the number of input sentences (${chunk.length}).`;
+
+    const systemPrompt = `${baseStyleRules}\n\n${outputFormatRules}${contextSection}`;
 
     const prompt = `${systemPrompt}
 
-Translate the following sentences from ${context.sourceLanguage} to ${context.targetLanguage}. Each sentence is prefixed with its ID in brackets.
+Translate the following ${chunk.length} sentences from ${context.sourceLanguage} to ${context.targetLanguage}. Each sentence is prefixed with its ID in brackets. The expected output is a JSON array of length ${chunk.length} containing the translation for every ID listed below.
 
 ${sentenceList}
 
-Return ONLY a JSON object mapping sentence IDs to their translations:`;
+Return the JSON array now:`;
 
+    // Generous output budget so a chunk of 30 short sentences can never be
+    // truncated mid-array. Korean output is roughly 1-1.5x the source length;
+    // English output of Korean source is shorter. 8192 is plenty for a 1200-token chunk.
+    const sourceChars = chunk.reduce((sum, s) => sum + s.source.length, 0);
+    const maxOutputTokens = Math.min(8192, Math.max(4096, sourceChars * 4));
+
+    const responseSchema: any = {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          id: { type: SchemaType.INTEGER },
+          text: { type: SchemaType.STRING },
+        },
+        required: ["id", "text"],
+      },
+    };
+
+    let parsed: Map<number, string>;
     try {
       const model = genAI.getGenerativeModel({
         model: modelName,
         safetySettings: SAFETY_SETTINGS,
         generationConfig: {
-          maxOutputTokens: Math.max(4096, chunk.reduce((sum, s) => sum + s.source.length * 2, 0)),
+          maxOutputTokens,
           temperature: 0.2,
           responseMimeType: "application/json",
+          responseSchema,
         },
       });
 
@@ -1093,43 +1118,54 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
       this.extractAndRecordTokens(result.response, context.userId, modelName);
 
       const responseText = result.response.text();
-      const expectedIds = chunk.map(s => s.id);
-
-      // Validate response format
-      const translations = this.validateTranslationResponse(responseText, expectedIds);
-
-      for (const sentence of chunk) {
-        const translation = translations[sentence.id.toString()] || translations[String(sentence.id)];
-        if (translation) {
-          const cleanedTranslation = isKoreanTarget
-            ? this.applyLocalCleanup(translation)
-            : translation;
-
-          results.set(sentence.id, cleanedTranslation);
-        } else {
-          console.warn(`[CHUNK_TRANSLATE] Missing translation for sentence ${sentence.id}`);
-          results.set(sentence.id, `[Translation pending] ${sentence.source}`);
-        }
-      }
-
-      return results;
-
+      parsed = this.parseTranslationResponse(responseText);
     } catch (error: any) {
       console.error(`[CHUNK_TRANSLATE] Chunk translation error (attempt ${retryCount + 1}):`, error.message);
 
-      // Retry logic
       if (retryCount < MAX_RETRIES) {
         console.log(`[CHUNK_TRANSLATE] Retrying chunk translation (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
         return this.translateChunk(chunk, context, overlapContext, retryCount + 1);
       }
 
-      // Mark all sentences in this chunk as failed
-      for (const sentence of chunk) {
-        results.set(sentence.id, `[Translation Error: This section requires retry] ${sentence.source}`);
-      }
-      return results;
+      // Out of retries: return empty so caller can decide what to do (gap-fill).
+      return new Map<number, string>();
     }
+
+    // Build the result, restricted to expected IDs only.
+    const results = new Map<number, string>();
+    for (const [id, text] of parsed) {
+      if (!expectedIdSet.has(id)) continue;
+      const cleaned = isKoreanTarget ? this.applyLocalCleanup(text) : text;
+      if (cleaned && cleaned.trim().length > 0) {
+        results.set(id, cleaned);
+      }
+    }
+
+    // If we missed any IDs, retry just the missing ones.
+    const missingIds = expectedIds.filter(id => !results.has(id));
+    if (missingIds.length > 0 && retryCount < MAX_RETRIES) {
+      const missingChunk = chunk.filter(s => missingIds.includes(s.id));
+      console.warn(
+        `[CHUNK_TRANSLATE] Missing ${missingIds.length}/${chunk.length} translations after attempt ${retryCount + 1}; retrying missing IDs only`
+      );
+      await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+      const retryResults = await this.translateChunk(
+        missingChunk,
+        context,
+        overlapContext,
+        retryCount + 1
+      );
+      for (const [id, text] of retryResults) {
+        results.set(id, text);
+      }
+    } else if (missingIds.length > 0) {
+      console.warn(
+        `[CHUNK_TRANSLATE] Giving up on ${missingIds.length} missing IDs after ${MAX_RETRIES + 1} attempts: ${missingIds.slice(0, 10).join(", ")}${missingIds.length > 10 ? "..." : ""}`
+      );
+    }
+
+    return results;
   }
 
   /**
@@ -1150,17 +1186,22 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
     const totalTokens = this.estimateSentencesTokenCount(sentences);
     console.log(`[GLOBAL_TRANSLATE] Starting translation of ${sentences.length} sentences (~${totalTokens} tokens)`);
 
-    // If under threshold, use direct translation (no chunking needed)
-    if (totalTokens <= TOKEN_ESTIMATION.MIN_CHUNK_TOKENS) {
+    // If under threshold AND under sentence cap, use direct translation.
+    if (
+      totalTokens <= TOKEN_ESTIMATION.MIN_CHUNK_TOKENS &&
+      sentences.length <= TOKEN_ESTIMATION.MAX_SENTENCES_PER_CHUNK
+    ) {
       console.log(`[GLOBAL_TRANSLATE] Under threshold, using direct batch translation`);
       const directResult = await this.translateChunk(sentences, context, []);
 
       directResult.forEach((translation, id) => {
         results.set(id, translation);
-        if (translation.startsWith("[Translation Error:")) {
-          failedSentences.push(id);
-        }
       });
+      for (const sentence of sentences) {
+        if (!directResult.has(sentence.id)) {
+          failedSentences.push(sentence.id);
+        }
+      }
 
       return {
         results,
@@ -1188,14 +1229,19 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
       try {
         const chunkResults = await this.translateChunk(chunk, context, overlapContext);
 
-        let chunkHasFailures = false;
+        // Successful translations get added to results.
         chunkResults.forEach((translation, id) => {
           results.set(id, translation);
-          if (translation.startsWith("[Translation Error:")) {
-            failedSentences.push(id);
+        });
+
+        // Anything missing from this chunk's response is a failure.
+        let chunkHasFailures = false;
+        for (const sentence of chunk) {
+          if (!chunkResults.has(sentence.id)) {
+            failedSentences.push(sentence.id);
             chunkHasFailures = true;
           }
-        });
+        }
 
         if (!chunkHasFailures) {
           successfulChunks++;
@@ -1206,9 +1252,9 @@ Return ONLY a JSON object mapping sentence IDs to their translations:`;
       } catch (error: any) {
         console.error(`[GLOBAL_TRANSLATE] Fatal error on chunk ${i + 1}:`, error);
 
-        // Mark all sentences in this chunk as failed
+        // Record failures without writing placeholder text — caller's gap-fill
+        // pass will retry these sentences.
         for (const sentence of chunk) {
-          results.set(sentence.id, `[Translation Error: This section requires retry] ${sentence.source}`);
           failedSentences.push(sentence.id);
         }
       }

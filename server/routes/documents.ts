@@ -1337,15 +1337,117 @@ async function translateDocumentInBackground(
       }
     }
 
+    // ===== Gap-fill pass =====
+    // After the main per-paragraph loop, sentences that the model dropped or
+    // failed to translate are still NULL in the database. Refetch the document
+    // and retry just those sentences in bounded passes, so the final
+    // `translatedCount` reflects what's actually in the DB.
+    const MAX_GAPFILL_PASSES = 3;
+    for (let pass = 1; pass <= MAX_GAPFILL_PASSES; pass++) {
+      const refreshed = await storage.getDocumentWithParagraphs(documentId, userId);
+      if (!refreshed) break;
+
+      const remaining: Array<{ id: number; source: string; type: 'heading' | 'sentence' }> = [];
+      const refreshedParagraphs: any[] = (refreshed as any).paragraphs || [];
+      for (const p of refreshedParagraphs) {
+        for (const s of (p.sentences || [])) {
+          if (!s.target || String(s.target).trim().length === 0) {
+            remaining.push({
+              id: s.id,
+              source: s.source,
+              type: headingSentenceIds.has(s.id) ? 'heading' : 'sentence',
+            });
+          }
+        }
+      }
+
+      if (remaining.length === 0) {
+        console.log(`[TRANSLATE] Gap-fill pass ${pass}: no remaining sentences, document fully translated`);
+        break;
+      }
+
+      console.log(`[TRANSLATE] Gap-fill pass ${pass}/${MAX_GAPFILL_PASSES}: ${remaining.length} sentences still untranslated`);
+
+      let filledThisPass = 0;
+      try {
+        const translations = await GeminiService.translateParagraphBatch(
+          remaining,
+          {
+            userEmail,
+            userPlan,
+            userId,
+            sourceLanguage,
+            targetLanguage,
+          },
+          previousContext
+        );
+
+        const translatedSentences: Array<{ id: number; target: string }> = [];
+        for (const [sentenceId, translation] of translations) {
+          if (!translation || translation.trim().length === 0) continue;
+          await storage.updateSentence(sentenceId, { target: translation });
+          translatedSentences.push({ id: sentenceId, target: translation });
+          translatedCount++;
+          filledThisPass++;
+        }
+
+        await storage.updateDocument(documentId, {
+          translationUpdatedAt: new Date(),
+          translatedCount: translatedCount,
+        });
+
+        if (translatedSentences.length > 0) {
+          sendSSEEvent(documentId, {
+            type: 'paragraph_complete',
+            paragraphIndex: -1,
+            paragraphId: -1,
+            sentences: translatedSentences,
+            progress: { translated: translatedCount, total: totalSentences },
+          });
+        }
+      } catch (gapError) {
+        console.error(`[TRANSLATE] Gap-fill pass ${pass} failed:`, gapError);
+      }
+
+      console.log(`[TRANSLATE] Gap-fill pass ${pass}: filled ${filledThisPass}/${remaining.length}`);
+
+      // If a pass made no progress, further passes won't help — give up.
+      if (filledThisPass === 0) {
+        console.warn(`[TRANSLATE] Gap-fill pass ${pass} made no progress; stopping`);
+        break;
+      }
+    }
+
+    // Recompute the final translated count from the database so the document
+    // status accurately reflects reality (in case the in-memory counter drifted).
+    let finalTranslatedCount = translatedCount;
+    try {
+      const finalDoc = await storage.getDocumentWithParagraphs(documentId, userId);
+      if (finalDoc) {
+        let count = 0;
+        for (const p of ((finalDoc as any).paragraphs || [])) {
+          for (const s of (p.sentences || [])) {
+            if (s.target && String(s.target).trim().length > 0) count++;
+          }
+        }
+        finalTranslatedCount = count;
+      }
+    } catch (_) {
+      // Non-critical: fall back to in-memory counter
+    }
+
     // Mark document as translation complete
-    await storage.updateDocument(documentId, { translationStatus: "completed" });
+    await storage.updateDocument(documentId, {
+      translationStatus: "completed",
+      translatedCount: finalTranslatedCount,
+    });
 
     sendSSEEvent(documentId, {
       type: 'complete',
-      progress: { translated: translatedCount, total: totalSentences },
+      progress: { translated: finalTranslatedCount, total: totalSentences },
     });
 
-    console.log(`[TRANSLATE] ✅ Document ${documentId} batch translation completed: ${translatedCount}/${totalSentences} sentences`);
+    console.log(`[TRANSLATE] ✅ Document ${documentId} batch translation completed: ${finalTranslatedCount}/${totalSentences} sentences`);
   } catch (error) {
     console.error(`[TRANSLATE] Background translation error for document ${documentId}:`, error);
     await storage.updateDocument(documentId, { translationStatus: "failed" });
