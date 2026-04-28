@@ -716,9 +716,13 @@ ${text}`;
       console.warn(`[BATCH_TRANSLATE] ${globalResult.failedSentences.length} sentences failed translation`);
     }
 
+    // `globalResult.results` already excludes any sentences the model failed to
+    // return, so `results.size` IS the successful count. Report that directly
+    // rather than subtracting `failedSentences.length` (which would double-count
+    // and could even go negative).
     console.log(
       `[BATCH_TRANSLATE] Completed: ${globalResult.successfulChunks}/${globalResult.totalChunks} chunks, ` +
-      `${globalResult.results.size - globalResult.failedSentences.length}/${sentences.length} sentences successful`
+      `${globalResult.results.size}/${sentences.length} sentences successful`
     );
 
     return globalResult.results;
