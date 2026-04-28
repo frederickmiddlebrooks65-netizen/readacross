@@ -317,15 +317,36 @@ export async function extractContentFromUrl(url: string): Promise<{
 
     const html = await response.text();
 
-    // Extract content using Readability-like approach
-    const { extractArticleContent } = await import('../utils/htmlParser.js');
-    const extractedContent = extractArticleContent(html, url);
+    // Use Readability to extract clean HTML (preserves <p> boundaries) so the
+    // downstream DocumentService HTML splitter can detect paragraphs. The
+    // previous path used extractArticleContent, which stripped all tags and
+    // collapsed whitespace, destroying every paragraph break before
+    // DocumentService ever saw the content.
+    let title: string | undefined;
+    let author: string | undefined;
+    let content: string;
+    try {
+      const article = extractArticle(html, url);
+      content = article.content; // HTML with <p> tags preserved
+      title = article.title;
+      author = article.byline;
+    } catch (readabilityError) {
+      console.warn(
+        '[extractContentFromUrl] Readability failed, falling back to legacy text extractor:',
+        readabilityError instanceof Error ? readabilityError.message : readabilityError,
+      );
+      const { extractArticleContent } = await import('../utils/htmlParser.js');
+      const extractedContent = extractArticleContent(html, url);
+      content = extractedContent.content;
+      title = extractedContent.title;
+      author = extractedContent.author;
+    }
 
     return {
-      title: extractedContent.title || urlObj.hostname,
-      author: extractedContent.author,
+      title: title || urlObj.hostname,
+      author,
       source: urlObj.hostname,
-      content: extractedContent.content
+      content,
     };
 
   } catch (error) {

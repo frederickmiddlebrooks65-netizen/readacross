@@ -452,15 +452,35 @@ export class DocumentService {
             `[DocumentService V2] HTML mode: extracted ${paragraphTexts.length} paragraphs from <p> tags`,
           );
         } else {
-          // Fallback: if no <p> tags, try splitting by double newlines or treating as single paragraph
+          // Safety net: no <p> tags found. The content may have been pre-stripped
+          // (e.g. legacy URL extractor) or use other block-level elements like
+          // <div>, <li>, <h2>, <br>, <blockquote>. Convert those boundaries to
+          // double newlines on the raw HTML *before* extracting text, so the
+          // double-newline splitter has real boundaries to work with.
+          //
+          // Order matters: insert double-newline markers into raw HTML, then let
+          // JSDOM strip the rest of the tags via textContent.
+          const blockBoundaryHtml = params.content
+            // self-closing / void block separators
+            .replace(/<br\s*\/?\s*>/gi, "\n\n")
+            .replace(/<hr\s*\/?\s*>/gi, "\n\n")
+            // closing tags for block-level containers
+            .replace(
+              /<\/(div|section|article|aside|header|footer|main|nav|figure|figcaption|li|ul|ol|dl|dd|dt|h[1-6]|blockquote|pre|table|tr|tbody|thead|tfoot)>/gi,
+              "\n\n",
+            );
+
+          const fallbackDom = new JSDOM(blockBoundaryHtml);
           const textContent =
-            dom.window.document.body?.textContent || params.content;
+            fallbackDom.window.document.body?.textContent ?? params.content;
+
           paragraphTexts = textContent
             .split(/\n\s*\n/)
-            .map((p: string) => p.trim())
+            .map((p: string) => p.replace(/[ \t]+/g, " ").trim())
             .filter((p: string) => p.length > 0);
+
           console.log(
-            `[DocumentService V2] HTML mode fallback: split into ${paragraphTexts.length} paragraphs`,
+            `[DocumentService V2] HTML mode fallback (block-boundary): split into ${paragraphTexts.length} paragraphs`,
           );
         }
       } else {
