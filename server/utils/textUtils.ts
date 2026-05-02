@@ -92,7 +92,7 @@ export function preprocessTextForSentenceProcessing(text: string): string {
  * - academic: Stricter rules, protect citations, formulas, abbreviations
  * - literary/essay/generic: Default behavior (unchanged)
  */
-export const SENTENCE_TOKENIZER_VERSION = "v2.4";
+export const SENTENCE_TOKENIZER_VERSION = "v2.5";
 
 export type DocumentArchetype = "academic" | "literary" | "essay" | "generic";
 
@@ -385,7 +385,7 @@ function splitIntoSentencesAcademic(cleanText: string): SentenceUnit[] {
     // Check if colon is followed by a complete sentence
     if (isColonFollowedByFullSentence(afterColon)) {
       // Split any sentences ending with .!? in [cursor, i)
-      const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9])/g;
+      const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9\uAC00-\uD7AF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF])/g;
       let lastEnd = cursor;
       let match;
       periodPattern.lastIndex = cursor;
@@ -424,7 +424,7 @@ function splitIntoSentencesAcademic(cleanText: string): SentenceUnit[] {
   // Step 2: Find valid sentence boundaries
   // Academic rule: terminal punctuation followed by whitespace and a plausible new-sentence start.
   // Allow leading quotes/brackets/paren before the first token, and allow digits (e.g., numbered lists).
-  const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9])/g;
+  const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9\uAC00-\uD7AF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF])/g;
   
   let lastEnd = cursor;
   let match;
@@ -554,7 +554,7 @@ function splitIntoSentencesLiterary(cleanText: string): SentenceUnit[] {
     // Check if colon is followed by a complete sentence
     if (isColonFollowedByFullSentence(afterColon)) {
       // Split any sentences ending with .!? in [cursor, i)
-      const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9])/g;
+      const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9\uAC00-\uD7AF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF])/g;
       let lastEnd = cursor;
       let match;
       periodPattern.lastIndex = cursor;
@@ -596,7 +596,7 @@ function splitIntoSentencesLiterary(cleanText: string): SentenceUnit[] {
   
   // Step 2: Find valid sentence boundaries (same as academic)
   // Terminal punctuation followed by whitespace and a capital letter or digit
-  const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9])/g;
+  const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9\uAC00-\uD7AF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF])/g;
   
   let lastEnd = cursor;
   let match;
@@ -711,7 +711,7 @@ function splitIntoSentencesEssay(cleanText: string): SentenceUnit[] {
     // Check if colon is followed by a complete sentence
     if (isColonFollowedByFullSentence(afterColon)) {
       // Split any sentences ending with .!? in [cursor, i)
-      const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9])/g;
+      const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9\uAC00-\uD7AF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF])/g;
       let lastEnd = cursor;
       let match;
       periodPattern.lastIndex = cursor;
@@ -753,7 +753,7 @@ function splitIntoSentencesEssay(cleanText: string): SentenceUnit[] {
   
   // Step 2: Find valid sentence boundaries (same as academic)
   // Terminal punctuation followed by whitespace and a capital letter or digit
-  const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9])/g;
+  const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9\uAC00-\uD7AF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF])/g;
   
   let lastEnd = cursor;
   let match;
@@ -870,7 +870,7 @@ function splitIntoSentencesDefault(cleanText: string): SentenceUnit[] {
     // Check if colon is followed by a complete sentence
     if (isColonFollowedByFullSentence(afterColon)) {
       // Split any sentences ending with .!? in [cursor, i)
-      const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9])/g;
+      const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9\uAC00-\uD7AF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF])/g;
       let lastEnd = cursor;
       let match;
       periodPattern.lastIndex = cursor;
@@ -909,7 +909,7 @@ function splitIntoSentencesDefault(cleanText: string): SentenceUnit[] {
   
   // Step 2: Find valid sentence boundaries (same as academic)
   // Terminal punctuation followed by whitespace and a capital letter or digit
-  const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9])/g;
+  const periodPattern = /([.!?])\s+(?=(?:["'\u201C\u201D\u2018\u2019\(\[\{]*\s*)?[A-Z0-9\uAC00-\uD7AF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF])/g;
   
   let lastEnd = cursor;
   let match;
