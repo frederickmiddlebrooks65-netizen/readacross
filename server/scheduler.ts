@@ -270,15 +270,12 @@ class CrawlerScheduler {
         await syncAllActiveFeeds();
       }
       
-      if (sourceType === 'arxiv' || sourceType === 'system' || sourceType === 'all') {
-        if (policy && policy.arxivEnabled === false) {
-          console.log('[SCHEDULER] arXiv source is disabled by admin, skipping');
-        } else {
-          console.log('[SCHEDULER] Starting arXiv sync...');
-          const result = await fetchDailyArxivPapers();
-          console.log(`[SCHEDULER] arXiv sync completed: ${result.papersAdded} papers added`);
-        }
+      if (sourceType === 'arxiv') {
+        // arXiv automatic crawling is disabled. URL-based arXiv imports
+        // continue to work via the generic URL importer.
+        console.log('[SCHEDULER] arXiv automatic sync is disabled, skipping');
       }
+      // Note: 'system' and 'all' no longer trigger arXiv sync.
       
       if (sourceType === 'gutenberg' || sourceType === 'system' || sourceType === 'all') {
         if (policy && policy.gutenbergEnabled === false) {
@@ -307,8 +304,9 @@ class CrawlerScheduler {
     console.log('[SCHEDULER] Seeding Foundation Content...');
     
     try {
-      // arXiv Foundation Papers
-      await seedFoundationArxivPapers();
+      // arXiv Foundation Papers seeding intentionally disabled —
+      // arXiv content is no longer auto-ingested.
+      // await seedFoundationArxivPapers();
       
       // Gutenberg Foundation Classics
       await seedFoundationClassics();
@@ -408,7 +406,10 @@ export function initializeScheduler() {
   
   crawlerScheduler.startRSSScheduler();
   crawlerScheduler.startUnifiedScheduler();
-  crawlerScheduler.startArxivDailyScheduler();
+  // arXiv daily scheduler intentionally disabled — arXiv content is no longer
+  // auto-crawled. URL-based arXiv imports continue to work via the generic
+  // URL importer in server/routes/documents.ts.
+  // crawlerScheduler.startArxivDailyScheduler();
   crawlerScheduler.startGutenbergWeeklyScheduler();
   crawlerScheduler.startExpirationCleanupScheduler();
   

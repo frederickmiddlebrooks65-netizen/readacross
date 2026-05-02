@@ -560,9 +560,15 @@ export async function initializeNewSources(): Promise<void> {
 
   const sources = [
     {
-      url: "https://learningenglish.voanews.com/api/zmg_pl-vomx-tpeymtm",
-      title: "VOA Learning English",
-      description: "News and feature stories in clear, simple English.",
+      url: "https://learningenglish.voanews.com/api/zkm-ql-vomx-tpej-rqi",
+      title: "VOA Learning English – As It Is",
+      description: '"As It Is" is a daily magazine-format show with stories for English learners.',
+      category: "News",
+    },
+    {
+      url: "https://learningenglish.voanews.com/api/ziiy_l-vomx-tpemgtv",
+      title: "VOA Learning English – News",
+      description: "VOA Learning English news and feature programs in simplified English (formerly Special English).",
       category: "News",
     },
   ];

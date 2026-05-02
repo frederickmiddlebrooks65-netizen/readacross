@@ -16,7 +16,7 @@ The system is built using TypeScript, with React for the frontend and Express.js
 
 ### Feature Specifications
 - **Translation System**: Offers optimized batch translation with context preservation, JSON response format, Server-Sent Events (SSE) for real-time updates, and Gemini-based text type detection.
-- **Content Integration**: Automated crawling and storage of public domain literature (e.g., Project Gutenberg) and academic papers (arXiv), including PDF text extraction and section-based processing.
+- **Content Integration**: Automated crawling and storage of public domain literature (Project Gutenberg) and curated RSS sources (VOA Learning English – "As It Is" and the general News feed). arXiv automatic ingestion is disabled; arXiv papers can still be added through URL-based import (handled by the generic URL importer in `server/routes/documents.ts`) and arXiv documents are excluded from the Explore page server-side via `getPublicLibraryDocuments` in `server/storage.ts`.
 - **Practice & Learning**: Features comprehensive session data recording, dynamic difficulty adaptation, flashcard and quiz modes, intelligent distractor generation, AI-powered daily review recommendations, and a Spaced Repetition System (Leitner algorithm).
 - **Document & Sentence Management**: Includes sorting, filtering, real-time searching within notebooks, a favorites system, enhanced status filters, bulk operations, and editable category dropdowns for documents.
 - **AI Coaching**: Provides AI-powered sentence coaching (polished translation, grammar insights, nuance tips) in comprehension and composition modes, with tier-based access.

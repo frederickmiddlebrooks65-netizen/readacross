@@ -108,7 +108,7 @@ import {
   type InsertCoaching
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql, inArray, like, desc, isNull, lt, isNotNull, asc, count, ilike } from "drizzle-orm";
+import { eq, ne, and, or, sql, inArray, like, desc, isNull, lt, isNotNull, asc, count, ilike } from "drizzle-orm";
 import { normalizeUrl, generateUrlHash, generateUrlCandidates, isValidFeedUrl } from "./utils/urlUtils";
 
 // Extended sentence interface that includes note data
@@ -1092,7 +1092,13 @@ export class DatabaseStorage implements IStorage {
 
 
   async getPublicLibraryDocuments(filters: LibraryFilters): Promise<Document[]> {
-    let conditions = [eq(documents.isPublic, true), eq(documents.isArchived, false)];
+    let conditions = [
+      eq(documents.isPublic, true),
+      eq(documents.isArchived, false),
+      // Exclude arXiv documents from the public Explore library.
+      // URL-based arXiv imports remain accessible via the user's own library.
+      ne(documents.source, 'arXiv'),
+    ];
 
     // Apply category filter with comprehensive mapping
     if (filters.category && filters.category !== 'all') {

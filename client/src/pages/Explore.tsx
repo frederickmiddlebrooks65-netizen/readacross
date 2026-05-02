@@ -670,9 +670,9 @@ export default function Explore() {
     const saved = localStorage.getItem("explore-system-sources");
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { arxiv: parsed.arxiv ?? true, gutenberg: parsed.gutenberg ?? true, voa: parsed.voa ?? true };
+      return { gutenberg: parsed.gutenberg ?? true, voa: parsed.voa ?? true };
     }
-    return { arxiv: true, gutenberg: true, voa: true };
+    return { gutenberg: true, voa: true };
   });
 
   const { toast } = useToast();
@@ -759,7 +759,6 @@ export default function Explore() {
       })();
 
       const source = doc.source;
-      if (source === "arXiv" && !systemSources.arxiv) return false;
       if (source === "Project Gutenberg" && !systemSources.gutenberg) return false;
       if (source === "VOA Learning English" && !systemSources.voa) return false;
 
@@ -782,7 +781,7 @@ export default function Explore() {
     const recommendations = recommendationsData.recommendations;
     const filtered = recommendations.filter((doc: any) => {
       const source = doc.source;
-      if (source === "arXiv" && !systemSources.arxiv) return false;
+      if (source === "arXiv") return false;
       if (source === "Project Gutenberg" && !systemSources.gutenberg) return false;
       if (source === "VOA Learning English" && !systemSources.voa) return false;
       return true;
@@ -1360,7 +1359,6 @@ export default function Explore() {
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(systemSources).map(([source, enabled]) => {
                       const sourceLabels: Record<string, { name: string; desc: string }> = {
-                        arxiv: { name: t('explore.arxiv'), desc: t('explore.arxivDesc') },
                         gutenberg: { name: t('explore.projectGutenberg'), desc: t('explore.projectGutenbergDesc') },
                         voa: { name: t('explore.voaLearningEnglish'), desc: t('explore.voaDesc') },
                       };

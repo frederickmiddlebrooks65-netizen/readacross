@@ -206,8 +206,9 @@ export async function seedPublicLibrary() {
     console.log("[seed] Seeding Gutenberg books...");
     await seedGutenbergBooks();
     
-    console.log("[seed] Seeding arXiv papers...");
-    await seedArxivPapers();
+    // arXiv automatic seeding is intentionally disabled.
+    // URL-based arXiv imports remain available via the generic URL importer.
+    console.log("[seed] arXiv automatic seeding skipped (disabled)");
     
     console.log("[seed] Public library seeding completed successfully");
   } catch (error) {

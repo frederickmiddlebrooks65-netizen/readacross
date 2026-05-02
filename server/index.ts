@@ -141,16 +141,10 @@ app.use((req, res, next) => {
         console.log(`Found ${gutenbergDocs.length} Gutenberg documents (all Foundation Classics seeded)`);
       }
 
-      // Check for arXiv content
-      const arxivDocs = existingPublicDocs.filter(doc => doc.source === "arXiv");
-      if (arxivDocs.length === 0) {
-        const { seedArxivPapers } = await import("./arxivCrawler.js");
-        console.log("Starting automatic arXiv papers seeding...");
-        await seedArxivPapers();
-        console.log("arXiv papers seeding completed successfully!");
-      } else {
-        console.log(`Found ${arxivDocs.length} existing arXiv documents, skipping arXiv seeding`);
-      }
+      // arXiv automatic seeding is intentionally disabled.
+      // arXiv papers are no longer auto-ingested. URL-based arXiv imports
+      // continue to work via the generic URL importer in routes/documents.ts.
+      // Manual admin seeding remains available via POST /api/library/seed-arxiv.
 
       // Set expiration dates for existing documents that don't have them
       await storage.setExpirationDatesForExistingDocuments();
