@@ -1065,7 +1065,9 @@ CRITICAL RULES:
     const outputFormatRules = `STRICT OUTPUT FORMAT:
 - Return ONLY a JSON array. Each element MUST be an object with exactly two fields: "id" (integer) and "text" (string).
 - Include EVERY input sentence ID exactly once, in the same order as the input.
-- "text" must be the translation only — no commentary, no quotes around the translation, no markdown.
+- "text" must be the translation only — no commentary, no markdown.
+- PRESERVE quotation marks that appear in the source EXACTLY as they appear, including dialogue quotes ("..." '...' “...” ‘...’ 「...」 『...』). Do NOT remove, add, or change quotation marks.
+- Do NOT wrap the entire translation in extra outer quotes that aren't in the source. (The JSON value itself is already a string; just put the translation inside it.)
 - Do NOT merge sentences. Do NOT skip sentences. Do NOT renumber.
 - Total number of array elements MUST equal the number of input sentences (${chunk.length}).`;
 
