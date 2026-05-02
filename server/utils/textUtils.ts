@@ -98,6 +98,11 @@ export type DocumentArchetype = "academic" | "literary" | "essay" | "generic";
 
 export interface SplitIntoSentencesOptions {
   archetype?: DocumentArchetype;
+  // Fast path for callers that have ALREADY cleaned the text (e.g. plain-text
+  // uploads where each paragraph comes from a `\n\s*\n` split). Skipping the
+  // PDF-oriented `smartNormalizeForSentenceProcessing` saves ~100ms per call
+  // on production-sized CJK paragraphs and prevents 30s+ upload hangs.
+  skipPreprocess?: boolean;
 }
 
 /**
@@ -988,7 +993,11 @@ export function splitIntoSentencesWithType(text: string, options?: SplitIntoSent
   }
 
   // P1 개선: 공통 전처리 함수 사용
-  const cleanText = preprocessTextForSentenceProcessing(text);
+  // Fast path: when caller guarantees the text is already clean (no embedded
+  // line-break artifacts, no HTML), skip the heavy smart-normalize pass.
+  const cleanText = options?.skipPreprocess
+    ? text.normalize('NFC')
+    : preprocessTextForSentenceProcessing(text);
 
   if (cleanText.length === 0) {
     return [];

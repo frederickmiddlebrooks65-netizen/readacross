@@ -46,8 +46,20 @@ export class DocumentService {
       throw new Error("Missing required fields");
     }
 
+    // Pre-clean the entire content ONCE (HTML strip + zero-widths + NFC).
+    // After this, each paragraph from `\n\s*\n` is already normalized, so we
+    // can pass `skipPreprocess: true` to splitIntoSentences and avoid the
+    // PDF-oriented smart-normalize pass per paragraph (which was the main
+    // cost of large CJK uploads — ~150ms × N paragraphs in production).
+    const cleanedContent = content
+      .replace(/<[^>]*>/g, '')
+      .replace(/&[a-zA-Z0-9#]+;/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .normalize('NFC');
+
     // Split content by paragraph (preserving structure)
-    const paragraphTexts = content
+    const paragraphTexts = cleanedContent
       .split(/\n\s*\n/)
       .map((p: string) => p.trim())
       .filter((p: string) => p.length > 0);
@@ -59,7 +71,8 @@ export class DocumentService {
       const paraContent = paragraphText;
 
       // Split sentences within this paragraph using unified function
-      let sentenceList = splitIntoSentences(paraContent);
+      // skipPreprocess: paragraph is already cleaned above
+      let sentenceList = splitIntoSentences(paraContent, { skipPreprocess: true });
 
       // Phase 2-3a hardening: never allow empty sentence arrays for translatable content
       if (sentenceList.length === 0) {
