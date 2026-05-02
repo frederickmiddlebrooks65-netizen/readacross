@@ -47,6 +47,7 @@ export default function HistorySidePanel({
 
   const { data, isLoading, refetch } = useQuery<HistoryResponse>({
     queryKey: ["/api/sentences", sentenceId, "history"],
+    queryFn: () => apiRequest(`/api/sentences/${sentenceId}/history`),
     enabled: isOpen && sentenceId != null,
   });
 
