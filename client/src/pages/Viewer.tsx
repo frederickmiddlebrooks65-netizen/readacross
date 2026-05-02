@@ -1104,6 +1104,10 @@ export default function Viewer() {
                       onOpenHistory={(sentenceId) => {
                         setHistoryPanelSentenceId(sentenceId);
                       }}
+                      onCloseSidePanels={() => {
+                        setIsAIDrawerOpen(false);
+                        setHistoryPanelSentenceId(null);
+                      }}
                       pendingRestore={pendingRestore}
                       onPendingRestoreApplied={() => setPendingRestore(null)}
                       isAIDrawerOpen={isAIDrawerOpen}

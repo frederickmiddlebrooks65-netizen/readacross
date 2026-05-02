@@ -90,6 +90,7 @@ interface SegmentViewerProps {
   onAddToGlossary?: (sentence: Sentence) => void;
   onOpenAIDrawer?: (sentence: Sentence, mode: "hover" | "edit") => void;
   onOpenHistory?: (sentenceId: number) => void;
+  onCloseSidePanels?: () => void;
   pendingRestore?: { sentenceId: number; text: string; ts: number } | null;
   onPendingRestoreApplied?: () => void;
   isAIDrawerOpen?: boolean;
@@ -1370,6 +1371,7 @@ export default function SegmentViewer({
   onAddToGlossary,
   onOpenAIDrawer,
   onOpenHistory,
+  onCloseSidePanels,
   pendingRestore,
   onPendingRestoreApplied,
   isAIDrawerOpen = false,
@@ -1714,6 +1716,7 @@ export default function SegmentViewer({
   };
 
   const handleSaveEdit = () => {
+    onCloseSidePanels?.();
     if (editingSentenceId && onUpdateSentence) {
       // Phase 3: Add anchor-based translation consistency validation
       const sentenceToUpdate = paragraphs
@@ -1771,6 +1774,7 @@ export default function SegmentViewer({
   };
 
   const handleCancelEdit = () => {
+    onCloseSidePanels?.();
     setEditingSentenceId(null);
     setEditedValue("");
     setHighlightedSentenceId(null);
