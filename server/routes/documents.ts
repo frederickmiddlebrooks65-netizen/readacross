@@ -543,10 +543,15 @@ router.post("/upload", authenticateJWT, upload.single("file"),
         console.log(`[File Upload] 🌐 Detected language: ${detectedSourceLanguage} (confidence: ${langDetection.confidence.toFixed(2)})`);
 
         // Use legacy pipeline for non-PDF files
+        // IMPORTANT: pass userId so the uploaded doc shows up in the user's
+        // own library list. Without this, GET /api/documents (which filters
+        // by userId) silently omits the new document and the user thinks the
+        // upload "did nothing".
         document = await DocumentService.createFromText({
           title: title || filename,
           content,
           sourceLanguage: detectedSourceLanguage,
+          userId: req.userId,
         });
       }
 
