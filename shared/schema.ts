@@ -253,6 +253,18 @@ export const sentences = pgTable("sentences", {
   language: text("language"), // The language of this specific sentence (Phase 1: language-agnostic)
 });
 
+// Sentence translation history - immutable log of AI + user translations
+export const sentenceTranslationHistory = pgTable("sentence_translation_history", {
+  id: serial("id").primaryKey(),
+  sentenceId: integer("sentence_id").references(() => sentences.id, { onDelete: "cascade" }).notNull(),
+  version: integer("version").notNull(),
+  translation: text("translation").notNull(),
+  type: text("type", { enum: ["ai", "user"] }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  sentenceVersionUnique: unique().on(table.sentenceId, table.version),
+}));
+
 // Translation cache table - stores previously translated text
 export const translationCache = pgTable("translation_cache", {
   id: serial("id").primaryKey(),
@@ -742,6 +754,11 @@ export const insertTranslationCacheSchema = createInsertSchema(translationCache)
   lastUsed: true,
 });
 
+export const insertSentenceTranslationHistorySchema = createInsertSchema(sentenceTranslationHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const updateSentenceSchema = z.object({
   isScrapped: z.boolean().optional(),
   note: z.string().nullable().optional(),
@@ -948,6 +965,9 @@ export type UpdateDocument = z.infer<typeof updateDocumentSchema>;
 
 export type InsertTranslationCache = z.infer<typeof insertTranslationCacheSchema>;
 export type TranslationCache = typeof translationCache.$inferSelect;
+
+export type InsertSentenceTranslationHistory = z.infer<typeof insertSentenceTranslationHistorySchema>;
+export type SentenceTranslationHistory = typeof sentenceTranslationHistory.$inferSelect;
 
 // Notebook Groups types  
 export type InsertNotebookGroup = z.infer<typeof insertNotebookGroupSchema>;

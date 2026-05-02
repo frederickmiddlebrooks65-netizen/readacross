@@ -33,6 +33,7 @@ import useImmersiveSettings from "@/hooks/useImmersiveSettings";
 import useKeyboardShortcuts from "@/hooks/useKeyboardShortcuts";
 import AddNoteModal from "@/components/AddNoteModal";
 import AISideDrawer from "@/components/AISideDrawer";
+import HistorySidePanel from "@/components/HistorySidePanel";
 import useBlockPagination, { PaginatedBlock } from "@/hooks/useBlockPagination";
 import {
   Dialog,
@@ -110,6 +111,14 @@ export default function Viewer() {
     target: string | null;
   } | null>(null);
   const [aiDrawerMode, setAIDrawerMode] = useState<"hover" | "edit">("hover");
+
+  // Translation history side panel state
+  const [historyPanelSentenceId, setHistoryPanelSentenceId] = useState<number | null>(null);
+  const [pendingRestore, setPendingRestore] = useState<{
+    sentenceId: number;
+    text: string;
+    ts: number;
+  } | null>(null);
   
   const isMobile = useIsMobile();
   const isMac = (navigator as any).userAgentData?.platform
@@ -948,7 +957,7 @@ export default function Viewer() {
         <div
           className={`
             flex-1 min-h-0 flex flex-col
-            ${(showRightDrawer || isAIDrawerOpen) ? 'max-[900px]:hidden' : ''}
+            ${(showRightDrawer || isAIDrawerOpen || historyPanelSentenceId !== null) ? 'max-[900px]:hidden' : ''}
           `}
         >
           {/* Page scroll container - THIS is the actual scroll target */}
@@ -1092,6 +1101,11 @@ export default function Viewer() {
                         setIsAIDrawerOpen(true);
                         // Note: hoveredSentence is managed inside SegmentViewer
                       }}
+                      onOpenHistory={(sentenceId) => {
+                        setHistoryPanelSentenceId(sentenceId);
+                      }}
+                      pendingRestore={pendingRestore}
+                      onPendingRestoreApplied={() => setPendingRestore(null)}
                       isAIDrawerOpen={isAIDrawerOpen}
                       fontSize={fontSize}
                       lineHeight={lineHeight}
@@ -1113,7 +1127,7 @@ export default function Viewer() {
           </div>
         </div>
         {/* Resize handle */}
-        {showRightDrawer && !isAIDrawerOpen && (
+        {showRightDrawer && !isAIDrawerOpen && historyPanelSentenceId === null && (
           <div
             className="w-1 flex-shrink-0 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors max-[900px]:hidden"
             onMouseDown={handleResizeStart}
@@ -1123,7 +1137,7 @@ export default function Viewer() {
         {/* Panel wrapper - flex child, width-animated */}
         <div
           className={`flex-shrink-0 overflow-hidden border-l border-border max-[900px]:hidden ${!isResizing ? 'transition-[width] duration-300 ease-out' : ''}`}
-          style={{ width: showRightDrawer && !isAIDrawerOpen && !!document ? panelWidth : 0 }}
+          style={{ width: showRightDrawer && !isAIDrawerOpen && historyPanelSentenceId === null && !!document ? panelWidth : 0 }}
         >
           <div style={{ width: panelWidth }} className="h-full">
         <RightDrawer
@@ -1403,6 +1417,22 @@ export default function Viewer() {
         mode={aiDrawerMode}
         documentSummary={document?.summaryEn || document?.summaryKo || ""}
         userDraft={aiDrawerSentence?.target || ""}
+      />
+
+      {/* Translation History Side Panel */}
+      <HistorySidePanel
+        isOpen={historyPanelSentenceId !== null}
+        sentenceId={historyPanelSentenceId}
+        onClose={() => setHistoryPanelSentenceId(null)}
+        onRestore={(text) => {
+          if (historyPanelSentenceId !== null) {
+            setPendingRestore({
+              sentenceId: historyPanelSentenceId,
+              text,
+              ts: Date.now(),
+            });
+          }
+        }}
       />
 
       {/* Login Dialog */}

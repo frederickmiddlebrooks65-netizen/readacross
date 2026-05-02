@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { StickyNote, Check, X, MessageSquare, Image as ImageIcon, Table, NotepadTextIcon, ChevronLeft, ChevronRight, Edit3, Highlighter, Sparkles, Loader2, ArrowRight, Crown, Bot } from "lucide-react";
+import { StickyNote, Check, X, MessageSquare, Image as ImageIcon, Table, NotepadTextIcon, ChevronLeft, ChevronRight, Edit3, Highlighter, Sparkles, Loader2, ArrowRight, Crown, Bot, History as HistoryIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import GlossaryTooltip from "./GlossaryTooltip";
@@ -89,6 +89,9 @@ interface SegmentViewerProps {
   onSaveSentence?: (sentence: Sentence) => void;
   onAddToGlossary?: (sentence: Sentence) => void;
   onOpenAIDrawer?: (sentence: Sentence, mode: "hover" | "edit") => void;
+  onOpenHistory?: (sentenceId: number) => void;
+  pendingRestore?: { sentenceId: number; text: string; ts: number } | null;
+  onPendingRestoreApplied?: () => void;
   isAIDrawerOpen?: boolean;
   fontSize?: number;
   lineHeight?: number;
@@ -335,7 +338,8 @@ function StructuredBlockRenderer({
   handleApplyCoachingTranslation,
   setShowAiCoaching,
   editPopupPosition,
-  onOpenAIDrawer
+  onOpenAIDrawer,
+  onOpenHistory
 }: {
   block: StructuredBlock;
   paragraphId?: number | string;
@@ -371,6 +375,7 @@ function StructuredBlockRenderer({
   setShowAiCoaching?: (show: boolean) => void;
   editPopupPosition?: { alignment: 'left' | 'right'; maxWidth: string };
   onOpenAIDrawer?: (sentence: Sentence, mode: "hover" | "edit") => void;
+  onOpenHistory?: (sentenceId: number) => void;
 }) {
   const { t } = useTranslation();
   // Determine the current lane based on mode
@@ -447,14 +452,36 @@ function StructuredBlockRenderer({
                         placeholder={t('viewer.enterTranslation')}
                       />
                       <span className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
-                        <button
-                          aria-label="AI 도우미"
-                          className="p-1.5 hover:bg-[hsl(var(--sage-subtle))] dark:hover:bg-slate-800/50 rounded text-xs flex items-center justify-center w-8 h-8 transition-all"
-                          onClick={() => onOpenAIDrawer?.({ id: sentence.id, source: sentence.source, target: editedValue || null } as any, "edit")}
-                          title="AI 도우미"
-                        >
-                          <Bot className="h-4 w-4 text-forest dark:text-slate-400" />
-                        </button>
+                        <span className="flex items-center gap-1">
+                          {(() => {
+                            const hasHistory = !!(sentence.target || sentence.targetEdited);
+                            return (
+                              <button
+                                aria-label="번역 히스토리"
+                                data-testid="button-history"
+                                disabled={!hasHistory}
+                                className={cn(
+                                  "p-1.5 rounded text-xs flex items-center justify-center w-8 h-8 transition-all",
+                                  hasHistory
+                                    ? "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                    : "opacity-40 cursor-not-allowed text-muted-foreground"
+                                )}
+                                onClick={() => hasHistory && onOpenHistory?.(sentence.id)}
+                                title={hasHistory ? "번역 히스토리" : "히스토리가 없습니다"}
+                              >
+                                <HistoryIcon className="h-4 w-4" />
+                              </button>
+                            );
+                          })()}
+                          <button
+                            aria-label="AI 도우미"
+                            className="p-1.5 hover:bg-[hsl(var(--sage-subtle))] dark:hover:bg-slate-800/50 rounded text-xs flex items-center justify-center w-8 h-8 transition-all"
+                            onClick={() => onOpenAIDrawer?.({ id: sentence.id, source: sentence.source, target: editedValue || null } as any, "edit")}
+                            title="AI 도우미"
+                          >
+                            <Bot className="h-4 w-4 text-forest dark:text-slate-400" />
+                          </button>
+                        </span>
                         <span className="flex gap-1">
                           <Button size="icon" variant="ghost" onClick={handleSaveEdit} className="h-7 w-7" title={t('viewer.save')}>
                             <Check className="h-4 w-4" />
@@ -754,19 +781,41 @@ function StructuredBlockRenderer({
                               placeholder={t('viewer.enterTranslation')}
                             />
                             <span className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
-                              <button
-                                aria-label="AI 도우미"
-                                data-testid="button-ai-review"
-                                className="p-1.5 hover:bg-[hsl(var(--sage-subtle))] dark:hover:bg-slate-800/50 rounded text-xs flex items-center justify-center w-8 h-8 transition-all"
-                                onClick={() => {
-                                  onOpenAIDrawer?.({ id: sentence.id, source: sentence.source, target: editedValue || null } as any, "edit");
-                                }}
-                                title="AI 도우미"
-                              >
-                                <Bot
-                                  aria-hidden="true"
-                                  className="h-4 w-4 text-forest dark:text-slate-400" />
-                              </button>
+                              <span className="flex items-center gap-1">
+                                {(() => {
+                                  const hasHistory = !!(sentence.target || sentence.targetEdited);
+                                  return (
+                                    <button
+                                      aria-label="번역 히스토리"
+                                      data-testid="button-history-structured"
+                                      disabled={!hasHistory}
+                                      className={cn(
+                                        "p-1.5 rounded text-xs flex items-center justify-center w-8 h-8 transition-all",
+                                        hasHistory
+                                          ? "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                          : "opacity-40 cursor-not-allowed text-muted-foreground"
+                                      )}
+                                      onClick={() => hasHistory && onOpenHistory?.(sentence.id)}
+                                      title={hasHistory ? "번역 히스토리" : "히스토리가 없습니다"}
+                                    >
+                                      <HistoryIcon className="h-4 w-4" />
+                                    </button>
+                                  );
+                                })()}
+                                <button
+                                  aria-label="AI 도우미"
+                                  data-testid="button-ai-review"
+                                  className="p-1.5 hover:bg-[hsl(var(--sage-subtle))] dark:hover:bg-slate-800/50 rounded text-xs flex items-center justify-center w-8 h-8 transition-all"
+                                  onClick={() => {
+                                    onOpenAIDrawer?.({ id: sentence.id, source: sentence.source, target: editedValue || null } as any, "edit");
+                                  }}
+                                  title="AI 도우미"
+                                >
+                                  <Bot
+                                    aria-hidden="true"
+                                    className="h-4 w-4 text-forest dark:text-slate-400" />
+                                </button>
+                              </span>
                               <span className="flex gap-1">
                                 <Button size="icon" variant="ghost" onClick={handleSaveEdit} className="h-7 w-7" title={t('viewer.save')}>
                                   <Check className="h-4 w-4" />
@@ -1320,6 +1369,9 @@ export default function SegmentViewer({
   onSaveSentence,
   onAddToGlossary,
   onOpenAIDrawer,
+  onOpenHistory,
+  pendingRestore,
+  onPendingRestoreApplied,
   isAIDrawerOpen = false,
   fontSize = 16,
   lineHeight = 1.6,
@@ -1434,6 +1486,18 @@ export default function SegmentViewer({
       textareaRef.current.setSelectionRange(length, length);
     }
   }, [editingSentenceId]);
+
+  // Apply restored translation text from history panel into the open editor
+  useEffect(() => {
+    if (
+      pendingRestore &&
+      editingSentenceId &&
+      pendingRestore.sentenceId === editingSentenceId
+    ) {
+      setEditedValue(pendingRestore.text);
+      onPendingRestoreApplied?.();
+    }
+  }, [pendingRestore, editingSentenceId, onPendingRestoreApplied]);
 
   // Auto-resize textarea - use setTimeout to ensure DOM is fully ready
   useEffect(() => {
@@ -1940,6 +2004,7 @@ export default function SegmentViewer({
                           setShowAiCoaching={setShowAiCoaching}
                           editPopupPosition={editPopupPosition}
                           onOpenAIDrawer={onOpenAIDrawer}
+                        onOpenHistory={onOpenHistory}
                         />
                       )}
 
@@ -2074,6 +2139,7 @@ export default function SegmentViewer({
                             setShowAiCoaching={setShowAiCoaching}
                             editPopupPosition={editPopupPosition}
                             onOpenAIDrawer={onOpenAIDrawer}
+                        onOpenHistory={onOpenHistory}
                           />
                         )}
 
@@ -2113,6 +2179,7 @@ export default function SegmentViewer({
                             setShowAiCoaching={setShowAiCoaching}
                             editPopupPosition={editPopupPosition}
                             onOpenAIDrawer={onOpenAIDrawer}
+                        onOpenHistory={onOpenHistory}
                           />
                         )}
 
@@ -2152,6 +2219,7 @@ export default function SegmentViewer({
                             setShowAiCoaching={setShowAiCoaching}
                             editPopupPosition={editPopupPosition}
                             onOpenAIDrawer={onOpenAIDrawer}
+                        onOpenHistory={onOpenHistory}
                           />
                         )}
 
@@ -2395,6 +2463,7 @@ export default function SegmentViewer({
                         setShowAiCoaching={setShowAiCoaching}
                         editPopupPosition={editPopupPosition}
                         onOpenAIDrawer={onOpenAIDrawer}
+                        onOpenHistory={onOpenHistory}
                       />
                     );
                   }
@@ -2438,6 +2507,7 @@ export default function SegmentViewer({
                         setShowAiCoaching={setShowAiCoaching}
                         editPopupPosition={editPopupPosition}
                         onOpenAIDrawer={onOpenAIDrawer}
+                        onOpenHistory={onOpenHistory}
                       />
                     );
                   }
@@ -2481,6 +2551,7 @@ export default function SegmentViewer({
                         setShowAiCoaching={setShowAiCoaching}
                         editPopupPosition={editPopupPosition}
                         onOpenAIDrawer={onOpenAIDrawer}
+                        onOpenHistory={onOpenHistory}
                       />
                     );
                   }

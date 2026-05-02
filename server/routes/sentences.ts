@@ -381,6 +381,89 @@ router.patch("/:id/translation", authenticateJWT, async (req: AuthenticatedReque
   }
 });
 
+// ===== Translation history =====
+// List the translation history for a sentence (newest first)
+router.get("/:id/history", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sentenceId = parseInt(req.params.id);
+    if (isNaN(sentenceId)) {
+      return res.status(400).json({ error: "Invalid sentence ID" });
+    }
+
+    const sentence = await storage.getSentenceById(sentenceId);
+    if (!sentence) {
+      return res.status(404).json({ error: "Sentence not found" });
+    }
+
+    const history = await storage.getSentenceTranslationHistory(sentenceId);
+
+    res.json({
+      sentenceId,
+      source: sentence.source,
+      currentTranslation: sentence.targetEdited ?? sentence.target ?? "",
+      history,
+    });
+  } catch (error) {
+    console.error("Error fetching sentence translation history:", error);
+    res.status(500).json({ error: "Failed to fetch translation history" });
+  }
+});
+
+// Restore a previous translation - saves current to history first, then returns the selected version's text
+router.post("/:id/history/restore", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sentenceId = parseInt(req.params.id);
+    const { historyId } = req.body as { historyId?: number };
+
+    if (isNaN(sentenceId)) {
+      return res.status(400).json({ error: "Invalid sentence ID" });
+    }
+    if (typeof historyId !== "number") {
+      return res.status(400).json({ error: "historyId is required" });
+    }
+
+    const sentence = await storage.getSentenceById(sentenceId);
+    if (!sentence) {
+      return res.status(404).json({ error: "Sentence not found" });
+    }
+
+    const allHistory = await storage.getSentenceTranslationHistory(sentenceId);
+    const target = allHistory.find((h) => h.id === historyId);
+    if (!target) {
+      return res.status(404).json({ error: "History entry not found" });
+    }
+
+    // Save the current translation to history before returning the restored text,
+    // so the user does not silently lose their working copy. Only save if the
+    // current text differs from the latest recorded history entry.
+    const currentText = (sentence.targetEdited ?? sentence.target ?? "").trim();
+    const latest = allHistory[0];
+    if (
+      currentText.length > 0 &&
+      currentText !== (latest?.translation ?? "").trim()
+    ) {
+      const nextVersion = (latest?.version ?? 0) + 1;
+      await storage.addSentenceTranslationHistory({
+        sentenceId,
+        type: "user",
+        translation: sentence.targetEdited ?? sentence.target ?? "",
+        version: nextVersion,
+      });
+    }
+
+    res.json({
+      success: true,
+      historyId: target.id,
+      version: target.version,
+      type: target.type,
+      translation: target.translation,
+    });
+  } catch (error) {
+    console.error("Error restoring translation history:", error);
+    res.status(500).json({ error: "Failed to restore translation history" });
+  }
+});
+
 // Get document info for a sentence
 router.get("/:id/document", async (req, res) => {
   try {

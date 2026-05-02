@@ -3,6 +3,7 @@ import {
   documents,
   paragraphs,
   sentences,
+  sentenceTranslationHistory,
   translationCache,
   translationAttempts,
   notebooks,
@@ -42,6 +43,8 @@ import {
   type UpdateDocument,
   type InsertTranslationCache,
   type TranslationCache,
+  type SentenceTranslationHistory,
+  type InsertSentenceTranslationHistory,
   type TranslationAttempt,
   type InsertTranslationAttempt,
   type Notebook,
@@ -216,6 +219,9 @@ export interface IStorage {
   createSentence(sentence: Omit<Sentence, "id" | "isScrapped" | "note" | "userTranslation" | "tags" | "practiced" | "practiceHistory" | "lastPracticedAt" | "status" | "practiceCount" | "userFeedback" | "styleVariations" | "notebookName" | "isFavorite">): Promise<Sentence>;
   updateSentence(id: number, changes: UpdateSentence): Promise<Sentence | undefined>;
   deleteSentence(id: number): Promise<boolean>;
+  // Translation history
+  getSentenceTranslationHistory(sentenceId: number): Promise<SentenceTranslationHistory[]>;
+  addSentenceTranslationHistory(entry: InsertSentenceTranslationHistory): Promise<SentenceTranslationHistory>;
   bulkDeleteSentences(sentenceIds: number[]): Promise<boolean>;
   validateSentenceOwnership(sentenceIds: number[], userId: number): Promise<number[]>;
   getUserSentences(filters: {
@@ -1401,13 +1407,128 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSentence(id: number, changes: UpdateSentence): Promise<Sentence | undefined> {
+    // Snapshot prior values to decide whether to log translation history
+    let priorTarget: string | null | undefined;
+    let priorTargetEdited: string | null | undefined;
+    const willTouchTranslation =
+      Object.prototype.hasOwnProperty.call(changes, 'target') ||
+      Object.prototype.hasOwnProperty.call(changes, 'targetEdited');
+
+    if (willTouchTranslation) {
+      const prior = await db
+        .select({ target: sentences.target, targetEdited: sentences.targetEdited })
+        .from(sentences)
+        .where(eq(sentences.id, id))
+        .limit(1);
+      if (prior.length > 0) {
+        priorTarget = prior[0].target ?? null;
+        priorTargetEdited = prior[0].targetEdited ?? null;
+      }
+    }
+
     const [updatedSentence] = await db
       .update(sentences)
       .set(changes)
       .where(eq(sentences.id, id))
       .returning();
 
+    if (updatedSentence && willTouchTranslation) {
+      try {
+        // First-time AI translation: previously empty `target` becomes non-empty.
+        if (
+          Object.prototype.hasOwnProperty.call(changes, 'target') &&
+          (changes as any).target &&
+          String((changes as any).target).trim().length > 0 &&
+          (!priorTarget || String(priorTarget).trim().length === 0)
+        ) {
+          await this.addSentenceTranslationHistory({
+            sentenceId: id,
+            type: 'ai',
+            translation: String((changes as any).target),
+            version: await this.getNextHistoryVersion(id),
+          });
+        }
+        // User edit: targetEdited changed to a different non-empty value.
+        if (
+          Object.prototype.hasOwnProperty.call(changes, 'targetEdited') &&
+          (changes as any).targetEdited &&
+          String((changes as any).targetEdited).trim().length > 0 &&
+          String((changes as any).targetEdited) !== String(priorTargetEdited ?? '')
+        ) {
+          await this.addSentenceTranslationHistory({
+            sentenceId: id,
+            type: 'user',
+            translation: String((changes as any).targetEdited),
+            version: await this.getNextHistoryVersion(id),
+          });
+        }
+      } catch (historyError) {
+        console.error('[updateSentence] Failed to record translation history:', historyError);
+      }
+    }
+
     return updatedSentence || undefined;
+  }
+
+  private async getNextHistoryVersion(sentenceId: number): Promise<number> {
+    const rows = await db
+      .select({ version: sentenceTranslationHistory.version })
+      .from(sentenceTranslationHistory)
+      .where(eq(sentenceTranslationHistory.sentenceId, sentenceId))
+      .orderBy(desc(sentenceTranslationHistory.version))
+      .limit(1);
+    return (rows[0]?.version ?? 0) + 1;
+  }
+
+  async getSentenceTranslationHistory(sentenceId: number): Promise<SentenceTranslationHistory[]> {
+    // Backfill: if a translation exists but no history rows, seed from current state
+    const existing = await db
+      .select()
+      .from(sentenceTranslationHistory)
+      .where(eq(sentenceTranslationHistory.sentenceId, sentenceId))
+      .orderBy(desc(sentenceTranslationHistory.version));
+
+    if (existing.length === 0) {
+      const sentence = await this.getSentenceById(sentenceId);
+      if (sentence) {
+        const aiText = sentence.target?.trim();
+        const editedText = sentence.targetEdited?.trim();
+        let nextVersion = 1;
+        if (aiText) {
+          await this.addSentenceTranslationHistory({
+            sentenceId,
+            type: 'ai',
+            translation: sentence.target!,
+            version: nextVersion++,
+          });
+        }
+        if (editedText && editedText !== aiText) {
+          await this.addSentenceTranslationHistory({
+            sentenceId,
+            type: 'user',
+            translation: sentence.targetEdited!,
+            version: nextVersion++,
+          });
+        }
+        if (nextVersion > 1) {
+          return await db
+            .select()
+            .from(sentenceTranslationHistory)
+            .where(eq(sentenceTranslationHistory.sentenceId, sentenceId))
+            .orderBy(desc(sentenceTranslationHistory.version));
+        }
+      }
+    }
+
+    return existing;
+  }
+
+  async addSentenceTranslationHistory(entry: InsertSentenceTranslationHistory): Promise<SentenceTranslationHistory> {
+    const [row] = await db
+      .insert(sentenceTranslationHistory)
+      .values(entry)
+      .returning();
+    return row;
   }
 
   async deleteSentence(id: number): Promise<boolean> {

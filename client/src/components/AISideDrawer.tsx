@@ -362,7 +362,7 @@ export default function AISideDrawer({
         bg-background/95 backdrop-blur-md transform-gpu transition-[transform,opacity] duration-300 ease-out
         w-[440px] min-w-[420px] max-w-[460px]
         ${isOpen ? "translate-x-0 pointer-events-auto opacity-100" : "translate-x-full pointer-events-none opacity-0"}
-        fixed top-0 right-0 bottom-0 z-50 border-l border-border
+        fixed top-12 right-0 bottom-0 z-50 border-l border-border
         shadow-2xl will-change-transform flex flex-col
       `}
       data-testid="ai-side-drawer"
