@@ -233,9 +233,34 @@ router.post("/:id/add-to-library", authenticateJWT, async (req: AuthenticatedReq
   }
 });
 
+// GET /recent - Get the authenticated user's most recently created document.
+// IMPORTANT: This must be declared BEFORE the `/:id` handler below, otherwise
+// Express matches `recent` against `:id`, parseInt → NaN → DB error → 500
+// (which silently breaks the home page after every upload).
+router.get("/recent", authenticateJWT, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.userId!;
+    const docs = await storage.getUserDocuments({
+      userId,
+      status: "active",
+    });
+    if (!docs || docs.length === 0) {
+      return res.status(404).json({ error: "No recent documents" });
+    }
+    const recent = docs[0];
+    return res.json({ id: recent.id, title: recent.title });
+  } catch (error) {
+    console.error("Error fetching recent document:", error);
+    return res.status(500).json({ error: "Failed to fetch recent document" });
+  }
+});
+
 // GET /:id - Get a single document (public documents accessible without auth)
 router.get("/:id", optionalAuthenticateJWT, async (req: AuthenticatedRequest, res) => {
   const documentId = parseInt(req.params.id);
+  if (Number.isNaN(documentId)) {
+    return res.status(400).json({ error: "Invalid document id" });
+  }
 
   try {
     // Get user ID from authentication if available
