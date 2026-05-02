@@ -1455,6 +1455,40 @@ export class DatabaseStorage implements IStorage {
           String((changes as any).targetEdited).trim().length > 0 &&
           String((changes as any).targetEdited) !== String(priorTargetEdited ?? '')
         ) {
+          // Seed AI baseline first if history is empty and a prior AI target exists
+          const existingHistory = await db
+            .select({ id: sentenceTranslationHistory.id })
+            .from(sentenceTranslationHistory)
+            .where(eq(sentenceTranslationHistory.sentenceId, id))
+            .limit(1);
+          if (
+            existingHistory.length === 0 &&
+            priorTarget &&
+            String(priorTarget).trim().length > 0 &&
+            String(priorTarget) !== String((changes as any).targetEdited)
+          ) {
+            await this.addSentenceTranslationHistory({
+              sentenceId: id,
+              type: 'ai',
+              translation: String(priorTarget),
+              version: await this.getNextHistoryVersion(id),
+            });
+          }
+          // Also seed prior user edit if it existed and was never logged
+          if (
+            existingHistory.length === 0 &&
+            priorTargetEdited &&
+            String(priorTargetEdited).trim().length > 0 &&
+            String(priorTargetEdited) !== String(priorTarget ?? '') &&
+            String(priorTargetEdited) !== String((changes as any).targetEdited)
+          ) {
+            await this.addSentenceTranslationHistory({
+              sentenceId: id,
+              type: 'user',
+              translation: String(priorTargetEdited),
+              version: await this.getNextHistoryVersion(id),
+            });
+          }
           await this.addSentenceTranslationHistory({
             sentenceId: id,
             type: 'user',
@@ -1481,43 +1515,68 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSentenceTranslationHistory(sentenceId: number): Promise<SentenceTranslationHistory[]> {
-    // Backfill: if a translation exists but no history rows, seed from current state
     const existing = await db
       .select()
       .from(sentenceTranslationHistory)
       .where(eq(sentenceTranslationHistory.sentenceId, sentenceId))
       .orderBy(desc(sentenceTranslationHistory.version));
 
+    const sentence = await this.getSentenceById(sentenceId);
+    if (!sentence) return existing;
+
+    const aiText = sentence.target?.trim();
+    const editedText = sentence.targetEdited?.trim();
+    let needsRefetch = false;
+
+    // Case 1: no history at all — seed from current state
     if (existing.length === 0) {
-      const sentence = await this.getSentenceById(sentenceId);
-      if (sentence) {
-        const aiText = sentence.target?.trim();
-        const editedText = sentence.targetEdited?.trim();
-        let nextVersion = 1;
-        if (aiText) {
+      let nextVersion = 1;
+      if (aiText) {
+        await this.addSentenceTranslationHistory({
+          sentenceId,
+          type: 'ai',
+          translation: sentence.target!,
+          version: nextVersion++,
+        });
+        needsRefetch = true;
+      }
+      if (editedText && editedText !== aiText) {
+        await this.addSentenceTranslationHistory({
+          sentenceId,
+          type: 'user',
+          translation: sentence.targetEdited!,
+          version: nextVersion++,
+        });
+        needsRefetch = true;
+      }
+    } else {
+      // Case 2: history exists but AI baseline never recorded — insert as version 0
+      const hasAi = existing.some(h => h.type === 'ai');
+      const aiAlreadyLogged = aiText
+        ? existing.some(h => h.translation === sentence.target)
+        : false;
+      if (aiText && !hasAi && !aiAlreadyLogged) {
+        const minVersion = Math.min(...existing.map(h => h.version));
+        try {
           await this.addSentenceTranslationHistory({
             sentenceId,
             type: 'ai',
             translation: sentence.target!,
-            version: nextVersion++,
+            version: minVersion - 1,
           });
-        }
-        if (editedText && editedText !== aiText) {
-          await this.addSentenceTranslationHistory({
-            sentenceId,
-            type: 'user',
-            translation: sentence.targetEdited!,
-            version: nextVersion++,
-          });
-        }
-        if (nextVersion > 1) {
-          return await db
-            .select()
-            .from(sentenceTranslationHistory)
-            .where(eq(sentenceTranslationHistory.sentenceId, sentenceId))
-            .orderBy(desc(sentenceTranslationHistory.version));
+          needsRefetch = true;
+        } catch (e) {
+          console.error('[getSentenceTranslationHistory] Failed to backfill AI baseline:', e);
         }
       }
+    }
+
+    if (needsRefetch) {
+      return await db
+        .select()
+        .from(sentenceTranslationHistory)
+        .where(eq(sentenceTranslationHistory.sentenceId, sentenceId))
+        .orderBy(desc(sentenceTranslationHistory.version));
     }
 
     return existing;
