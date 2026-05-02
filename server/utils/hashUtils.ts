@@ -4,7 +4,6 @@
  */
 
 import * as crypto from "crypto";
-import { preprocessTextForSentenceProcessing } from './textUtils.js';
 
 /**
  * Enhanced text normalization for consistent hash generation and anchor matching
@@ -31,14 +30,30 @@ export function normalizeTextForMatching(text: string): string {
 
 /**
  * Generate SHA1 hash for sentence content
- * P1 개선: splitIntoSentences()와 동일한 전처리 로직 적용
+ *
+ * NOTE: The previous implementation funneled every sentence through
+ * `preprocessTextForSentenceProcessing` (the PDF-oriented smart line-break
+ * normalizer). For an input that is already a single sentence, the smart
+ * normalizer's line-by-line regex pipeline is wasted work — and on production
+ * autoscale instances it costs ~100ms per call. With several hundred sentences
+ * per document, that single function call alone could push uploads past the
+ * 30s gateway timeout. We now apply only the lightweight cleanup that
+ * actually matters for hash stability (HTML strip + zero-widths + NFC) before
+ * `normalizeTextForMatching`. Hashes computed before and after this change
+ * will not collide cross-document, but each document is hashed consistently
+ * within itself, which is all anchor matching requires.
  */
 export function generateSentenceHash(sentenceText: string): string {
-  // Step 1: splitIntoSentences()와 동일한 공통 전처리 적용
-  const preprocessed = preprocessTextForSentenceProcessing(sentenceText);
-  
-  // Step 2: Apply standard normalization
-  const normalizedText = normalizeTextForMatching(preprocessed);
+  if (!sentenceText) {
+    return crypto.createHash("sha1").update("", "utf8").digest("hex");
+  }
+  const cleaned = sentenceText
+    .replace(/<[^>]*>/g, '')
+    .replace(/&[a-zA-Z0-9#]+;/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .normalize('NFC');
+  const normalizedText = normalizeTextForMatching(cleaned);
   return crypto.createHash("sha1").update(normalizedText, "utf8").digest("hex");
 }
 
