@@ -37,6 +37,9 @@ Recent PDF pipeline improvements (Feb 2026):
 - **Table/list cluster heading protection**: postProcessBlocksStructural now blocks heading promotion for single-word blocks and blocks surrounded by 3+ nearby short blocks (table cell / summary table patterns).
 - **arxiv profile paragraph segmentation**: Dedicated `arxiv` branch in shouldEndParagraphSimplified with page-boundary tolerance (allows sentence continuation across pages, unlike strict journal mode).
 
+Text upload pipeline (May 2026):
+- `DocumentService.createFromText` builds structured blocks **directly** from the paragraphs/sentences it just inserted into the DB (one block per paragraph, anchor IDs taken from the inserted sentence rows). It no longer calls `generateStructuredBlocks` + `attachAnchorsToStructuredContent` for plain text uploads. This removes the heavy CJK-unfriendly re-parse + hash/similarity matching that caused Korean .txt uploads (e.g. "최애의 아이", ~24KB) to hang and trip the autoscale proxy timeout in production. Other paths (HTML/PDF / `createDocumentWithPSAndStructure*`) still use the full structured-parse pipeline.
+
 Performance optimizations (Feb 2026):
 - **Legacy thumbnail queue disabled**: Removed `thumbnailQueue.addJob()` calls from rssCrawler.ts and arxivCrawler.ts to eliminate unnecessary CPU/storage usage from background image processing.
 - **Image proxy bypass**: `getProxiedImageUrl` in SegmentViewer.tsx now returns original URLs directly, bypassing the server-side image proxy for faster CDN-direct loading.

@@ -100,14 +100,7 @@ export class DocumentService {
       paragraphs: paragraphsData,
     });
 
-    // Step 2: Generate structured blocks from content (anchor-free)
-    const structuredBlocks = await generateStructuredBlocks(
-      content,
-      "text",
-      "Upload",
-    );
-
-    // Step 3: Load committed document with paragraph/sentence IDs for anchor attachment
+    // Step 2: Load committed document with paragraph/sentence IDs
     const documentWithData = await storage.getDocumentWithParagraphs(
       document.id,
     );
@@ -115,13 +108,46 @@ export class DocumentService {
       throw new Error("Failed to load document after creation");
     }
 
-    // Step 4: Attach anchors using committed DB IDs
-    const blocksWithAnchors = await attachAnchorsToStructuredContent(
-      structuredBlocks,
-      documentWithData,
-    );
+    // Step 3: Build structured blocks directly from already-split paragraphs.
+    // For plain text uploads, the paragraph split (\n\s*\n) IS the structure —
+    // there is no need to re-parse the content with generateStructuredBlocks
+    // and then run heavy hash/similarity matching to recover anchors. This
+    // direct mapping is O(n), avoids the slow CJK code path in the structured
+    // parser, and guarantees anchors are attached for every paragraph.
+    const blocksWithAnchors: StructuredBlockWithAnchor[] = (
+      documentWithData.paragraphs || []
+    ).map((p: any, idx: number) => {
+      const sentences = (p.sentences || []) as Array<{
+        id: number;
+        order: number;
+        source: string;
+      }>;
+      const content = sentences.map((s) => s.source).join(" ");
+      const startId = sentences.length > 0 ? sentences[0].id : 0;
+      const endId =
+        sentences.length > 0 ? sentences[sentences.length - 1].id : 0;
+      const block: StructuredBlockWithAnchor = {
+        type: "paragraph",
+        order: idx + 1,
+        content,
+        sentences: sentences.map((s) => ({
+          id: String(s.id),
+          text: s.source,
+          order: s.order,
+        })),
+      };
+      if (sentences.length > 0) {
+        block.anchor = {
+          sentenceStartId: startId,
+          sentenceEndId: endId,
+          matchedSentenceCount: sentences.length,
+          blockSentenceCount: sentences.length,
+        };
+      }
+      return block;
+    });
 
-    // Step 5: Save structured content and metadata to document
+    // Step 4: Save structured content and metadata to document
     await storage.updateDocument(document.id, {
       structuredContent: JSON.stringify(blocksWithAnchors),
       structuredVersion: 2,
@@ -131,7 +157,7 @@ export class DocumentService {
     });
 
     console.log(
-      `[createFromText] ✅ Document ${document.id} created with ${blocksWithAnchors.length} structured blocks`,
+      `[createFromText] ✅ Document ${document.id} created with ${blocksWithAnchors.length} structured blocks (direct paragraph mapping)`,
     );
 
     return document;

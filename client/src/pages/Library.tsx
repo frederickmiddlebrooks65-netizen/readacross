@@ -347,9 +347,10 @@ export default function Library() {
     content: string,
     sourceLanguage: string,
   ) => {
+    const token = localStorage.getItem('accessToken');
+    let response: Response;
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch("/api/documents/create-from-text", {
+      response = await fetch("/api/documents/create-from-text", {
         method: "POST",
         headers: {
           'Content-Type': 'application/json',
@@ -361,31 +362,40 @@ export default function Library() {
           sourceLanguage,
         }),
       });
-
-      if (response.ok) {
-        toast({ title: t('library.documentAdded') });
-        setIsModalOpen(false);
-        queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
-      } else {
-        const errorData = await response.json();
-        if (errorData.errorCode === "UPLOAD_LIMIT_REACHED") {
-          const err = new Error(errorData.error);
-          (err as any).errorCode = "UPLOAD_LIMIT_REACHED";
-          throw err;
-        }
-        throw new Error(errorData.error || t('library.addDocumentFailed'));
-      }
-    } catch (error) {
-      if ((error as any)?.errorCode === "UPLOAD_LIMIT_REACHED") {
-        throw error;
-      }
-      toast({
-        title: t('library.addDocumentError'),
-        description: error instanceof Error ? error.message : t('library.pleaseRetry'),
-        variant: "destructive",
-      });
+    } catch (networkError) {
+      throw new Error(
+        networkError instanceof Error
+          ? networkError.message
+          : t('library.addDocumentFailed')
+      );
     }
-  }, [toast, queryClient]); // Added dependencies
+
+    if (response.ok) {
+      toast({ title: t('library.documentAdded') });
+      setIsModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+      return;
+    }
+
+    const errorData = await response.json().catch(() => ({} as any));
+
+    if (errorData?.errorCode === "UPLOAD_LIMIT_REACHED") {
+      const err = new Error(errorData.error || t('library.addDocumentFailed'));
+      (err as any).errorCode = "UPLOAD_LIMIT_REACHED";
+      throw err;
+    }
+
+    const fallbackByStatus =
+      response.status === 504 || response.status === 408
+        ? t('library.uploadTimeout', { defaultValue: '문서 처리 시간이 너무 오래 걸려 서버가 요청을 종료했어요. 더 짧은 본문으로 다시 시도해 주세요.' })
+        : response.status >= 500
+          ? t('library.serverError', { defaultValue: '서버에서 문서를 처리하지 못했어요. 잠시 후 다시 시도해 주세요.' })
+          : t('library.addDocumentFailed');
+
+    throw new Error(
+      errorData?.error || errorData?.message || fallbackByStatus
+    );
+  }, [toast, queryClient, t]);
 
   // RSS Feed Handlers
   const handleAddRSSFeed = useCallback(async () => {
